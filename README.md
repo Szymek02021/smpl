@@ -32,7 +32,24 @@ Dzięki temu repozytorium możesz wygodnie edytować portal z **dowolnego komput
 
 ---
 
-## Wrzucanie aktualizacji na serwer Hostido.pl (BEZ utraty bazy graczy!)
+## Automatyczne wdrażanie na Hostido.pl (GitHub Actions — 1 kliknięcie!)
+
+Repozytorium ma wbudowany workflow [`.github/workflows/deploy-hostido.yml`](.github/workflows/deploy-hostido.yml), który po każdym **Push na gałąź `main`**:
+1. Automatycznie uruchamia testy składni PHP (`php -l`), JavaScript (`node --check`), JSON oraz audyt wycieku sekretów.
+2. Jeśli testy przejdą w 100%, łączy się przez szyfrowany **FTPS** z Hostido.pl i wysyła **wyłącznie zmienione pliki kodu i grafik** (`api.php`, `*.html`, `js/`, `css/`, `img/`, `sw.js`, `manifest.json`, `.htaccess`, `.user.ini`).
+3. **NIGDY nie rusza** folderu `data/` (żywej bazy graczy, snapshotów i sekretów) ani `.well-known/` (certyfikatu SSL).
+
+**Jednorazowa konfiguracja (3 minuty):**
+1. W DirectAdmin (Hostido.pl) → **Zarządzanie FTP** utwórz osobne konto FTP (np. `deploy@twojadomena.pl`) przypięte do `public_html`.
+2. Na GitHub.com w repo `smpl` → **Settings → Secrets and variables → Actions → New repository secret** dodaj:
+   - `FTP_SERVER` — adres serwera FTP z Hostido (np. `sXX.hostido.net.pl`)
+   - `FTP_USERNAME` — login konta FTP (np. `deploy@twojadomena.pl`)
+   - `FTP_PASSWORD` — hasło tego konta FTP
+   - *(opcjonalnie)* `FTP_SERVER_DIR` — ścieżka docelowa, jeśli konto FTP nie startuje bezpośrednio w `public_html` (domyślnie `./`)
+
+---
+
+## Ręczne wrzucanie aktualizacji na serwer Hostido.pl (opcja awaryjna ZIP)
 
 1. Uruchom w terminalu:
    ```powershell

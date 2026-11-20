@@ -1,0 +1,153 @@
+name: SMPL — Weryfikacja i Auto-Deploy na Hostido.pl
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Nigdy nie uruchamiaj dwoch wdrozen rownoczesnie
+concurrency:
+  group: smpl-hostido-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 1. Testy PHP, JS, JSON i Bezpieczenstwa
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz kod z repozytorium
+        uses: actions/checkout@v4
+
+      - name: Sprawdz skladnie PHP (php -l)
+        run: |
+          php -v
+          for f in *.php; do
+            [ -f "$f" ] || continue
+            echo "Checking $f..."
+            php -l "$f"
+          done
+
+      - name: Sprawdz skladnie JavaScript (node --check)
+        run: |
+          node -v
+          for f in sw.js server.js js/*.js; do
+            [ -f "$f" ] || continue
+            echo "Checking $f..."
+            node --check "$f"
+          done
+
+      - name: Sprawdz poprawnosc JSON (manifest.json, package.json)
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('manifest.json OK');"
+          node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package.json OK');"
+
+      - name: Audyt bezpieczenstwa (zero wyciekow bazy i sekretow)
+        run: |
+          LEAKS=$(git ls-files | grep -E '^(data/(smpl-db|\.smpl-|snapshots/|audit\.log))|(\.(zip|mp4|env))$' || true)
+          if [ -n "$LEAKS" ]; then
+            echo "::error::WYKRYTO WRAZLIWE PLIKI W REPOZYTORIUM: $LEAKS"
+            exit 1
+          fi
+          echo "Audyt bezpieczenstwa OK — 0 wrazliwych plikow w repo."
+
+  deploy:
+    name: 2. Auto-Deploy na Hostido.pl (FTPS — BEZ folderu data/)
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz kod z repozytorium
+        uses: actions/checkout@v4
+
+      - name: Sprawdz czy sekrety FTP sa skonfigurowane
+        id: secrets_check
+        env:
+          S_SERVER: ${{ secrets.FTP_SERVER }}
+          S_USER: ${{ secrets.FTP_USERNAME }}
+          S_PASS: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          if [ -n "$S_SERVER" ] && [ -n "$S_USER" ] && [ -n "$S_PASS" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Sekrety FTP wykryte — uruchamiam bezpieczny deploy na Hostido.pl."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Auto-Deploy czeka na konfiguracje! Dodaj sekrety FTP_SERVER, FTP_USERNAME i FTP_PASSWORD w Settings -> Secrets and variables -> Actions."
+          fi
+
+      - name: Znormalizuj sciezke docelowa na serwerze
+        id: remote_dir
+        if: steps.secrets_check.outputs.configured == 'true'
+        env:
+          RAW_DIR: ${{ secrets.FTP_SERVER_DIR }}
+        run: |
+          DIR="${RAW_DIR:-./}"
+          case "$DIR" in
+            */) ;;
+            *) DIR="${DIR}/" ;;
+          esac
+          echo "path=$DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Przygotuj czysta paczke produkcyjna (biala lista — 0 plikow z data/)
+        if: steps.secrets_check.outputs.configured == 'true'
+        run: |
+          mkdir -p deploy-staging
+          for f in \
+            .htaccess \
+            .user.ini \
+            api.php \
+            manifest.json \
+            sw.js \
+            favicon.ico \
+            index.html \
+            MASTER-SZYMON-KOMENDA.html \
+            PANEL-ADMINA.html \
+            REJESTRACJA.html \
+            REGULAMIN-I-POLITYKA-SMPL.md
+          do
+            if [ -f "$f" ]; then
+              cp "$f" "deploy-staging/$f"
+            fi
+          done
+
+          for d in css js img; do
+            if [ -d "$d" ]; then
+              cp -R "$d" "deploy-staging/$d"
+            fi
+          done
+
+          # Twarda blokada bezpieczenstwa przed wysylka
+          if [ -e "deploy-staging/data" ]; then
+            echo "::error::BLAD KRYTYCZNY: Folder data/ nie moze znalezc sie w paczce deploy!"
+            exit 1
+          fi
+          COUNT=$(find deploy-staging -type f | wc -l)
+          echo "Gotowych plikow produkcyjnych do synchronizacji: $COUNT"
+
+      - name: Wyslij zmienione pliki na Hostido.pl (FTPS)
+        if: steps.secrets_check.outputs.configured == 'true'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          security: loose
+          local-dir: ./deploy-staging/
+          server-dir: ${{ steps.remote_dir.outputs.path }}
+          dangerous-clean-slate: false
+          timeout: 60000
+          exclude: |
+            **/.git*
+            **/.git*/**
+            data/**
+            data/*
+            .well-known/**
+            cgi-bin/**
+            stats/**
+            error_log
+            **/Thumbs.db
+            **/.DS_Store

@@ -12,7 +12,9 @@
    - Anti-Trophy/History Wipe Guard (chroni trofea i `historicalStats` przed przypadkowym wyzerowaniem).
    - Server-side DM base64 avatar deduplication (nie zapisuj ciężkich base64 avatarów w każdej wiadomości DM).
    - Wyłączny zapis ustawień sekcji Wsparcia (`portalSettings.supportConfig` / Donate) oraz ról `MASTER_ADMIN` tylko dla Master Admina (blokada `403` dla `CO_ADMIN` i gości).
-3. **Bezpieczne aktualizacje na Hostido:** Do codziennych aktualizacji używaj WYŁĄCZNIE paczki bez folderu `data/` (`npm run build:zip` → `PACZKA-AKTUALIZACJA-BEZ-BAZY.zip`), żeby nie nadpisać żywej bazy graczy i sekretów serwera!
+3. **Bezpieczne aktualizacje na Hostido:**
+   - **Auto-Deploy (GitHub Actions):** Workflow `.github/workflows/deploy-hostido.yml` automatycznie weryfikuje kod (`php -l` + `node --check`) i synchronizuje wyłącznie białą listę plików produkcyjnych po FTPS po każdym `push` na `main` (z twardym wykluczeniem `data/**` i `.well-known/**`).
+   - **Paczka ręczna (awaryjna):** `npm run build:zip` buduje `PACZKA-AKTUALIZACJA-BEZ-BAZY.zip` (0 plików z `data/`), aby nigdy nie nadpisać żywej bazy graczy i sekretów serwera!
 
 ## 3. Obowiązkowy Changelog po Każdej Zmianie
 1. **Zakładka dla Graczy (`🆕 Update V...`)**: Po każdej zmianie funkcji, poprawce błędu lub przebudowie UI **ZAWSZE** dopisz nowy wpis na początku tablicy `BUILTIN_PLAYER_UPDATES` w `js/expansion-studio.js` (kolejny numer `V...`, data `YYYY-MM-DD`, kategoria `NOWOŚCI` / `ULEPSZENIA` / `TURNIEJE` / `POPRAWKI`, zwięzły tytuł, opis i lista `highlights`).

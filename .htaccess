@@ -19,7 +19,7 @@ ErrorDocument 404 /index.html
   </IfModule>
 </FilesMatch>
 
-<FilesMatch "^(package\.json|server\.js|server\.ps1|netlify\.toml|vercel\.json)$">
+<FilesMatch "^(package\.json|server\.js|server\.ps1|netlify\.toml|vercel\.json|\.ftp-deploy-sync-state\.json|\.user\.ini|\.env.*|\.git.*|\.editorconfig)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
