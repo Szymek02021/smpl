@@ -378,6 +378,75 @@ window.SMPL_DB = (function () {
 
   let activeApiEndpoint = './api.php';
   let lastServerEtag = '';
+  let lastServerArchiveSnapshot = null;
+  const SERVER_ARCHIVE_TOP_KEYS = [
+    'historicalSeasons',
+    'allTimeRanking',
+    'generalRanking',
+    'fiveSeasonRanking',
+    'careerRanking',
+    'archiveRecalcVersion'
+  ];
+  const SERVER_ARCHIVE_PLAYER_KEYS = ['trophies', 'historicalStats', 'historicalArchiveName', 'playedBefore'];
+
+  function captureServerArchiveSnapshot(rawRemote) {
+    if (!rawRemote || typeof rawRemote !== 'object') return;
+    const fields = {};
+    let hasAny = false;
+    SERVER_ARCHIVE_TOP_KEYS.forEach((k) => {
+      if (Object.prototype.hasOwnProperty.call(rawRemote, k)) {
+        try {
+          fields[k] = JSON.parse(JSON.stringify(rawRemote[k]));
+          hasAny = true;
+        } catch (_eSnap) {}
+      }
+    });
+    const playersById = {};
+    if (Array.isArray(rawRemote.players)) {
+      rawRemote.players.forEach((p) => {
+        if (!p || !p.id) return;
+        const pSnap = {};
+        SERVER_ARCHIVE_PLAYER_KEYS.forEach((pk) => {
+          if (Object.prototype.hasOwnProperty.call(p, pk)) {
+            try {
+              pSnap[pk] = JSON.parse(JSON.stringify(p[pk]));
+            } catch (_ePSnap) {}
+          }
+        });
+        playersById[String(p.id)] = pSnap;
+      });
+    }
+    if (hasAny) {
+      lastServerArchiveSnapshot = { fields: fields, playersById: playersById };
+    }
+  }
+
+  function applyServerArchiveSnapshotForPublicWrite(wireObj) {
+    if (!wireObj || !lastServerArchiveSnapshot) return wireObj;
+    const snap = lastServerArchiveSnapshot;
+    if (snap.fields) {
+      Object.keys(snap.fields).forEach((k) => {
+        wireObj[k] = snap.fields[k];
+      });
+    }
+    if (snap.playersById && Array.isArray(wireObj.players)) {
+      wireObj.players = wireObj.players.map((p) => {
+        if (!p || !p.id) return p;
+        const pSnap = snap.playersById[String(p.id)];
+        if (!pSnap) return p;
+        const copyP = Object.assign({}, p);
+        SERVER_ARCHIVE_PLAYER_KEYS.forEach((pk) => {
+          if (Object.prototype.hasOwnProperty.call(pSnap, pk)) {
+            copyP[pk] = pSnap[pk];
+          } else {
+            delete copyP[pk];
+          }
+        });
+        return copyP;
+      });
+    }
+    return wireObj;
+  }
 
   function isHttpProtocol() {
     return !!(
@@ -496,9 +565,12 @@ window.SMPL_DB = (function () {
       }
       const hasExtra = extraWireFlags && typeof extraWireFlags === 'object' && Object.keys(extraWireFlags).length > 0;
       let payloadStr = '';
-      if (admToken || hasExtra) {
+      if (admToken || hasExtra || lastServerArchiveSnapshot) {
         try {
           const wireObj = Object.assign({}, state, hasExtra ? extraWireFlags : {}, admToken ? { _adminToken: admToken } : {});
+          if (!admToken && lastServerArchiveSnapshot) {
+            applyServerArchiveSnapshotForPublicWrite(wireObj);
+          }
           payloadStr = JSON.stringify(wireObj);
         } catch (e) {
           payloadStr = JSON.stringify(state);
@@ -519,6 +591,7 @@ window.SMPL_DB = (function () {
         .then((res) => {
           if (res && res.ok) {
             backendOnline = true;
+            if (admToken) captureServerArchiveSnapshot(state);
             doneWrite();
             return;
           }
@@ -629,6 +702,7 @@ window.SMPL_DB = (function () {
           }
 
           backendOnline = true;
+          captureServerArchiveSnapshot(remoteData);
           state = enrichFromArchive(remoteData);
           processIncomingPlayerNotifications(state, prevNotifIdsMap, prevPendingMatchIdsMap);
           seedSeenMessageIds(state);
@@ -1159,7 +1233,7 @@ window.SMPL_DB = (function () {
     const archData = window.SMPL_ARCHIVE_DATA;
     if (!archData) return { updatedPlayers: 0 };
 
-    const archVer = archData.ARCHIVE_RECALC_VERSION || '2026-11-15-S55-FULL-RECALC-V1';
+    const archVer = archData.ARCHIVE_RECALC_VERSION || '2026-11-20-S55-MIDSEASON-V2';
     const archSeasons = archData.HISTORICAL_SEASONS || [];
     const archGen = archData.GENERAL_RANKING || [];
     const arch5 = archData.FIVE_SEASON_RANKING || [];
@@ -1189,7 +1263,7 @@ window.SMPL_DB = (function () {
     }
 
     const extraFinished = (targetState.historicalSeasons || []).some(function (s) {
-      if (!s || Number(s.seasonNumber) <= 55 || !s.leagues) return false;
+      if (!s || s.inProgress === true || Number(s.seasonNumber) <= 55 || !s.leagues) return false;
       return Object.keys(s.leagues).some(function (lid) {
         return (s.leagues[lid] || []).some(function (r) { return Number(r && r.M) > 0; });
       });
@@ -1200,7 +1274,7 @@ window.SMPL_DB = (function () {
       targetState.careerRanking = computeArchiveRankingFromSeasons(targetState.historicalSeasons, 0, 9999, false);
       const finishedL1Nums = (targetState.historicalSeasons || [])
         .filter(function (s) {
-          return s && s.leagues && Array.isArray(s.leagues.L1) && s.leagues.L1.some(function (r) { return Number(r && r.M) > 0; });
+          return s && s.inProgress !== true && s.leagues && Array.isArray(s.leagues.L1) && s.leagues.L1.some(function (r) { return Number(r && r.M) > 0; });
         })
         .map(function (s) { return Number(s.seasonNumber || 0); })
         .sort(function (a, b) { return b - a; });
@@ -1685,7 +1759,8 @@ window.SMPL_DB = (function () {
               if (res.ok && data && data.ok) {
                 backendOnline = true;
                 if (data.state && Array.isArray(data.state.players)) {
-                  state = enrichFromArchive(data.state);
+                  captureServerArchiveSnapshot(data.state);
+state = enrichFromArchive(data.state);
                 }
                 const sNow = getSession();
                 if (op === 'join' && data.playerId && sNow) {
@@ -2099,7 +2174,8 @@ window.SMPL_DB = (function () {
               if (res.ok && data && data.ok) {
                 backendOnline = true;
                 if (data.state && Array.isArray(data.state.players)) {
-                  state = enrichFromArchive(data.state);
+                  captureServerArchiveSnapshot(data.state);
+state = enrichFromArchive(data.state);
                   try {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
                   } catch (e) {}
@@ -2936,6 +3012,7 @@ window.SMPL_DB = (function () {
     const plRegex = /[\u0105\u0107\u0119\u0142\u0144\u00F3\u015B\u017A\u017C\u0104\u0106\u0118\u0141\u0143\u00D3\u015A\u0179\u017B]/;
     (seasonsList || []).forEach(function (s) {
       if (!s || !s.leagues) return;
+      if (s.inProgress === true || /w\s+trakcie|przedsezon|p[o\u00F3][l\u0142]metek/i.test(String(s.yearLabel || ''))) return;
       const sn = Number(s.seasonNumber || 0);
       if (minSeason && sn < minSeason) return;
       if (maxSeason && sn > maxSeason) return;
@@ -3295,7 +3372,8 @@ window.SMPL_DB = (function () {
           if (res.ok && data && data.ok) {
             backendOnline = true;
             if (data.state && Array.isArray(data.state.players)) {
-              state = enrichFromArchive(data.state);
+              captureServerArchiveSnapshot(data.state);
+state = enrichFromArchive(data.state);
               try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
               } catch (e) {}
@@ -7713,7 +7791,8 @@ window.SMPL_DB = (function () {
   function restoreServerSnapshot(snapshotName) {
     return callAdminServerPost('snapshot_restore', { name: snapshotName }).then((data) => {
       if (data && data.ok && data.state && Array.isArray(data.state.players)) {
-        state = enrichFromArchive(data.state);
+        captureServerArchiveSnapshot(data.state);
+state = enrichFromArchive(data.state);
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
       }
       return data;

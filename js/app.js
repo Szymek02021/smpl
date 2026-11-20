@@ -7862,8 +7862,8 @@ window.SMPL_APP = (function () {
     } else if (mode === 'ARCHIVE_55') {
       activeTab = 'archive';
       archiveState.mode = 'SEASONS';
-      archiveState.seasonNumber = 54;
-      showToast('🏛️ Otwarto Tabele Archiwalne Sezonów (S1–S55).');
+      archiveState.seasonNumber = 55;
+      showToast('⏳ Otwarto tabelę Sezonu 55 (W trakcie — półmetek).');
     } else if (mode === 'ARCHIVE_ALL') {
       activeTab = 'archive';
       archiveState.mode = 'SEASONS';

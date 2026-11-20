@@ -627,6 +627,7 @@ window.SMPL_STUDIO = (function () {
           if (targets.indexOf(foldName(row.name)) >= 0) {
             found = {
               seasonNumber: Number(seas.seasonNumber || 0),
+              inProgress: Boolean(seas.inProgress),
               yearLabel: seas.yearLabel || ('S' + seas.seasonNumber),
               leagueId: lKey,
               pos: Number(row.pos || (ri + 1)),
@@ -685,7 +686,7 @@ window.SMPL_STUDIO = (function () {
     var l3H = (15 / 49) * plotH;
 
     var dotsSvg = coords.map(function (c) {
-      var tip = 'Sezon ' + c.pt.seasonNumber + ' (' + c.pt.leagueId + '): #' + c.pt.pos + ' • ' + c.pt.PKT + ' pkt (' + c.pt.W + 'W-' + c.pt.R + 'R-' + c.pt.P + 'P)';
+      var tip = 'Sezon ' + c.pt.seasonNumber + (c.pt.inProgress ? ' (półmetek)' : '') + ' (' + c.pt.leagueId + '): #' + c.pt.pos + ' • ' + c.pt.PKT + ' pkt (' + c.pt.W + 'W-' + c.pt.R + 'R-' + c.pt.P + 'P)';
       return '<circle cx="' + c.x + '" cy="' + c.y + '" r="' + (coords.length > 25 ? 3.5 : 4.8) + '" fill="' + c.color + '" stroke="#0f172a" stroke-width="1.5"><title>' + escHtml(tip) + '</title></circle>';
     }).join('');
 
@@ -730,7 +731,7 @@ window.SMPL_STUDIO = (function () {
 
     trajB.points.forEach(function (pb) {
       var pa = mapA[pb.seasonNumber];
-      if (!pa) return;
+      if (!pa || pa.inProgress || pb.inProgress) return;
       var lA = Number(String(pa.leagueId || 'L1').replace(/\D/g, '')) || 1;
       var lB = Number(String(pb.leagueId || 'L1').replace(/\D/g, '')) || 1;
       var sameLg = pa.leagueId === pb.leagueId;
@@ -768,6 +769,7 @@ window.SMPL_STUDIO = (function () {
     var allRows = [];
     arch.HISTORICAL_SEASONS.forEach(function (seas) {
       if (!seas || !seas.leagues) return;
+      if (seas.inProgress === true || /w\s+trakcie|przedsezon|p[o\u00F3][l\u0142]metek/i.test(String(seas.yearLabel || ''))) return;
       Object.keys(seas.leagues).forEach(function (lKey) {
         var rows = seas.leagues[lKey];
         if (!Array.isArray(rows)) return;
@@ -2917,6 +2919,22 @@ window.SMPL_STUDIO = (function () {
    * Uwaga: opisujemy wyłącznie funkcje i poprawki dla graczy (zero wewnętrznych detali serwera).
    */
   var BUILTIN_PLAYER_UPDATES = [
+    {
+      id: 'BUILTIN_V2_6',
+      version: 'V2.6',
+      date: '2026-11-20',
+      category: 'NOWOŚCI',
+      title: 'Sezon 55 (Półmetek) w Archiwum — Ekstraklasa i 2. Liga na Żywo!',
+      summary: 'Wgraliśmy aktualny stan rozgrywek z półmetka Sezonu 55 w Ekstraklasie (51,7% meczów) i 2. Lidze (60,4% meczów), aby wszyscy gracze mogli na bieżąco śledzić walkę o podium, awans i utrzymanie przed startem Sezonu 56.',
+      highlights: [
+        'Ekstraklasa S55 (124/240 meczów • 247 goli): na czele Krzysztof Dziubak (31 pkt w 14 M) przed Patrykiem Warzybokiem (31 pkt) i Michałem Wu (28 pkt, lider strzelców — 23 gole).',
+        '2. Liga S55 (110/182 meczów realnych • 195 goli): prowadzi Patryk Dzierża (47 pkt, 10 czystych kont i tylko 4 stracone bramki!) przed Tomaszem Fałatem (44 pkt, 28 goli) i Adrianem Balińskim (42 pkt).',
+        'Przycisk „⏳ Sezon 55 (Półmetek)” na górze portalu przenosi teraz od razu do aktualnej tabeli S55 z podsumowaniem czystych kont, króla strzelców i strefy spadkowej/awansu.',
+        'Bezpieczna ochrona historii: dopóki trwa Sezon 55, medale końcowe, Ranking Wszech Czasów, Kariery i Rekordy Sezonowe obejmują wyłącznie ukończone sezony (S1–S54) — po 30. kolejce S55 zostanie zamknięty i doliczony automatycznie.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
     {
       id: 'BUILTIN_V2_5',
       version: 'V2.5',

@@ -2697,6 +2697,7 @@ window.SMPL_VIEWS = (function () {
           seen[dedupeKey] = true;
           records.push({
             seasonNumber: s.seasonNumber,
+            inProgress: Boolean(s.inProgress),
             leagueId: lid,
             leagueLabel: ARCHIVE_LEAGUE_LABELS[lid] || lid,
             pos: match.pos,
@@ -2749,17 +2750,18 @@ window.SMPL_VIEWS = (function () {
             <tbody class="divide-y divide-white/5">
               ${recs
                 .map((rc) => {
-                  const posBadge =
-                    rc.pos === 1
-                      ? '<span class="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-black">👑 #1</span>'
-                      : rc.pos === 2
-                      ? '<span class="px-1.5 py-0.5 rounded bg-slate-300/20 text-slate-200 font-black">🥈 #2</span>'
-                      : rc.pos === 3
-                      ? '<span class="px-1.5 py-0.5 rounded bg-amber-700/25 text-amber-400 font-black">🥉 #3</span>'
-                      : '<span class="text-slate-300 font-bold">#' + rc.pos + '</span>';
+                  const posBadge = rc.inProgress
+                    ? '<span class="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-400/35 text-amber-300 font-bold">⏳ #' + rc.pos + '</span>'
+                    : rc.pos === 1
+                    ? '<span class="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-black">👑 #1</span>'
+                    : rc.pos === 2
+                    ? '<span class="px-1.5 py-0.5 rounded bg-slate-300/20 text-slate-200 font-black">🥈 #2</span>'
+                    : rc.pos === 3
+                    ? '<span class="px-1.5 py-0.5 rounded bg-amber-700/25 text-amber-400 font-black">🥉 #3</span>'
+                    : '<span class="text-slate-300 font-bold">#' + rc.pos + '</span>';
                   return `
                     <tr onclick="SMPL_APP.setArchiveMode('SEASONS'); SMPL_APP.setArchiveSeason(${rc.seasonNumber}); SMPL_APP.setArchiveLeague('${rc.leagueId}'); SMPL_APP.switchTab('archive');" class="hover:bg-white/5 cursor-pointer transition">
-                      <td class="py-2 px-2.5 font-display font-bold text-white">S${rc.seasonNumber}</td>
+                      <td class="py-2 px-2.5 font-display font-bold text-white">S${rc.seasonNumber}${rc.inProgress ? ' <span class="text-[9px] text-amber-300 font-semibold">(w trakcie)</span>' : ''}</td>
                       <td class="py-2 px-2 text-slate-300 font-semibold">${escapeHtml(rc.leagueId)}</td>
                       <td class="py-2 px-2 text-center">${posBadge}</td>
                       <td class="py-2 px-2 text-center text-slate-300">${rc.M}</td>
@@ -3155,7 +3157,7 @@ window.SMPL_VIEWS = (function () {
                         ? `<tr><td colspan="10" class="py-8 text-center text-slate-400 text-xs">Brak rozegranych meczów w archiwum dla tego gracza.</td></tr>`
                         : careerRecords.map((rc) => `
                             <tr onclick="SMPL_APP.setArchiveMode('SEASONS'); SMPL_APP.setArchiveSeason(${rc.seasonNumber}); SMPL_APP.setArchiveLeague('${rc.leagueId}');" class="hover:bg-white/5 cursor-pointer transition">
-                              <td class="py-2.5 pl-4 pr-2 font-display font-black text-amber-300">Sezon ${rc.seasonNumber}</td>
+                              <td class="py-2.5 pl-4 pr-2 font-display font-black text-amber-300">Sezon ${rc.seasonNumber}${rc.inProgress ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-400/35 text-[9px] text-amber-200 uppercase">W trakcie</span>' : ''}</td>
                               <td class="py-2.5 px-3 font-sans font-bold text-white">${escapeHtml(rc.leagueLabel)}</td>
                               <td class="py-2.5 px-2 text-center font-display font-bold ${rc.pos === 1 ? 'text-amber-300' : rc.pos <= 3 ? 'text-emerald-300' : 'text-white'}">#${rc.pos}</td>
                               <td class="py-2.5 px-2 text-center text-slate-300">${rc.M}</td>
@@ -3189,7 +3191,7 @@ window.SMPL_VIEWS = (function () {
                   <div class="flex items-center gap-2">
                     <span class="text-xs text-slate-400 font-bold">Szybki wybór:</span>
                     <select onchange="SMPL_APP.setArchiveSeason(Number(this.value))" class="px-3 py-1.5 rounded-xl bg-slate-950 border border-amber-400/50 text-xs text-white font-bold">
-                      ${seasonsList.map((s) => `<option value="${s.seasonNumber}" ${Number(selectedSeasonNum) === Number(s.seasonNumber) ? 'selected' : ''}>Sezon ${s.seasonNumber} (${Object.keys(s.leagues || {}).length} lig)</option>`).join('')}
+                      ${seasonsList.map((s) => `<option value="${s.seasonNumber}" ${Number(selectedSeasonNum) === Number(s.seasonNumber) ? 'selected' : ''}>Sezon ${s.seasonNumber}${s.inProgress ? ' (Półmetek)' : ''} (${Object.keys(s.leagues || {}).length} lig)</option>`).join('')}
                     </select>
                   </div>
                 </div>
@@ -3203,7 +3205,7 @@ window.SMPL_VIEWS = (function () {
                             ? 'btn-league'
                             : 'bg-slate-900 text-slate-300 border border-white/15 hover:bg-slate-800'
                         }">
-                          S${s.seasonNumber}
+                          S${s.seasonNumber}${s.inProgress ? ' ⏳' : ''}
                         </button>
                       `
                     )
@@ -3231,15 +3233,29 @@ window.SMPL_VIEWS = (function () {
                   ? `
                     <div class="glass-panel rounded-2xl overflow-hidden border border-white/10">
                       <div class="p-4 sm:px-6 border-b border-white/10 bg-slate-900/60 flex flex-wrap items-center justify-between gap-3">
-                        <div>
+                        <div class="space-y-1.5">
+                          ${
+                            activeSeasonObj.inProgress
+                              ? `<div class="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-[10px] sm:text-[11px] font-display font-bold uppercase tracking-wider text-amber-300">
+                                   <span>⏳ SEZON W TRAKCIE (PÓŁMETEK)</span>
+                                   <span class="text-slate-400">•</span>
+                                   <span class="text-emerald-300">Medale i Ranking All-Time naliczą się po 30. kolejce</span>
+                                 </div>`
+                              : ''
+                          }
                           <h3 class="font-display font-black text-lg text-white uppercase">
                             📚 ${escapeHtml(activeSeasonObj.yearLabel)} — ${escapeHtml(ARCHIVE_LEAGUE_LABELS[selectedLeague] || selectedLeague)}
                           </h3>
-                          <p class="text-xs text-slate-300 mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                            <span>Mistrz Ekstraklasy: <strong class="text-amber-300">${escapeHtml(activeSeasonObj.championL1 || '—')}</strong></span>
-                            ${activeSeasonObj.championL2 && activeSeasonObj.championL2 !== '—' ? `<span>• Mistrz 2. Ligi: <strong class="text-blue-300">${escapeHtml(activeSeasonObj.championL2)}</strong></span>` : ''}
-                            ${activeSeasonObj.championL3 && activeSeasonObj.championL3 !== '—' ? `<span>• Mistrz 3. Ligi: <strong class="text-emerald-300">${escapeHtml(activeSeasonObj.championL3)}</strong></span>` : ''}
+                          <p class="text-xs text-slate-300 flex flex-wrap gap-x-3 gap-y-1">
+                            <span>${activeSeasonObj.inProgress ? 'Lider Ekstraklasy' : 'Mistrz Ekstraklasy'}: <strong class="text-amber-300">${escapeHtml(activeSeasonObj.championL1 || '—')}</strong></span>
+                            ${activeSeasonObj.championL2 && activeSeasonObj.championL2 !== '—' ? `<span>• ${activeSeasonObj.inProgress ? 'Lider 2. Ligi' : 'Mistrz 2. Ligi'}: <strong class="text-blue-300">${escapeHtml(activeSeasonObj.championL2)}</strong></span>` : ''}
+                            ${activeSeasonObj.championL3 && activeSeasonObj.championL3 !== '—' ? `<span>• ${activeSeasonObj.inProgress ? 'Lider 3. Ligi' : 'Mistrz 3. Ligi'}: <strong class="text-emerald-300">${escapeHtml(activeSeasonObj.championL3)}</strong></span>` : ''}
                           </p>
+                          ${
+                            activeSeasonObj.progressSummary && activeSeasonObj.progressSummary[selectedLeague]
+                              ? `<p class="text-[11px] sm:text-xs text-emerald-300/95 font-medium pt-0.5">📊 ${escapeHtml(activeSeasonObj.progressSummary[selectedLeague])}</p>`
+                              : ''
+                          }
                         </div>
                         <span class="text-[11px] text-slate-400">Kliknij zawodnika, aby zobaczyć całą jego karierę (S1–S55)</span>
                       </div>
