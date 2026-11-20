@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, user-scalable=yes" />
+  <meta name="color-scheme" content="dark light" />
   <title>Score Match Liga — Rejestracja Konta Gracza</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=56" />
-  <link rel="stylesheet" href="css/smpl-wow-overhaul.css?v=56" />
+  <link rel="stylesheet" href="css/styles.css?v=57" />
+  <link rel="stylesheet" href="css/smpl-wow-overhaul.css?v=57" />
   <script>
     (function () {
       try {
@@ -34,7 +35,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="css/favicon-32x32.png?v=15" />
   <link rel="icon" type="image/png" sizes="16x16" href="css/favicon-16x16.png?v=15" />
   <link rel="apple-touch-icon" sizes="180x180" href="css/apple-touch-icon.png?v=15" />
-  <link rel="manifest" href="manifest.json?v=56" />
+  <link rel="manifest" href="manifest.json?v=57" />
   <meta name="theme-color" content="#0f172a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
@@ -90,32 +91,45 @@
 
   <header id="top-auth-bar" class="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-white/10"></header>
 
-  <div id="main-portal-container" class="relative z-10 max-w-7xl mx-auto px-3 sm:px-6 pt-5 pb-14">
-    <!-- Dedykowany Nagłówek Strony Rejestracji Gracza -->
-    <section class="reg-showcase-banner rounded-3xl p-5 sm:p-7 mb-6 border-2 border-emerald-400/50">
-      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <span class="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/50 font-display font-bold text-xs text-emerald-300 uppercase tracking-widest">
-            📝 OFICJALNA STRONA REJESTRACJI GRACZY — SCORE MATCH LIGA
-          </span>
-          <h1 class="font-display font-black text-2xl sm:text-4xl text-white uppercase mt-2">
-            Załóż Konto Gracza i Dołącz do Score Match Ligi
+  <div id="main-portal-container" class="relative z-10 max-w-7xl mx-auto px-3 sm:px-6 pt-4 pb-14">
+    <!-- Zunifikowany Królewski Nagłówek Strony Rejestracji Gracza (Wzorzec Studio Mistrzów) -->
+    <section class="hero-showcase-banner smpl-hero-reg rounded-3xl p-4 sm:p-6 mb-4 relative overflow-hidden">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5">
+        <div class="min-w-0 max-w-3xl">
+          <div class="inline-flex flex-wrap items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/45 font-display font-bold text-[10px] sm:text-[11px] text-emerald-300 uppercase tracking-wider">
+            <span class="smpl-live-beacon-dot flex-shrink-0"></span>
+            <span>REJESTRACJA GRACZY • SCORE MATCH LIGA</span>
+          </div>
+          <h1 class="font-display font-black text-xl sm:text-3xl text-white uppercase tracking-tight leading-tight mt-2">
+            Załóż Konto Gracza i <span class="text-league-primary">Dołącz do Ligi</span>
           </h1>
-          <p class="text-xs sm:text-sm text-slate-200 mt-1.5 max-w-3xl leading-relaxed">
-            Wypełnij poniższy formularz i ustaw swoje hasło. Jeśli grałeś już wcześniej w naszych rozgrywkach (sezony S1–S55), zaznacz opcję powracającego gracza i wybierz swoje nazwisko z listy, aby automatycznie połączyć karierę! Po rejestracji trafisz na <strong>Listę Oczekujących</strong>, a Administracja Score Match Ligi jednym kliknięciem dopisze Cię do ligi (Ekstraklasa / 2. Liga / 3. Liga).
+          <p class="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
+            Utwórz profil i ustaw prywatne hasło — powracający gracze (S1–S55) mogą jednym kliknięciem połączyć pełną karierę i trofea.
           </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2.5">
-          <a href="index.html" class="px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white border border-white/15 font-display font-bold text-xs uppercase tracking-wider">
-            🏆 Przejdź do Tabel i Portalu Głównego
+        <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+          <a href="index.html" class="btn-league px-4 py-2.5 rounded-xl font-display font-black text-xs uppercase tracking-wider shadow-lg">
+            🏆 Portal Główny i Tabele
           </a>
         </div>
       </div>
     </section>
 
-    <section id="league-selector-container" class="mb-6 hidden"></section>
-    <nav id="main-tabs-nav" class="mb-6 sticky top-[49px] z-30 bg-obsidian/85 backdrop-blur-xl py-2 px-2 rounded-2xl border border-white/10"></nav>
+    <section id="league-selector-container" class="mb-4 hidden"></section>
+    <nav id="main-tabs-nav" class="smpl-nav-bar mb-5 sticky top-[49px] z-30 bg-obsidian/85 backdrop-blur-xl py-2 px-2 rounded-2xl border border-white/10"></nav>
     <main id="app-main-view" class="min-h-[480px]"></main>
+
+    <footer class="smpl-unified-footer mt-10 pt-5 border-t border-white/10 text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+        <span class="font-display font-bold text-white">SCORE MATCH POLSKA</span>
+        <span>• Stronę przygotował <strong class="text-amber-300">Szymon Komenda</strong></span>
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-3.5">
+        <a href="index.html" class="text-amber-300 hover:text-white underline font-semibold">🏆 Portal Główny</a>
+        <button type="button" onclick="SMPL_APP.switchTab('support')" class="text-amber-200 hover:text-white underline font-semibold">☕ Wesprzyj Ligę</button>
+        <button type="button" onclick="SMPL_APP.switchTab('legal')" class="text-emerald-300 hover:text-white underline font-semibold">⚖️ Regulamin &amp; RODO</button>
+      </div>
+    </footer>
   </div>
 
   <div id="mobile-bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-white/15 px-2 py-1.5 grid grid-cols-6 gap-1 text-[10px] font-display font-bold"></div>
@@ -124,18 +138,18 @@
   <div id="smpl-notif-center-root"></div>
   <div id="toast-container" class="fixed top-16 right-4 flex flex-col gap-2 max-w-sm"></div>
 
-  <script src="js/crests-and-media.js"></script>
-  <script src="js/archive-data.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/expansion-studio.js?v=56"></script>
-  <script src="js/ranks.js?v=56"></script>
-  <script src="js/seed-data.js"></script>
-  <script src="js/api-client.js?v=56"></script>
-  <script src="js/ui-views.js?v=56"></script>
-  <script src="js/ui-forms-admin.js?v=56"></script>
-  <script src="js/notifications.js?v=56"></script>
-  <script src="js/ai-assistant.js?v=56"></script>
-  <script src="js/wow-overhaul.js?v=56"></script>
-  <script src="js/app.js?v=56"></script>
+  <script src="js/crests-and-media.js?v=57"></script>
+  <script src="js/archive-data.js?v=57"></script>
+  <script src="js/engine.js?v=57"></script>
+  <script src="js/expansion-studio.js?v=57"></script>
+  <script src="js/ranks.js?v=57"></script>
+  <script src="js/seed-data.js?v=57"></script>
+  <script src="js/api-client.js?v=57"></script>
+  <script src="js/ui-views.js?v=57"></script>
+  <script src="js/ui-forms-admin.js?v=57"></script>
+  <script src="js/notifications.js?v=57"></script>
+  <script src="js/ai-assistant.js?v=57"></script>
+  <script src="js/wow-overhaul.js?v=57"></script>
+  <script src="js/app.js?v=57"></script>
 </body>
 </html>

@@ -180,42 +180,42 @@
     var nextHome = nextSpot && nextSpot.match ? playersMap[nextSpot.match.homeId] : null;
     var nextAway = nextSpot && nextSpot.match ? playersMap[nextSpot.match.awayId] : null;
 
-    hudEl.className = 'wow-hero-hud-card space-y-2.5';
+    hudEl.className = 'wow-hero-hud-card space-y-2';
     hudEl.innerHTML =
       '<div class="flex items-center justify-between gap-1.5 text-[9px] sm:text-[10px] font-display font-bold uppercase whitespace-nowrap overflow-hidden">' +
       '  <span class="inline-flex items-center gap-1 text-emerald-300 whitespace-nowrap min-w-0 truncate">' +
       '    <span class="smpl-live-beacon-dot flex-shrink-0"></span>' +
-      '    <span class="truncate">STUDIO • ' + escHtml(lgObj.shortName || lgId) + ' • TYDZ. ' + curWeek + ' (K' + rStart + '–' + rEnd + ')</span>' +
+      '    <span class="truncate">STUDIO • ' + escHtml(lgObj.shortName || lgId) + ' • T' + curWeek + ' (K' + rStart + '–' + rEnd + ')</span>' +
       '  </span>' +
-      '  <span class="text-slate-300 font-mono-num whitespace-nowrap flex-shrink-0">' + playedCount + '/' + totalCount + ' meczów (' + pct + '%)' + (pendingCount > 0 ? ' • ⏳ ' + pendingCount : '') + '</span>' +
+      '  <span class="text-slate-300 font-mono-num whitespace-nowrap flex-shrink-0">' + playedCount + '/' + totalCount + ' (' + pct + '%)' + (pendingCount > 0 ? ' • ⏳' + pendingCount : '') + '</span>' +
       '</div>' +
       '<div class="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">' +
       '  <div class="h-full rounded-full transition-all duration-300" style="width:' + pct + '%;background:linear-gradient(90deg,var(--league-primary),var(--wow-accent-prism))"></div>' +
       '</div>' +
-      '<div class="grid grid-cols-2 gap-2 pt-0.5">' +
+      '<div class="grid grid-cols-2 gap-1.5 sm:gap-2 pt-0.5">' +
       (leader
-        ? '<button type="button" onclick="SMPL_APP.openPlayerProfileTab(\'' + escHtml(leader.playerId) + '\')" class="text-left p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition flex items-center gap-2.5 min-w-0">' +
-          (leader.avatar ? '<img src="' + escHtml(leader.avatar) + '" class="w-9 h-9 rounded-full object-cover border border-amber-400/70 flex-shrink-0" alt=""/>' : '<div class="w-9 h-9 rounded-full bg-amber-400/20 border border-amber-400/60 flex items-center justify-center flex-shrink-0">👑</div>') +
+        ? '<button type="button" onclick="SMPL_APP.openPlayerProfileTab(\'' + escHtml(leader.playerId) + '\')" class="wow-hud-mini-tile text-left p-2 sm:p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition flex items-center gap-2 min-w-0">' +
+          (leader.avatar ? '<img src="' + escHtml(leader.avatar) + '" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-amber-400/70 flex-shrink-0" alt=""/>' : '<div class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-amber-400/20 border border-amber-400/60 flex items-center justify-center flex-shrink-0">👑</div>') +
           '  <div class="min-w-0 flex-1">' +
-          '    <div class="text-[9px] font-display font-black uppercase text-amber-300 tracking-wider">👑 Lider Tabeli</div>' +
-          '    <div class="text-xs font-display font-bold text-white truncate">' + escHtml(leader.name) + '</div>' +
-          '    <div class="text-[10px] text-slate-300 font-mono-num">' + Number(leader.PKT || 0) + ' pkt • ' + Number(leader.W || 0) + '-' + Number(leader.R || 0) + '-' + Number(leader.P || 0) + '</div>' +
+          '    <div class="text-[9px] font-display font-black uppercase text-amber-300 tracking-wider truncate">👑 Lider</div>' +
+          '    <div class="text-[11px] sm:text-xs font-display font-bold text-white truncate">' + escHtml(leader.name) + '</div>' +
+          '    <div class="text-[10px] text-slate-300 font-mono-num truncate">' + Number(leader.PKT || 0) + ' pkt • ' + Number(leader.W || 0) + '-' + Number(leader.R || 0) + '-' + Number(leader.P || 0) + '</div>' +
           '  </div>' +
           '</button>'
-        : '<div class="p-2.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-slate-300">👑 Lider tabeli pojawi się po 1. meczu</div>') +
+        : '<div class="wow-hud-mini-tile p-2 sm:p-2.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-slate-300">👑 Lider po 1. meczu</div>') +
       (nextSpot && nextHome && nextAway
-        ? '<button type="button" onclick="SMPL_APP.switchTab(\'' + (nextSpot.isOwn ? 'submit' : 'schedule') + '\')" class="text-left p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition flex flex-col justify-center min-w-0">' +
+        ? '<button type="button" onclick="SMPL_APP.switchTab(\'' + (nextSpot.isOwn ? 'submit' : 'schedule') + '\')" class="wow-hud-mini-tile text-left p-2 sm:p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition flex flex-col justify-center min-w-0">' +
           '  <div class="flex items-center justify-between gap-1 text-[9px] font-display font-black uppercase tracking-wider ' + (nextSpot.isOwn ? 'text-emerald-300' : 'text-blue-300') + '">' +
-          '    <span>' + (nextSpot.isOwn ? '⚡ Twój Najbliższy Mecz' : '📅 Następny Mecz (K' + Number(nextSpot.match.round || 1) + ')') + '</span>' +
+          '    <span class="truncate">' + (nextSpot.isOwn ? '⚡ Twój Mecz' : '📅 Kolejka ' + Number(nextSpot.match.round || 1)) + '</span>' +
           '    <span>›</span>' +
           '  </div>' +
-          '  <div class="text-xs font-display font-bold text-white truncate mt-0.5">' + escHtml(nextHome.name) + ' <span class="text-amber-300">vs</span> ' + escHtml(nextAway.name) + '</div>' +
-          '  <div class="text-[10px] text-slate-300 truncate">' + (nextSpot.isOwn ? 'Kliknij, aby wpisać wynik po meczu' : 'Kliknij, aby otworzyć terminarz') + '</div>' +
+          '  <div class="text-[11px] sm:text-xs font-display font-bold text-white truncate mt-0.5">' + escHtml(nextHome.name) + ' <span class="text-amber-300">vs</span> ' + escHtml(nextAway.name) + '</div>' +
+          '  <div class="text-[10px] text-slate-300 truncate">' + (nextSpot.isOwn ? 'Wpisz wynik po meczu' : 'Otwórz terminarz') + '</div>' +
           '</button>'
-        : '<button type="button" onclick="SMPL_APP.switchTab(\'schedule\')" class="text-left p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition flex flex-col justify-center min-w-0">' +
-          '  <div class="text-[9px] font-display font-black uppercase text-blue-300">📅 Terminarz Sezonu</div>' +
-          '  <div class="text-xs font-bold text-white mt-0.5">Sprawdź kolejki i wyniki</div>' +
-          '  <div class="text-[10px] text-slate-300">' + (totalCount > 0 ? 'Wszystkie mecze rozegrane' : 'Wygeneruj terminarz w panelu') + '</div>' +
+        : '<button type="button" onclick="SMPL_APP.switchTab(\'schedule\')" class="wow-hud-mini-tile text-left p-2 sm:p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition flex flex-col justify-center min-w-0">' +
+          '  <div class="text-[9px] font-display font-black uppercase text-blue-300 truncate">📅 Terminarz</div>' +
+          '  <div class="text-[11px] sm:text-xs font-bold text-white truncate mt-0.5">Kolejki i wyniki</div>' +
+          '  <div class="text-[10px] text-slate-300 truncate">' + (totalCount > 0 ? 'Wszystkie rozegrane' : 'Czeka na generowanie') + '</div>' +
           '</button>') +
       '</div>';
   }

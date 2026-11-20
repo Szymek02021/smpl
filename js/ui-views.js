@@ -1032,28 +1032,28 @@ window.SMPL_VIEWS = (function () {
               <strong>Zasada SMPL:</strong> W każdej kolejce gramy od razu <strong class="text-emerald-300">pełny dwumecz (1 u siebie + 1 na wyjeździe w tej samej kolejce)</strong> do <strong class="text-white">max 2 bramek</strong> — wysyłacie oba wyniki + oba SS! Mecze z <strong class="text-emerald-400">WOLNYM LOSEM</strong> automatycznie liczą się jako <strong class="text-emerald-400">2:0 i 0:2 (+3 PKT za mecz)</strong>.
             </p>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="smpl-schedule-toolbar grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-nowrap items-stretch gap-2 flex-shrink-0">
             <input
               type="text"
               placeholder="🔍 Szukaj gracza..."
               value="${escapeHtml(filterState.search || '')}"
               oninput="SMPL_APP.setScheduleSearch(this.value)"
-              class="px-3 py-2 rounded-xl bg-slate-950/90 border border-white/15 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+              class="px-3 py-2 rounded-xl bg-slate-950/90 border border-white/15 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 min-w-[165px]"
             />
-            <select onchange="SMPL_APP.setScheduleStatus(this.value)" class="px-3 py-2 rounded-xl bg-slate-950/90 border border-white/15 text-xs text-white focus:outline-none">
+            <select onchange="SMPL_APP.setScheduleStatus(this.value)" class="px-3 py-2 rounded-xl bg-slate-950/90 border border-white/15 text-xs text-white focus:outline-none min-w-[165px]">
               <option value="ALL" ${statusFilter === 'ALL' ? 'selected' : ''}>Wszystkie statusy</option>
               <option value="APPROVED" ${statusFilter === 'APPROVED' ? 'selected' : ''}>✅ Rozegrane (Zatwierdzone)</option>
               <option value="PENDING" ${statusFilter === 'PENDING' ? 'selected' : ''}>⏳ Oczekujące na Admina</option>
               <option value="SCHEDULED" ${statusFilter === 'SCHEDULED' ? 'selected' : ''}>📅 Nierozegrane</option>
               <option value="WALKOVER" ${statusFilter === 'WALKOVER' ? 'selected' : ''}>⚠️ Walkowery (WO)</option>
             </select>
-            <button onclick="SMPL_APP.setScheduleRound('ALL')" class="px-3 py-2 rounded-xl text-xs font-bold border ${activeRound === 'ALL' && !activeWeek ? 'btn-league' : 'bg-slate-900 border-white/15 text-slate-300'}">
+            <button type="button" onclick="SMPL_APP.setScheduleRound('ALL')" class="px-3.5 py-2 rounded-xl text-xs font-bold border whitespace-nowrap ${activeRound === 'ALL' && !activeWeek ? 'btn-league' : 'bg-slate-900 border-white/15 text-slate-300'}">
               Wszystkie Kolejki
             </button>
             ${
               isAdmin && leagueMatches.length > 0
-                ? `<button onclick="SMPL_APP.adminClearSchedule('${leagueId}')" class="px-3 py-2 rounded-xl text-xs font-display font-bold uppercase bg-rose-950/60 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/40 transition" title="Wyzeruj całkowicie terminarz tej ligi do nowego wygenerowania">
-                     🗑️ Wyzeruj Terminarz
+                ? `<button type="button" onclick="SMPL_APP.adminClearSchedule('${leagueId}')" class="px-3 py-2 rounded-xl text-xs font-display font-bold uppercase whitespace-nowrap bg-rose-950/60 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/40 transition" title="Wyzeruj całkowicie terminarz tej ligi do nowego wygenerowania">
+                     🗑️ Wyzeruj
                    </button>`
                 : ''
             }
@@ -1063,13 +1063,13 @@ window.SMPL_VIEWS = (function () {
         <!-- Pasek wyboru Tygodnia (po 4 kolejki na tydzień) -->
         <div class="mb-3">
           <div class="text-[11px] font-display uppercase text-slate-400 font-bold mb-1.5">Filtruj wg Tygodnia Rozgrywkowego (4 kolejki / tydzień):</div>
-          <div class="flex items-center gap-1.5 overflow-x-auto pb-1.5">
+          <div class="smpl-hscroll-fade flex items-center gap-1.5 overflow-x-auto pb-1.5">
             ${weeksButtons.join('')}
           </div>
         </div>
 
         <!-- Pasek wyboru Kolejki 1-30 -->
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-2 pt-1">
+        <div class="smpl-hscroll-fade flex items-center gap-1.5 overflow-x-auto pb-2 pt-1">
           ${roundsButtons.join('')}
         </div>
       </div>
@@ -4877,11 +4877,11 @@ window.SMPL_VIEWS = (function () {
       <div class="competitions-showcase-banner rounded-3xl p-5 sm:p-7 mb-6">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div class="max-w-2xl">
-            <span class="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-display font-black text-xs uppercase tracking-widest">
-              🏟️ GALA & ROZGRYWKI PUCHAROWE SCORE MATCH LIGA (SEZON ${(state && state.season) || 56})
-            </span>
-            <h2 class="font-display font-black text-2xl sm:text-3xl text-white uppercase mt-2">
-              Konkursy Piłkarskie & Puchar Ligi SMPL
+            <div class="inline-flex flex-wrap items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-display font-black text-[10px] sm:text-xs uppercase tracking-wider max-w-full">
+              <span>🏟️ GALA &amp; PUCHARY SMPL • SEZON ${(state && state.season) || 56}</span>
+            </div>
+            <h2 class="font-display font-black text-xl sm:text-3xl text-white uppercase mt-2">
+              Konkursy Piłkarskie &amp; Puchar Ligi SMPL
             </h2>
             <p class="text-xs sm:text-sm text-slate-200 mt-1">
               Komplet prawdziwych futbolowych trofeów obok tabeli ligowej: <strong class="text-amber-300">Złoty But</strong>, <strong class="text-emerald-300">Puchar Ligi (Knockout)</strong>, <strong class="text-purple-300">Typer Kolejki</strong>, <strong class="text-blue-300">Nagroda Puskása</strong>, <strong class="text-amber-200">Klub Invincibles</strong>${clansOn ? `, <strong class="text-emerald-200">Fair Play</strong> oraz <strong class="text-white">Liga Mistrzów Klanów</strong>!` : ` oraz <strong class="text-emerald-200">Puchar Fair Play</strong>!`}

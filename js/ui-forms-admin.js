@@ -739,14 +739,14 @@ window.SMPL_FORMS_ADMIN = (function () {
       : enabledLeaguesReg;
 
     return `
-      <!-- BANER DEDYKOWANEGO LINKU DO REJESTRACJI GRACZY -->
-      <div class="reg-showcase-banner rounded-2xl p-4 sm:px-6 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <div class="text-xs font-display font-black uppercase text-emerald-300">
-            🔗 DEDYKOWANA STRONA REJESTRACJI DLA GRACZY (WRZUĆ LINK NA GRUPĘ FB / MESSENGER):
+      <!-- ZUNIFIKOWANY PASEK SZYBKIEGO LINKU DO REJESTRACJI -->
+      <div class="glass-panel smpl-reg-link-strip rounded-2xl px-4 py-3 sm:px-5 mb-4 border border-emerald-400/35 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+        <div class="min-w-0">
+          <div class="text-[11px] font-display font-black uppercase text-emerald-300 tracking-wide">
+            🔗 Bezpośredni link do rejestracji (FB / Messenger)
           </div>
-          <div class="text-xs text-slate-200 mt-0.5">
-            Gracze mogą rejestrować się tutaj lub pod bezpośrednim adresem: <code class="px-2 py-0.5 rounded bg-slate-950 text-amber-300 font-mono-num">REJESTRACJA.html</code> (lub <code class="px-2 py-0.5 rounded bg-slate-950 text-amber-300 font-mono-num">#rejestracja</code>). Po rejestracji Administracja <strong>jednym kliknięciem dopisuje im ligę oraz statystyki z poprzednich sezonów (S1–S55)!</strong>
+          <div class="text-xs text-slate-300 mt-0.5 leading-relaxed">
+            Wyślij znajomym <code class="px-1.5 py-0.5 rounded bg-slate-950/90 text-amber-300 font-mono-num">REJESTRACJA.html</code> — po zapisie Administracja 1 kliknięciem dopisuje ligę i pełną historię S1–S55.
           </div>
         </div>
         <button
@@ -754,16 +754,16 @@ window.SMPL_FORMS_ADMIN = (function () {
           onclick="SMPL_APP.copyRegistrationLink()"
           class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-display font-black text-xs uppercase tracking-wider flex-shrink-0 shadow-lg"
         >
-          📋 Kopiuj Link do Rejestracji
+          📋 Kopiuj Link
         </button>
       </div>
 
       <!-- GÓRNY PANEL: LOGOWANIE NA KONTO GRACZA + OPCJA PRZYPOMNIENIA HASŁA -->
-      <div class="glass-panel rounded-2xl p-5 sm:p-6 mb-6 border border-blue-500/35">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+      <div class="glass-panel rounded-2xl p-4 sm:p-6 mb-5 border border-blue-500/30">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
           <div class="lg:col-span-7">
-            <span class="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[11px] font-display font-bold uppercase tracking-wider">
-              👤 LOGOWANIE GRACZA • ZBIERANIE STATYSTYK &amp; TROFEÓW
+            <span class="inline-flex flex-wrap items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[10px] sm:text-[11px] font-display font-bold uppercase tracking-wider max-w-full">
+              👤 LOGOWANIE GRACZA • STATYSTYKI &amp; TROFEA
             </span>
             <h3 class="font-display font-black text-lg sm:text-xl text-white uppercase mt-1.5">
               Masz już konto w lidze? Zaloguj się lub przypomnij hasło
@@ -1214,33 +1214,37 @@ window.SMPL_FORMS_ADMIN = (function () {
   // =========================================================================
   // BRAMKA AUTORYZACJI ADMINISTRACJI (GDY KTOŚ MA LINK ADMINA, ALE NIE JEST ZALOGOWANY)
   // =========================================================================
-  function renderAdminLoginAndJoinGate(state) {
-    const pendingAdmins = (state.admins || []).filter((a) => a.status === 'PENDING');
+  function renderAdminLoginAndJoinGate(state, session) {
+    const isMasterGate =
+      (session && session.linkMode === 'MASTER') ||
+      (typeof window !== 'undefined' && window.SMPL_FORCED_MODE === 'MASTER');
 
     return `
-      <div class="w-full max-w-5xl mx-auto glass-panel-league rounded-3xl p-5 sm:p-8 my-6 border-2 border-amber-500/40 shadow-2xl">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-white/10">
-          <span class="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 font-display font-bold text-xs uppercase tracking-widest">
-            🔒 STREFA ADMINISTRACJI — WYMAGANA AUTORYZACJA
+      <div class="w-full max-w-5xl mx-auto glass-panel-league smpl-admin-gate-card rounded-3xl p-4 sm:p-7 my-4 sm:my-6 border-2 ${isMasterGate ? 'border-amber-400/60' : 'border-amber-500/40'} shadow-2xl">
+        <div class="flex flex-wrap items-center justify-between gap-2.5 mb-5 pb-3.5 border-b border-white/10">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full ${isMasterGate ? 'bg-amber-400/20 border border-amber-400/60 text-amber-200' : 'bg-blue-500/20 border border-blue-400/50 text-blue-200'} font-display font-bold text-[10px] sm:text-xs uppercase tracking-wider max-w-full">
+            ${isMasterGate ? '👑 KONSOLA ZAŁOŻYCIELA — MASTER ADMIN SMPL' : '🛡️ STREFA ADMINISTRACJI — WYMAGANA AUTORYZACJA'}
           </span>
           <button
             type="button"
             onclick="SMPL_APP.exitAdminGateToPublic()"
-            class="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/15 text-xs font-display font-bold uppercase transition"
+            class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/15 text-xs font-display font-bold uppercase transition"
           >
             ← Wróć na stronę główną
           </button>
         </div>
 
-        <div class="max-w-3xl mx-auto text-center mb-7">
-          <div class="smpl-auth-crest-stage mb-4">
+        <div class="max-w-3xl mx-auto text-center mb-5 sm:mb-6">
+          <div class="smpl-auth-crest-stage mb-3">
             <img src="css/icon-192.png" class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover border border-amber-400/70 shadow-xl crest-float" alt="Score Match Liga"/>
           </div>
-          <h2 class="font-display font-black text-2xl sm:text-3xl text-white uppercase">
-            Logowanie do Panelu Administratora
-          </h2>
-          <p class="text-xs sm:text-sm text-slate-300 mt-2">
-            Dostęp do panelu zarządzania ligą jest ściśle chroniony. Zaloguj się wyłącznie na swoje indywidualne konto Administratora. Nikt spoza zatwierdzonej listy nie ma tutaj dostępu bez zgody Właściciela Ligi.
+          <h1 class="font-display font-black text-xl sm:text-3xl text-white uppercase tracking-tight">
+            ${isMasterGate ? 'Master Panel Szymona Komendy' : 'Panel Administratora SMPL'}
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-300 mt-1.5 max-w-xl mx-auto">
+            ${isMasterGate
+              ? 'Pełne uprawnienia Właściciela Ligi: zarząd dywizji, konfigurator Wsparcia (Donate), bezpieczeństwo, kopie bazy oraz Vanessa Gemini AI.'
+              : 'Dostęp do panelu zarządzania ligą jest ściśle chroniony. Zaloguj się wyłącznie na swoje indywidualne konto Administratora SMPL.'}
           </p>
         </div>
 
@@ -2343,81 +2347,77 @@ window.SMPL_FORMS_ADMIN = (function () {
       window.SMPL_MEDIA.generatePlayerAvatar('Nowy Gracz', 'Zawodnik', 95);
 
     return `
-      <div class="w-full max-w-4xl mx-auto my-auto py-6 sm:py-10">
-        <!-- Brand Header & Herby Aktywnych Lig -->
-        <div class="text-center mb-6 sm:mb-8">
-          <div class="smpl-auth-crest-stage mb-4 max-w-full flex-wrap">
-            <img src="css/icon-192.png" class="w-11 h-11 sm:w-16 sm:h-16 rounded-2xl object-cover border border-amber-400/60 shadow-xl" alt="Score Match Liga"/>
+      <div class="smpl-auth-shell w-full max-w-3xl mx-auto my-auto py-3 sm:py-6">
+        <!-- Brand Header & Herby Aktywnych Lig (Royal Compact Above-The-Fold) -->
+        <div class="text-center mb-4 sm:mb-5">
+          <div class="smpl-auth-crest-stage mb-2.5 sm:mb-3 max-w-full">
+            <img src="css/icon-192.png" class="smpl-auth-crest-main" alt="Score Match Liga"/>
             ${activeGateLeagues
               .map((lg) => {
                 const crestUrl = getLeagueCrestSafe(state, lg);
-                const isCenterL2 = lg.id === 'L2';
-                const imgCls = isCenterL2
-                  ? 'w-12 h-14 sm:w-20 sm:h-24 object-contain drop-shadow-2xl crest-float transition'
-                  : 'w-10 h-12 sm:w-16 sm:h-20 object-contain drop-shadow-2xl hover:scale-105 transition';
-                return `<img src="${crestUrl}" class="${imgCls}" alt="${escapeHtml(lg.shortName || lg.name)}"/>`;
+                return `<img src="${crestUrl}" class="smpl-auth-crest-medallion" alt="${escapeHtml(lg.shortName || lg.name)}"/>`;
               })
               .join('')}
           </div>
 
           <div class="block max-w-full">
-            <div class="inline-flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 font-display font-black text-[10px] sm:text-xs uppercase tracking-wider sm:tracking-widest mb-2.5 shadow-lg max-w-full text-center">
+            <div class="inline-flex flex-wrap items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/45 text-emerald-300 font-display font-black text-[10px] sm:text-[11px] uppercase tracking-wider mb-1.5 shadow-lg max-w-full text-center">
               <span class="smpl-live-beacon-dot"></span>
-              <span>SCORE MATCH LIGA (SMPL) • SEZON ${state.season || 56} • OFICJALNY PORTAL</span>
+              <span>SCORE MATCH LIGA • SEZON ${state.season || 56} • OFICJALNY PORTAL</span>
             </div>
           </div>
-          <h1 class="font-display font-black text-xl sm:text-4xl text-white uppercase tracking-tight leading-tight px-1">
+          <h1 class="font-display font-black text-xl sm:text-3xl text-white uppercase tracking-tight leading-tight px-1">
             Centrum Dostępu i Kont Graczy
           </h1>
-          <p class="text-xs sm:text-sm text-slate-200 mt-1.5 max-w-xl mx-auto leading-relaxed">
+          <p class="hidden sm:block text-xs sm:text-sm text-slate-300 mt-1 max-w-xl mx-auto leading-relaxed">
             ${isClansUiEnabledSafe(state)
-              ? 'Zaloguj się na swoje konto zawodnika lub zarejestruj do Score Match Ligi — wybierz swój klan, odbierz Kartę UT i walcz w Ekstraklasie lub 2. Lidze!'
-              : 'Zaloguj się na swoje konto zawodnika lub zarejestruj do Score Match Ligi — odbierz Kartę UT i walcz w Ekstraklasie lub 2. Lidze!'}
+              ? 'Zaloguj się na swoje konto zawodnika lub zarejestruj do Score Match Ligi — wybierz klan, odbierz Kartę UT i walcz o mistrzostwo!'
+              : 'Zaloguj się na swoje konto zawodnika lub zarejestruj do Score Match Ligi — odbierz Kartę UT i walcz o mistrzostwo!'}
           </p>
-          <div class="flex flex-wrap items-center justify-center gap-2 mt-3.5">
+          <div class="hidden sm:flex flex-wrap items-center justify-center gap-1.5 mt-2.5">
             <span class="smpl-feature-pill text-[10px] font-display font-bold text-amber-300 uppercase">🏆 Tabele &amp; Mecze Live</span>
             ${isClansUiEnabledSafe(state)
-              ? '<span class="smpl-feature-pill text-[10px] font-display font-bold text-emerald-300 uppercase">🛡️ Klany &amp; Własne Loga</span>'
+              ? '<span class="smpl-feature-pill text-[10px] font-display font-bold text-emerald-300 uppercase">🛡️ Klany &amp; Loga</span>'
               : '<span class="smpl-feature-pill text-[10px] font-display font-bold text-emerald-300 uppercase">⚔️ Ranking H2H &amp; ELO</span>'}
             <span class="smpl-feature-pill text-[10px] font-display font-bold text-blue-300 uppercase">🎴 Karty UT &amp; Złota Piłka</span>
-            <span class="smpl-feature-pill text-[10px] font-display font-bold text-pink-300 uppercase">💋 Vanessa Gemini AI</span>
+            <span class="smpl-feature-pill text-[10px] font-display font-bold text-pink-300 uppercase">✨ Vanessa AI</span>
           </div>
         </div>
 
-        <!-- 3 Przyciski Wyboru Trybu Wejścia -->
-        <div class="glass-panel rounded-2xl p-2 mb-6 max-w-2xl mx-auto flex flex-col sm:flex-row gap-2 border border-white/15">
+        <!-- 3 Przyciski Wyboru Trybu Wejścia (Zawsze 1 wiersz — również na smartfonie!) -->
+        <div class="smpl-auth-mode-bar glass-panel rounded-2xl p-1.5 mb-3.5 sm:mb-4 max-w-xl mx-auto grid grid-cols-3 gap-1.5 border border-white/15">
           <button
             type="button"
             onclick="SMPL_APP.setGateMode('login')"
-            class="flex-1 py-3 px-4 rounded-xl font-display font-black text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 ${
+            class="py-2.5 px-2 sm:px-4 rounded-xl font-display font-black text-[11px] sm:text-xs uppercase tracking-wide transition flex items-center justify-center gap-1.5 min-w-0 ${
               activeGateTab === 'login'
-                ? 'btn-league shadow-xl scale-[1.02]'
-                : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300'
+                ? 'btn-league shadow-xl'
+                : 'bg-slate-900/75 hover:bg-slate-800 text-slate-300'
             }"
           >
-            <span>🔑 1. Zaloguj się</span>
+            <span class="truncate">🔑 <span class="sm:hidden">Loguj</span><span class="hidden sm:inline">1. Zaloguj się</span></span>
           </button>
           <button
             type="button"
             onclick="SMPL_APP.setGateMode('register')"
-            class="flex-1 py-3 px-4 rounded-xl font-display font-black text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 ${
+            class="py-2.5 px-2 sm:px-4 rounded-xl font-display font-black text-[11px] sm:text-xs uppercase tracking-wide transition flex items-center justify-center gap-1.5 min-w-0 ${
               activeGateTab === 'register'
-                ? 'btn-league shadow-xl scale-[1.02]'
-                : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300'
+                ? 'btn-league shadow-xl'
+                : 'bg-slate-900/75 hover:bg-slate-800 text-slate-300'
             }"
           >
-            <span>📝 2. Rejestracja</span>
+            <span class="truncate">📝 <span class="sm:hidden">Zapisy</span><span class="hidden sm:inline">2. Rejestracja</span></span>
           </button>
           <button
             type="button"
             onclick="SMPL_APP.setGateMode('guest')"
-            class="flex-1 py-3 px-4 rounded-xl font-display font-black text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 ${
+            class="py-2.5 px-2 sm:px-4 rounded-xl font-display font-black text-[11px] sm:text-xs uppercase tracking-wide transition flex items-center justify-center gap-1.5 min-w-0 ${
               activeGateTab === 'guest'
-                ? 'btn-league shadow-xl scale-[1.02]'
-                : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300'
+                ? 'btn-league shadow-xl'
+                : 'bg-slate-900/75 hover:bg-slate-800 text-slate-300'
             }"
           >
-            <span>👁️ 3. Tryb Gościa</span>
+            <span class="truncate">👁️ <span class="sm:hidden">Gość</span><span class="hidden sm:inline">3. Tryb Gościa</span></span>
           </button>
         </div>
 
@@ -2425,20 +2425,20 @@ window.SMPL_FORMS_ADMIN = (function () {
         ${
           activeGateTab === 'login'
             ? `
-              <div class="glass-panel-league auth-card-login-pro rounded-3xl p-6 sm:p-8 max-w-xl mx-auto border-2 border-league shadow-2xl">
-                <div class="flex items-center gap-3 pb-3 mb-5 border-b border-white/10">
-                  <div class="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-xl">
+              <div class="glass-panel-league auth-card-login-pro rounded-3xl p-4 sm:p-6 max-w-xl mx-auto border border-league shadow-2xl">
+                <div class="flex items-center gap-3 pb-3 mb-4 border-b border-white/10">
+                  <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-lg flex-shrink-0">
                     🔑
                   </div>
-                  <div>
-                    <h3 class="font-display font-black text-lg text-white uppercase">Logowanie do Konta Gracza</h3>
-                    <p class="text-xs text-slate-300">Wpisz swój login, nick lub imię i nazwisko:</p>
+                  <div class="min-w-0">
+                    <h3 class="font-display font-black text-base sm:text-lg text-white uppercase leading-tight">Logowanie do Konta Gracza</h3>
+                    <p class="text-[11px] sm:text-xs text-slate-300">Wpisz swój login, nick lub imię i nazwisko:</p>
                   </div>
                 </div>
 
-                <div class="space-y-4 mb-6">
+                <div class="space-y-3.5 mb-4">
                   <div>
-                    <label class="block text-xs font-display uppercase text-slate-300 font-bold mb-1.5">
+                    <label class="block text-[11px] font-display uppercase text-slate-300 font-bold mb-1">
                       👤 Twój Login lub Nick w grze *
                     </label>
                     <input
@@ -2446,17 +2446,17 @@ window.SMPL_FORMS_ADMIN = (function () {
                       type="text"
                       autocomplete="username"
                       placeholder="Wpisz swój indywidualny login lub nick..."
-                      class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-white/20 text-sm text-white font-semibold focus:outline-none focus:border-league"
+                      class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/20 text-sm text-white font-semibold focus:outline-none focus:border-league"
                       onkeydown="if(event.key==='Enter') SMPL_APP.handleGateLoginSubmit()"
                     />
                   </div>
 
                   <div>
-                    <div class="flex items-center justify-between mb-1.5">
-                      <label class="block text-xs font-display uppercase text-slate-300 font-bold">
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                      <label class="block text-[11px] font-display uppercase text-slate-300 font-bold">
                         🔒 Hasło do konta *
                       </label>
-                      <button onclick="SMPL_APP.openPasswordReminderModal()" class="text-xs text-amber-300 hover:underline font-semibold">
+                      <button type="button" onclick="SMPL_APP.openPasswordReminderModal()" class="smpl-inline-touch-link text-xs text-amber-300 hover:underline font-semibold">
                         Zapomniałeś hasła?
                       </button>
                     </div>
@@ -2465,33 +2465,26 @@ window.SMPL_FORMS_ADMIN = (function () {
                       type="password"
                       autocomplete="current-password"
                       placeholder="Wpisz swoje prywatne hasło..."
-                      class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-white/20 text-sm text-white font-semibold focus:outline-none focus:border-league"
+                      class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/20 text-sm text-white font-semibold focus:outline-none focus:border-league"
                       onkeydown="if(event.key==='Enter') SMPL_APP.handleGateLoginSubmit()"
                     />
-                  </div>
-
-                  <!-- Karta Zabezpieczeń i Zasad SMPL -->
-                  <div class="p-3.5 rounded-xl bg-emerald-950/25 border border-emerald-500/30 text-xs text-emerald-300 flex items-start gap-2.5">
-                    <span class="text-base flex-shrink-0">🛡️</span>
-                    <div>
-                      <strong>Maksymalna ochrona ligi:</strong> Każdy zawodnik oraz administrator loguje się wyłącznie na swoje osobiste konto przy użyciu indywidualnego hasła.
-                    </div>
                   </div>
                 </div>
 
                 <button
+                  type="button"
                   onclick="SMPL_APP.handleGateLoginSubmit()"
-                  class="btn-league w-full py-4 px-6 rounded-2xl font-display font-black text-sm uppercase tracking-wider shadow-2xl flex items-center justify-center gap-2 hover:scale-[1.01] transition"
+                  class="btn-league w-full py-3.5 px-5 rounded-2xl font-display font-black text-xs sm:text-sm uppercase tracking-wider shadow-2xl flex items-center justify-center gap-2 transition"
                 >
                   <span>🚀 Zaloguj się i Przejdź do Portalu</span>
                 </button>
 
-                <div class="flex flex-wrap items-center justify-between gap-3 text-xs pt-4 mt-5 border-t border-white/10">
-                  <button onclick="SMPL_APP.setGateMode('register')" class="text-emerald-400 hover:text-white font-bold">
-                    📝 Nie masz jeszcze konta? Załóż w 1 minutę
+                <div class="flex flex-wrap items-center justify-between gap-2 text-xs pt-3 mt-3.5 border-t border-white/10">
+                  <button type="button" onclick="SMPL_APP.setGateMode('register')" class="smpl-inline-touch-link text-emerald-400 hover:text-white font-bold">
+                    📝 Nie masz konta? Załóż w 1 min
                   </button>
-                  <button onclick="SMPL_APP.handleGateGuestEnter()" class="text-blue-300 hover:text-white font-bold">
-                    👁️ Przeglądaj jako Gość →
+                  <button type="button" onclick="SMPL_APP.handleGateGuestEnter()" class="smpl-inline-touch-link text-blue-300 hover:text-white font-bold">
+                    👁️ Wejdź jako Gość →
                   </button>
                 </div>
               </div>

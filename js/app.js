@@ -445,20 +445,20 @@ window.SMPL_APP = (function () {
       hudEl.innerHTML = `
         <div class="smpl-hero-telemetry-grid">
           <div class="smpl-hero-metric-chip">
-            <div class="text-[10px] font-display uppercase text-slate-400 font-bold">🏆 Sezon &amp; Dywizje</div>
-            <div class="font-display font-black text-base sm:text-lg text-amber-300 font-mono-num mt-0.5">SEZON ${(state && state.season) || 56} • ${leaguesLabel}</div>
+            <div class="smpl-metric-lbl text-[9px] sm:text-[10px] font-display uppercase text-slate-400 font-bold truncate">🏆 <span class="sm:hidden">Sezon</span><span class="hidden sm:inline">Sezon &amp; Dywizje</span></div>
+            <div class="smpl-metric-val font-display font-black text-xs sm:text-base text-amber-300 font-mono-num mt-0.5 truncate"><span class="sm:hidden">S${(state && state.season) || 56} • ${leaguesCnt}L</span><span class="hidden sm:inline">SEZON ${(state && state.season) || 56} • ${leaguesLabel}</span></div>
           </div>
           <div class="smpl-hero-metric-chip">
-            <div class="text-[10px] font-display uppercase text-slate-400 font-bold">⚡ Aktywni Zawodnicy</div>
-            <div class="font-display font-black text-base sm:text-lg text-white font-mono-num mt-0.5">${playersLabel}</div>
+            <div class="smpl-metric-lbl text-[9px] sm:text-[10px] font-display uppercase text-slate-400 font-bold truncate">⚡ <span class="sm:hidden">Gracze</span><span class="hidden sm:inline">Aktywni Zawodnicy</span></div>
+            <div class="smpl-metric-val font-display font-black text-xs sm:text-base text-white font-mono-num mt-0.5 truncate"><span class="sm:hidden">${activePlayersCnt}</span><span class="hidden sm:inline">${playersLabel}</span></div>
           </div>
           <div class="smpl-hero-metric-chip">
-            <div class="text-[10px] font-display uppercase text-slate-400 font-bold">📊 Mecze w Sezonie</div>
-            <div class="font-display font-black text-base sm:text-lg text-emerald-400 font-mono-num mt-0.5">${playedMatchesCnt} / ${allMatches.length}</div>
+            <div class="smpl-metric-lbl text-[9px] sm:text-[10px] font-display uppercase text-slate-400 font-bold truncate">📊 <span class="sm:hidden">Mecze</span><span class="hidden sm:inline">Mecze w Sezonie</span></div>
+            <div class="smpl-metric-val font-display font-black text-xs sm:text-base text-emerald-400 font-mono-num mt-0.5 truncate">${playedMatchesCnt} / ${allMatches.length}</div>
           </div>
           <div class="smpl-hero-metric-chip">
-            <div class="text-[10px] font-display uppercase text-slate-400 font-bold">⚽ Zdobyte Bramki</div>
-            <div class="font-display font-black text-base sm:text-lg text-blue-300 font-mono-num mt-0.5">${goalsLabel}</div>
+            <div class="smpl-metric-lbl text-[9px] sm:text-[10px] font-display uppercase text-slate-400 font-bold truncate">⚽ <span class="sm:hidden">Bramki</span><span class="hidden sm:inline">Zdobyte Bramki</span></div>
+            <div class="smpl-metric-val font-display font-black text-xs sm:text-base text-blue-300 font-mono-num mt-0.5 truncate"><span class="sm:hidden">${goalsScoredCnt}</span><span class="hidden sm:inline">${goalsLabel}</span></div>
           </div>
         </div>
       `;
@@ -478,17 +478,17 @@ window.SMPL_APP = (function () {
       document.body.appendChild(container);
     }
 
-    const colors =
+    const toneCls =
       type === 'error'
-        ? 'bg-rose-950/95 border-rose-500 text-rose-100'
+        ? 'smpl-toast-error'
         : type === 'warning'
-        ? 'bg-amber-950/95 border-amber-400 text-amber-100'
-        : 'bg-emerald-950/95 border-emerald-400 text-emerald-100';
+        ? 'smpl-toast-warning'
+        : 'smpl-toast-success';
 
     const el = document.createElement('div');
-    el.className = `px-3.5 py-2.5 rounded-2xl border-2 shadow-2xl backdrop-blur-xl text-xs sm:text-sm font-semibold flex items-start justify-between gap-2.5 transition-all duration-300 ${colors}`;
-    el.innerHTML = `<span class="flex-1 leading-snug">${message}</span><button type="button" onclick="this.parentElement&&this.parentElement.remove()" class="text-white/70 hover:text-white text-xs font-black px-1 flex-shrink-0" title="Zamknij">✕</button>`;
-    while (container.children && container.children.length >= 3) {
+    el.className = `smpl-toast ${toneCls} px-3.5 py-2.5 rounded-2xl border shadow-2xl backdrop-blur-xl text-xs sm:text-sm font-semibold flex items-center justify-between gap-2.5 transition-all duration-300`;
+    el.innerHTML = `<span class="flex-1 leading-snug">${message}</span><button type="button" onclick="this.parentElement&&this.parentElement.remove()" class="smpl-toast-close flex-shrink-0" aria-label="Zamknij powiadomienie" title="Zamknij">✕</button>`;
+    while (container.children && container.children.length >= 2) {
       if (container.firstElementChild) container.removeChild(container.firstElementChild);
       else break;
     }
@@ -498,7 +498,7 @@ window.SMPL_APP = (function () {
       el.style.opacity = '0';
       el.style.transform = 'translateY(-8px)';
       setTimeout(() => el.remove(), 300);
-    }, 5500);
+    }, 4500);
   }
 
   function fileToDataUrl(file, maxWidth = 850) {
@@ -694,11 +694,12 @@ window.SMPL_APP = (function () {
         : isStrictAdmin;
 
     if (!isUnlocked) {
+      document.body.classList.add('smpl-gate-locked');
       if (gateContainer) {
         gateContainer.style.display = 'flex';
         gateContainer.innerHTML =
           session.linkMode !== 'PUBLIC'
-            ? window.SMPL_FORMS_ADMIN.renderAdminLoginAndJoinGate(state)
+            ? window.SMPL_FORMS_ADMIN.renderAdminLoginAndJoinGate(state, session)
             : window.SMPL_FORMS_ADMIN.renderFullScreenAuthGate(
                 state,
                 gateMode,
@@ -708,16 +709,22 @@ window.SMPL_APP = (function () {
       }
       if (mainContainer) mainContainer.style.display = 'none';
       if (topBarEl) topBarEl.style.display = 'none';
-      if (mobEl) mobEl.style.display = 'none';
+      if (mobEl) {
+        mobEl.style.display = 'none';
+        mobEl.innerHTML = '';
+      }
       syncIosSafeAreaGuard();
       syncTopBarHeightVar();
       settingsDrawerOpen = false;
       const lockedDrawerRoot = document.getElementById('smpl-settings-drawer-root');
       if (lockedDrawerRoot) lockedDrawerRoot.innerHTML = '';
-      renderAiAssistantWidget(state, session);
+      const aiRootLocked = document.getElementById('smpl-ai-widget-root');
+      if (aiRootLocked) aiRootLocked.innerHTML = '';
       dismissLoadingScreen();
       return;
     }
+
+    document.body.classList.remove('smpl-gate-locked');
 
     if (gateContainer) gateContainer.style.display = 'none';
     if (mainContainer) mainContainer.style.display = 'block';
@@ -1181,7 +1188,7 @@ window.SMPL_APP = (function () {
                    ${activeTab === 'admin' ? '🏆 Tabele' : '🛡️ Panel Admina'}
                  </button>`
               : (!isAuthenticated
-                  ? `<button type="button" onclick="SMPL_APP.handleGateLock()" class="px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-black text-[10px] sm:text-[11px] uppercase shadow transition whitespace-nowrap">
+                  ? `<button type="button" onclick="SMPL_APP.handleGateLock()" class="smpl-topbar-login-btn px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-black text-[11px] uppercase shadow transition whitespace-nowrap inline-flex items-center justify-center gap-1">
                        🔑 Zaloguj
                      </button>`
                   : '')
@@ -1464,7 +1471,7 @@ window.SMPL_APP = (function () {
     }
 
     navEl.innerHTML = `
-      <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-1">
+      <div class="smpl-tabs-scroller smpl-hscroll-fade flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-1">
         ${tabs
           .map((t) => {
             const isAct = activeTab === t.id;
@@ -1492,6 +1499,13 @@ window.SMPL_APP = (function () {
           .join('')}
       </div>
     `;
+    try {
+      const navWrap = navEl.querySelector('.smpl-tabs-scroller');
+      const activeBtn = navWrap ? navWrap.querySelector('[data-tab="' + activeTab + '"]') : null;
+      if (navWrap && activeBtn && typeof activeBtn.offsetLeft === 'number') {
+        navWrap.scrollLeft = Math.max(0, activeBtn.offsetLeft - Math.max(16, (navWrap.clientWidth - activeBtn.offsetWidth) / 2));
+      }
+    } catch (_e) {}
   }
 
   function renderMobileBottomNav(state, session) {
@@ -6315,7 +6329,7 @@ window.SMPL_APP = (function () {
       : [];
 
     if (!aiWidgetState.isOpen) {
-      if (!isAiFabVisibleNow()) {
+      if (!isAiFabVisibleNow() || (typeof document !== 'undefined' && document.body && document.body.classList.contains('smpl-gate-locked'))) {
         root.innerHTML = '';
         return;
       }
@@ -9998,7 +10012,11 @@ window.SMPL_APP = (function () {
     } catch (e) {}
     const eff = applyThemeToDom();
     renderTopBar(window.SMPL_DB.getState(), window.SMPL_DB.getSession());
-    showToast(`${found.icon} Motyw: ${found.name} (${getThemeEffectiveLabel(eff)})`);
+    const effLabel = getThemeEffectiveLabel(eff);
+    const toastTitle = effLabel.toLowerCase().indexOf(found.name.toLowerCase()) !== -1
+      ? effLabel
+      : `${found.name} • ${effLabel}`;
+    showToast(`${found.icon} Motyw: ${toastTitle}`);
   }
 
   function setPortalDesignMode(mode) {

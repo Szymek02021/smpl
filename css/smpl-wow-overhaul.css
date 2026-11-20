@@ -759,5 +759,623 @@ html[data-smpl-theme="dawn"] .smpl-support-tab-pill {
   border-color: rgba(217, 119, 6, 0.5) !important;
 }
 
+/* ============================================================================
+ * STUDIO MISTRZÓW ROYAL EDITION (v57) — ONE UNIFIED LUXURY SYSTEM (MOBILE & PC)
+ * Modern Web Standards: color-scheme, oklab gradients, dvh, mask soft-fade,
+ * standard scrollbar-color + fallback, natural-interactions & WCAG contrast.
+ * ============================================================================ */
+
+:root {
+  color-scheme: dark light;
+  --in-oklab: ;
+  --in-oklch: ;
+  --wow-scroll-thumb: #64748B;
+  --wow-scroll-track: #0B1120;
+  --wow-focus-ring: #FBBF24;
+  --wow-accent-native: #F59E0B;
+}
+
+@supports (background: linear-gradient(in oklab, white, black)) {
+  :root {
+    --in-oklab: in oklab;
+    --in-oklch: in oklch;
+  }
+}
+
+html[data-smpl-theme="dark"] {
+  color-scheme: dark;
+  --wow-scroll-thumb: #64748B;
+  --wow-scroll-track: #090F1E;
+  --wow-focus-ring: #FBBF24;
+  --wow-accent-native: #F59E0B;
+}
+
+html[data-smpl-theme="prestige"] {
+  color-scheme: dark;
+  --wow-scroll-thumb: #34D399;
+  --wow-scroll-track: #031A11;
+  --wow-focus-ring: #FDE047;
+  --wow-accent-native: #10B981;
+}
+
+html[data-smpl-theme="twilight"] {
+  color-scheme: dark;
+  --wow-scroll-thumb: #38BDF8;
+  --wow-scroll-track: #100A2E;
+  --wow-focus-ring: #38BDF8;
+  --wow-accent-native: #38BDF8;
+}
+
+html[data-smpl-theme="light"] {
+  color-scheme: light;
+  --wow-scroll-thumb: #64748B;
+  --wow-scroll-track: #E2E8F0;
+  --wow-focus-ring: #1D4ED8;
+  --wow-accent-native: #1D4ED8;
+}
+
+html[data-smpl-theme="dawn"] {
+  color-scheme: light;
+  --wow-scroll-thumb: #92400E;
+  --wow-scroll-track: #F5E6C8;
+  --wow-focus-ring: #B45309;
+  --wow-accent-native: #D97706;
+}
+
+html {
+  accent-color: var(--wow-accent-native);
+  scrollbar-color: var(--wow-scroll-thumb) var(--wow-scroll-track);
+  scrollbar-width: thin;
+}
+
+::selection {
+  background: rgba(245, 158, 11, 0.32);
+  color: inherit;
+}
+
+html[data-smpl-theme="light"] ::selection {
+  background: rgba(37, 99, 235, 0.22);
+  color: #0F172A;
+}
+
+/* Legacy WebKit scrollbar fallback ONLY when standard scrollbar-color is unsupported */
+@supports not (scrollbar-color: auto) {
+  html,
+  .smpl-tabs-scroller,
+  .smpl-hscroll-fade {
+    scrollbar-width: auto;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--wow-scroll-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--wow-scroll-thumb);
+    border-radius: 9999px;
+  }
+}
+
+/* 1. Typography & Fluid Readability (WCAG 1.4.4 / 1.4.12 safe) */
+h1, h2, h3, th {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+html[data-smpl-overhaul="wow"] #hero-portal-title {
+  font-size: clamp(1.18rem, 0.85rem + 1.45vw, 2.25rem) !important;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+}
+
+/* 2. Dynamic Viewport Units (dvh) & Zero Phantom Mobile Dock on Auth Gate */
+#fullscreen-auth-gate {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+body.smpl-gate-locked #mobile-bottom-nav,
+body.smpl-gate-locked .smpl-ai-fab-wrap {
+  display: none !important;
+}
+
+/* 3. Natural Interactions — Distinct Hover, Press (compositor scale), Focus-Visible */
+:where(button, a[href], input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--wow-focus-ring) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :where(button, .league-tab-card, .btn-league, .smpl-drawer-action-row) {
+    transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease-out, border-color 180ms ease-out, background-color 180ms ease-out, scale 130ms ease-out;
+  }
+  :where(button, .btn-league, .league-tab-card):active {
+    scale: 0.975;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 4. Soft-Edge Horizontal Scroll Fade & Native Swipe Momentum */
+.smpl-hscroll-fade {
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-inline-end: 1.25rem;
+  -webkit-mask-image: linear-gradient(to right, black 0%, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, black 0%, black calc(100% - 28px), transparent 100%);
+}
+
+.smpl-hscroll-fade > * {
+  scroll-snap-align: start;
+}
+
+.smpl-hscroll-fade::-webkit-scrollbar {
+  display: none;
+}
+
+/* 5. Royal Obsidian & Champagne Gold PWA Install Bar */
+.smpl-pwa-luxury-bar {
+  background: linear-gradient(95deg var(--in-oklab), rgba(9, 14, 28, 0.97) 0%, rgba(23, 30, 54, 0.96) 52%, rgba(34, 24, 14, 0.96) 100%);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42), inset 0 -1px 0 rgba(251, 191, 36, 0.28);
+}
+
+html[data-smpl-theme="light"] .smpl-pwa-luxury-bar,
+html[data-smpl-theme="dawn"] .smpl-pwa-luxury-bar {
+  background: linear-gradient(95deg var(--in-oklab), #FFFFFF 0%, #F8FAFC 55%, #FFFBEB 100%);
+  color: #0F172A !important;
+  border-bottom-color: rgba(180, 83, 9, 0.22) !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+html[data-smpl-theme="light"] .smpl-pwa-luxury-bar strong,
+html[data-smpl-theme="dawn"] .smpl-pwa-luxury-bar strong {
+  color: #92400E !important;
+}
+
+html[data-smpl-theme="light"] .smpl-pwa-luxury-bar span,
+html[data-smpl-theme="dawn"] .smpl-pwa-luxury-bar span {
+  color: #475569 !important;
+}
+
+/* 6. Top Auth Bar — Exact Uniform 36px Optical Alignment */
+#top-auth-bar .smpl-topbar-login-btn {
+  min-block-size: 36px;
+  padding-inline: 0.85rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+#top-auth-bar .smpl-topbar-icon-btn,
+#top-auth-bar .smpl-gear-trigger {
+  min-block-size: 36px;
+}
+
+/* 7. Compact Royal Hero + 4-Column Mobile Telemetry Micro-Ribbon */
+html[data-smpl-overhaul="wow"] .hero-showcase-banner {
+  border-radius: 1.5rem !important;
+  padding: 0.95rem 1.25rem !important;
+  margin-bottom: 0.75rem !important;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.52),
+    0 2px 8px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(251, 191, 36, 0.28) !important;
+}
+
+.smpl-hero-toggle-btn {
+  min-block-size: 30px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.smpl-hero-cta-row > button {
+  min-block-size: 38px;
+}
+
+html[data-smpl-overhaul="wow"] #smpl-hero-telemetry-hud {
+  margin-top: 0.6rem !important;
+  padding-top: 0.6rem !important;
+}
+
+html[data-smpl-overhaul="wow"] .smpl-hero-telemetry-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 0.45rem !important;
+}
+
+html[data-smpl-overhaul="wow"] .smpl-hero-metric-chip {
+  padding: 0.42rem 0.65rem !important;
+  border-radius: 0.85rem !important;
+  background: linear-gradient(155deg var(--in-oklab), rgba(14, 21, 40, 0.86) 0%, rgba(7, 11, 22, 0.92) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.11) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  html[data-smpl-overhaul="wow"] #main-portal-container {
+    padding-top: 0.65rem !important;
+  }
+  html[data-smpl-overhaul="wow"] .hero-showcase-banner {
+    padding: 0.72rem 0.82rem !important;
+    margin-bottom: 0.55rem !important;
+    border-radius: 1.25rem !important;
+  }
+  html[data-smpl-overhaul="wow"] .wow-hero-grid {
+    gap: 0.55rem !important;
+  }
+  html[data-smpl-overhaul="wow"] .wow-hero-hud-card {
+    padding: 0.55rem 0.65rem !important;
+    border-radius: 0.95rem !important;
+  }
+  html[data-smpl-overhaul="wow"] .wow-hud-mini-tile {
+    padding: 0.45rem 0.52rem !important;
+    border-radius: 0.75rem !important;
+  }
+  html[data-smpl-overhaul="wow"] #smpl-hero-telemetry-hud {
+    margin-top: 0.5rem !important;
+    padding-top: 0.5rem !important;
+  }
+  html[data-smpl-overhaul="wow"] .smpl-hero-telemetry-grid {
+    gap: 0.3rem !important;
+  }
+  html[data-smpl-overhaul="wow"] .smpl-hero-metric-chip {
+    padding: 0.32rem 0.35rem !important;
+    text-align: center;
+    border-radius: 0.7rem !important;
+  }
+  html[data-smpl-overhaul="wow"] .smpl-hero-metric-chip .smpl-metric-lbl {
+    font-size: 8.5px !important;
+  }
+  html[data-smpl-overhaul="wow"] .smpl-hero-metric-chip .smpl-metric-val {
+    font-size: 11px !important;
+    margin-top: 1px !important;
+  }
+}
+
+/* 8. Jewel-Framed Medallion Crests (League Switcher & Auth Gate) */
+html[data-smpl-overhaul="wow"] .wow-league-seg-card .wow-seg-crest {
+  width: 2.35rem !important;
+  height: 2.35rem !important;
+  aspect-ratio: 1 / 1;
+  object-fit: cover !important;
+  border-radius: 0.72rem !important;
+  border: 1.5px solid rgba(251, 191, 36, 0.42);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: #070B16;
+}
+
+@media (max-width: 639px) {
+  html[data-smpl-overhaul="wow"] .wow-league-seg-card .wow-seg-crest {
+    width: 2rem !important;
+    height: 2rem !important;
+    border-radius: 0.62rem !important;
+  }
+}
+
+.smpl-auth-crest-stage {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.9rem !important;
+  border-radius: 9999px;
+  background: rgba(8, 13, 27, 0.78);
+  border: 1px solid rgba(251, 191, 36, 0.26);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.smpl-auth-crest-main {
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 0.85rem;
+  object-fit: cover;
+  border: 1.5px solid rgba(251, 191, 36, 0.72);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.32);
+}
+
+.smpl-auth-crest-medallion {
+  width: 2.65rem;
+  height: 2.65rem;
+  aspect-ratio: 1 / 1;
+  border-radius: 0.8rem;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s ease;
+}
+
+.smpl-auth-crest-medallion:hover {
+  transform: scale(1.06);
+}
+
+@media (min-width: 640px) {
+  .smpl-auth-crest-main {
+    width: 3.35rem;
+    height: 3.35rem;
+  }
+  .smpl-auth-crest-medallion {
+    width: 3.1rem;
+    height: 3.1rem;
+  }
+}
+
+.smpl-inline-touch-link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 34px;
+  padding: 0.2rem 0.35rem;
+  border-radius: 0.5rem;
+}
+
+/* 9. Royal Frosted Vanessa AI Orb (Clean on Mobile, Executive Pill on PC) */
+.smpl-ai-fab {
+  background: linear-gradient(135deg var(--in-oklab), rgba(15, 23, 42, 0.94) 0%, rgba(30, 22, 62, 0.94) 60%, rgba(56, 36, 16, 0.92) 100%) !important;
+  border: 1.5px solid rgba(251, 191, 36, 0.55) !important;
+  color: #FEF3C7 !important;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.58),
+    0 0 20px rgba(245, 158, 11, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.smpl-ai-fab:hover {
+  border-color: rgba(253, 224, 71, 0.85) !important;
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.65),
+    0 0 28px rgba(251, 191, 36, 0.38) !important;
+}
+
+.smpl-ai-fab-close {
+  width: 1.85rem !important;
+  height: 1.85rem !important;
+  min-width: 30px;
+  min-height: 30px;
+}
+
+@media (max-width: 767px) {
+  .smpl-ai-fab-wrap {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    right: 0.65rem !important;
+    gap: 0.25rem !important;
+  }
+  .smpl-ai-fab {
+    padding: 0.28rem !important;
+    border-radius: 9999px !important;
+  }
+  .smpl-ai-fab > span:not([class*="rounded-full"]) {
+    display: none !important;
+  }
+  .smpl-ai-fab-photo {
+    width: 2.45rem !important;
+    height: 2.45rem !important;
+    border: 1.5px solid rgba(251, 191, 36, 0.7);
+  }
+}
+
+html[data-smpl-theme="light"] .smpl-ai-fab,
+html[data-smpl-theme="dawn"] .smpl-ai-fab {
+  background: linear-gradient(135deg var(--in-oklab), rgba(255, 255, 255, 0.96) 0%, rgba(254, 249, 235, 0.96) 100%) !important;
+  color: #0F172A !important;
+  border-color: rgba(217, 119, 6, 0.45) !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16), 0 0 18px rgba(245, 158, 11, 0.18) !important;
+}
+
+/* 10. Adaptive Frosted Luxury Toasts (Dark & Light/Dawn) */
+.smpl-toast {
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.smpl-toast-success {
+  background: rgba(6, 36, 26, 0.92);
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #ECFDF5;
+}
+
+.smpl-toast-warning {
+  background: rgba(48, 28, 6, 0.94);
+  border-color: rgba(251, 191, 36, 0.58);
+  color: #FEF3C7;
+}
+
+.smpl-toast-error {
+  background: rgba(56, 10, 22, 0.94);
+  border-color: rgba(251, 113, 133, 0.58);
+  color: #FFE4E6;
+}
+
+html[data-smpl-theme="light"] .smpl-toast-success,
+html[data-smpl-theme="dawn"] .smpl-toast-success {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(16, 185, 129, 0.55);
+  color: #064E3B;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+}
+
+html[data-smpl-theme="light"] .smpl-toast-warning,
+html[data-smpl-theme="dawn"] .smpl-toast-warning {
+  background: rgba(255, 251, 235, 0.96);
+  border-color: rgba(217, 119, 6, 0.55);
+  color: #78350F;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+}
+
+html[data-smpl-theme="light"] .smpl-toast-error,
+html[data-smpl-theme="dawn"] .smpl-toast-error {
+  background: rgba(255, 241, 242, 0.96);
+  border-color: rgba(225, 29, 72, 0.5);
+  color: #881337;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+}
+
+.smpl-toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: currentColor;
+  opacity: 0.78;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.smpl-toast-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* 11. Fix Mobile Standings Sticky Column Theme Parity + Platinum XP Contrast */
+@media (max-width: 767px) {
+  html[data-smpl-theme] .smpl-standings-table th:first-child,
+  html[data-smpl-theme] .smpl-standings-table td:first-child {
+    background: var(--wow-surface-elevated) !important;
+  }
+}
+
+/* Fix Platynowy Taktyk & active XP career ladder readable contrast */
+.rk-ladder .rk-step-cur,
+.rk-platinum.bg-slate-950\/80,
+.rk-platinum[class*="bg-slate-9"],
+.glass-panel .rk-platinum.border {
+  background: linear-gradient(155deg var(--in-oklab), rgba(15, 23, 42, 0.94) 0%, rgba(12, 42, 58, 0.92) 100%) !important;
+  color: #F8FAFC !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75) !important;
+  border: 1.5px solid rgba(45, 212, 191, 0.78) !important;
+  box-shadow: 0 0 22px rgba(45, 212, 191, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+.rk-ladder .rk-step-cur .rk-step-name {
+  color: #FFFFFF !important;
+}
+
+.rk-ladder .rk-step-cur .rk-step-xp {
+  color: #99F6E4 !important;
+  opacity: 1 !important;
+}
+
+html[data-smpl-theme="light"] .rk-ladder .rk-step,
+html[data-smpl-theme="dawn"] .rk-ladder .rk-step {
+  background: rgba(15, 23, 42, 0.06);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #334155;
+}
+
+html[data-smpl-theme="light"] .rk-ladder .rk-step-cur,
+html[data-smpl-theme="dawn"] .rk-ladder .rk-step-cur {
+  background: linear-gradient(155deg var(--in-oklab), #0F172A 0%, #134E4A 100%) !important;
+  color: #FFFFFF !important;
+}
+
+/* 12. Unified Schedule Filter Toolbar & Form Controls */
+.smpl-schedule-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .smpl-schedule-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .smpl-schedule-toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+}
+
+.smpl-schedule-toolbar > input,
+.smpl-schedule-toolbar > select,
+.smpl-schedule-toolbar > button {
+  min-block-size: 38px;
+}
+
+/* 13. Unified Registration Page Hero Accent */
+html[data-smpl-overhaul="wow"] .hero-showcase-banner.smpl-hero-reg {
+  border-color: rgba(52, 211, 153, 0.45) !important;
+}
+
+/* 14. Unified Premium Surface Depth & Light Mode Polish */
+html[data-smpl-overhaul="wow"] .matchday-showcase-banner,
+html[data-smpl-overhaul="wow"] .competitions-showcase-banner,
+html[data-smpl-overhaul="wow"] .goldenball-showcase-banner,
+html[data-smpl-overhaul="wow"] .h2h-showcase-banner {
+  border: 1px solid var(--wow-border) !important;
+  box-shadow: var(--wow-shadow) !important;
+}
+
+html[data-smpl-theme="light"] .smpl-unified-footer,
+html[data-smpl-theme="dawn"] .smpl-unified-footer {
+  border-top-color: rgba(15, 23, 42, 0.12) !important;
+  color: #475569 !important;
+}
+
+html[data-smpl-theme="light"] .smpl-unified-footer .text-white,
+html[data-smpl-theme="dawn"] .smpl-unified-footer .text-white {
+  color: #0F172A !important;
+}
+
+html[data-smpl-theme="light"] .smpl-unified-footer .text-amber-300,
+html[data-smpl-theme="dawn"] .smpl-unified-footer .text-amber-300,
+html[data-smpl-theme="light"] .smpl-unified-footer .text-amber-200,
+html[data-smpl-theme="dawn"] .smpl-unified-footer .text-amber-200 {
+  color: #B45309 !important;
+}
+
+html[data-smpl-theme="light"] .smpl-unified-footer .text-emerald-300,
+html[data-smpl-theme="dawn"] .smpl-unified-footer .text-emerald-300 {
+  color: #047857 !important;
+}
+
+/* 15. Prevent Torn Multi-Line Inline Pill Badges Across Every View (never override .hidden) */
+span.rounded-full[class*="px-3"]:not(.hidden),
+span.rounded-full[class*="px-2.5"]:not(.hidden) {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  max-width: 100%;
+  line-height: 1.3;
+}
+
+/* 16. Elevated Luxury Mobile Bottom Dock */
+html[data-smpl-overhaul="wow"] #mobile-bottom-nav {
+  padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px)) !important;
+  box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+html[data-smpl-theme="light"] #mobile-bottom-nav,
+html[data-smpl-theme="dawn"] #mobile-bottom-nav {
+  box-shadow: 0 -8px 26px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+
 
 

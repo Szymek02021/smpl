@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, user-scalable=yes" />
+  <meta name="color-scheme" content="dark light" />
   <title>Score Match Liga — Oficjalny Portal Rozgrywek i Historia Ligi</title>
 
   <!-- Fonty (opcjonalne — bez internetu aplikacja używa fontów systemowych) -->
@@ -11,8 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
 
   <!-- Pełny lokalny arkusz stylów (100% niezależny od zewnętrznych CDN, działa również offline) -->
-  <link rel="stylesheet" href="css/styles.css?v=56" />
-  <link rel="stylesheet" href="css/smpl-wow-overhaul.css?v=56" />
+  <link rel="stylesheet" href="css/styles.css?v=57" />
+  <link rel="stylesheet" href="css/smpl-wow-overhaul.css?v=57" />
   <script>
     (function () {
       try {
@@ -39,7 +40,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="css/favicon-32x32.png?v=15" />
   <link rel="icon" type="image/png" sizes="16x16" href="css/favicon-16x16.png?v=15" />
   <link rel="apple-touch-icon" sizes="180x180" href="css/apple-touch-icon.png?v=15" />
-  <link rel="manifest" href="manifest.json?v=56" />
+  <link rel="manifest" href="manifest.json?v=57" />
   <meta name="theme-color" content="#0f172a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
@@ -82,20 +83,20 @@
     }, 4500);
   </script>
 
-  <!-- PWA Install Banner na smartfony -->
-  <div id="pwa-install-banner" class="relative z-30 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white px-4 py-2.5 shadow-xl flex items-center justify-between gap-3 text-xs border-b border-white/20" style="display: none;">
+  <!-- PWA Install Banner na smartfony (Royal Obsidian & Gold) -->
+  <div id="pwa-install-banner" class="smpl-pwa-luxury-bar relative z-30 text-white px-3 sm:px-4 py-2 shadow-xl flex items-center justify-between gap-2.5 text-xs border-b border-amber-400/25" style="display: none;">
     <div class="flex items-center gap-2.5 min-w-0">
-      <img src="css/icon-192.png?v=15" class="w-8 h-8 rounded-lg shadow-md flex-shrink-0" alt="SMPL App"/>
+      <img src="css/icon-192.png?v=15" class="w-8 h-8 rounded-lg shadow-md border border-amber-400/50 flex-shrink-0" alt="SMPL App"/>
       <div class="min-w-0">
-        <strong class="font-display uppercase tracking-wide block truncate">Zainstaluj aplikację Score Match Liga</strong>
-        <span class="text-[11px] text-blue-100 hidden sm:inline">Otrzymuj natychmiastowe powiadomienia o wynikach, nagrodach i nowych kolejkach!</span>
+        <strong class="font-display uppercase tracking-wide block truncate text-amber-200">Zainstaluj aplikację Score Match Liga</strong>
+        <span class="text-[11px] text-slate-300 hidden sm:inline">Błyskawiczny dostęp z ekranu głównego i powiadomienia o wynikach oraz kolejkach!</span>
       </div>
     </div>
     <div class="flex items-center gap-2 flex-shrink-0">
-      <button type="button" onclick="SMPL_NOTIF.promptInstall()" class="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-black text-xs uppercase shadow transition">
+      <button type="button" onclick="SMPL_NOTIF.promptInstall()" class="btn-league px-3.5 py-1.5 rounded-xl font-display font-black text-[11px] uppercase shadow transition">
         📲 Zainstaluj
       </button>
-      <button type="button" onclick="SMPL_NOTIF.dismissInstallBanner()" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center">
+      <button type="button" onclick="SMPL_NOTIF.dismissInstallBanner()" class="smpl-topbar-icon-btn" aria-label="Zamknij baner instalacji" title="Zamknij">
         ✕
       </button>
     </div>
@@ -135,24 +136,24 @@
               id="smpl-hero-collapse-btn"
               type="button"
               onclick="SMPL_APP.toggleHeroExpand()"
-              class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 font-display font-bold text-[10px] uppercase border border-white/20 transition flex-shrink-0"
+              class="smpl-hero-toggle-btn px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 font-display font-bold text-[10px] uppercase border border-white/20 transition flex-shrink-0"
               aria-expanded="false"
             >
               Rozwiń Hub S1–S56 ▾
             </button>
           </div>
-          <h1 id="hero-portal-title" class="font-display font-black text-xl sm:text-4xl text-white uppercase tracking-tight leading-tight">
+          <h1 id="hero-portal-title" class="font-display font-black text-xl sm:text-3xl lg:text-4xl text-white uppercase tracking-tight leading-tight">
             SCORE MATCH LIGA <span class="text-league-primary">— OFICJALNY PORTAL</span>
           </h1>
-          <div class="mt-3 grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2">
-            <button type="button" onclick="SMPL_APP.switchTab('submit')" class="btn-league inline-flex items-center justify-center text-center whitespace-nowrap px-2 py-2 sm:px-3.5 rounded-xl font-display font-black text-[10px] sm:text-xs uppercase tracking-wider shadow-lg min-w-0">
-              ➕ Wpisz Wynik
+          <div class="smpl-hero-cta-row mt-2.5 grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2">
+            <button type="button" onclick="SMPL_APP.switchTab('submit')" class="btn-league inline-flex items-center justify-center text-center whitespace-nowrap overflow-hidden px-2 py-2 sm:px-4 rounded-xl font-display font-black text-[10px] sm:text-xs uppercase tracking-wider shadow-lg min-w-0">
+              <span>➕ <span class="sm:hidden">Wynik</span><span class="hidden sm:inline">Wpisz Wynik</span></span>
             </button>
-            <button type="button" onclick="SMPL_APP.switchTab('profile')" class="inline-flex items-center justify-center text-center whitespace-nowrap px-2 py-2 sm:px-3.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 font-display font-bold text-[10px] sm:text-xs uppercase tracking-wider transition min-w-0">
-              🎴 Karta UT &amp; Trofea
+            <button type="button" onclick="SMPL_APP.switchTab('profile')" class="smpl-hero-secondary-cta inline-flex items-center justify-center text-center whitespace-nowrap overflow-hidden px-2 py-2 sm:px-4 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-400/40 font-display font-bold text-[10px] sm:text-xs uppercase tracking-wider transition min-w-0">
+              <span>🎴 <span class="sm:hidden">Karta UT</span><span class="hidden sm:inline">Karta UT &amp; Trofea</span></span>
             </button>
-            <button type="button" onclick="SMPL_APP.switchTab('register')" class="inline-flex items-center justify-center text-center whitespace-nowrap px-2 py-2 sm:px-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white border border-white/15 font-display font-bold text-[10px] sm:text-xs uppercase tracking-wider transition min-w-0">
-              📝 Zapisy
+            <button type="button" onclick="SMPL_APP.switchTab('register')" class="smpl-hero-secondary-cta inline-flex items-center justify-center text-center whitespace-nowrap overflow-hidden px-2 py-2 sm:px-4 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white border border-white/15 font-display font-bold text-[10px] sm:text-xs uppercase tracking-wider transition min-w-0">
+              <span>📝 Zapisy</span>
             </button>
           </div>
           <div class="smpl-hero-expandable">
@@ -238,19 +239,19 @@
       if (ev && ev.message) window.__SMPL_BOOT_ERRORS.push(ev.message);
     });
   </script>
-  <script src="js/crests-and-media.js"></script>
-  <script src="js/archive-data.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/expansion-studio.js?v=56"></script>
-  <script src="js/ranks.js?v=56"></script>
-  <script src="js/seed-data.js"></script>
-  <script src="js/api-client.js?v=56"></script>
-  <script src="js/ui-views.js?v=56"></script>
-  <script src="js/ui-forms-admin.js?v=56"></script>
-  <script src="js/notifications.js?v=56"></script>
-  <script src="js/ai-assistant.js?v=56"></script>
-  <script src="js/wow-overhaul.js?v=56"></script>
-  <script src="js/app.js?v=56"></script>
+  <script src="js/crests-and-media.js?v=57"></script>
+  <script src="js/archive-data.js?v=57"></script>
+  <script src="js/engine.js?v=57"></script>
+  <script src="js/expansion-studio.js?v=57"></script>
+  <script src="js/ranks.js?v=57"></script>
+  <script src="js/seed-data.js?v=57"></script>
+  <script src="js/api-client.js?v=57"></script>
+  <script src="js/ui-views.js?v=57"></script>
+  <script src="js/ui-forms-admin.js?v=57"></script>
+  <script src="js/notifications.js?v=57"></script>
+  <script src="js/ai-assistant.js?v=57"></script>
+  <script src="js/wow-overhaul.js?v=57"></script>
+  <script src="js/app.js?v=57"></script>
   <script>
     window.addEventListener('DOMContentLoaded', function () {
       setTimeout(function () {

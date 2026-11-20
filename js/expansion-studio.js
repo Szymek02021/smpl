@@ -2918,6 +2918,22 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_5',
+      version: 'V2.5',
+      date: '2026-11-20',
+      category: 'ULEPSZENIA',
+      title: 'Studio Mistrzów Royal 2026 — Ekskluzywny, Spójny Wygląd na Smartfon i PC',
+      summary: 'Przebudowaliśmy cały wizualny system portalu, rejestracji i paneli do jednego luksusowego wzorca Broadcast Gold & Glass — szybszego, czytelniejszego i idealnie dopasowanego zarówno na telefony, jak i duże monitory.',
+      highlights: [
+        'Smartfon bez ścisku: odchudzony baner Hero (z 535 px do kompaktowego paska Broadcast), 4-kolumnowy pasek telemetrii i bezbłędne przyciski CTA bez nachodzenia tekstu.',
+        'Ekran logowania (Auth Gate) mieści teraz od razu przycisk wejścia bez przewijania na telefonach i PC, a dymek Vanessy AI nie zasłania już pól haseł.',
+        'Jednolity królewski wzorzec na wszystkich 4 stronach (Portal, Rejestracja, Panel Admina, Master Panel), medalionowe herby lig, miękkie wygaszanie krawędzi zakładek i dopracowany tryb Jasny Prestiż.',
+        'Nowoczesne suwaki, czytelne odznaki XP (Platynowy Taktyk), wyrównane filtry Terminarza oraz szklane toasty dopasowane do każdego z 5 motywów.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_4',
       version: 'V2.4',
       date: '2026-11-17',
