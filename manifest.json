@@ -1,0 +1,37 @@
+{
+  "id": "/",
+  "name": "Score Match Liga",
+  "short_name": "SMPL",
+  "description": "Oficjalny portal rozgrywek Score Match Liga — Wszystkie Sezony, Terminarz, Tabele, Czat i Czarna Lista",
+  "start_url": "/index.html?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#030712",
+  "theme_color": "#0f172a",
+  "categories": [
+    "sports",
+    "games",
+    "entertainment"
+  ],
+  "icons": [
+    {
+      "src": "/css/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/css/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/css/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pl" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, user-scalable=yes" />
+  <title>Score Match Liga — Master Panel Szymona Komendy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=56" />
+  <link rel="stylesheet" href="css/smpl-wow-overhaul.css?v=56" />
+  <script>
+    (function () {
+      try {
+        var pref = localStorage.getItem('smpl_theme_pref') || 'auto-system';
+        var design = localStorage.getItem('smpl_portal_design') || 'wow';
+        if (design !== 'classic') design = 'wow';
+        var eff = pref;
+        if (pref === 'auto-time') {
+          var h = new Date().getHours();
+          eff = (h >= 6 && h < 12) ? 'dawn' : (h >= 12 && h < 18) ? 'light' : (h >= 18 && h < 22) ? 'twilight' : 'dark';
+        } else if (pref === 'auto-system' || (pref !== 'dark' && pref !== 'light' && pref !== 'prestige' && pref !== 'twilight' && pref !== 'dawn')) {
+          eff = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+        }
+        var isLight = (eff === 'light' || eff === 'dawn');
+        document.documentElement.setAttribute('data-smpl-overhaul', design);
+        document.documentElement.setAttribute('data-smpl-theme', eff);
+        document.documentElement.setAttribute('data-smpl-theme-pref', pref);
+        document.documentElement.className = isLight ? 'light' : 'dark';
+      } catch (e) {}
+    })();
+  </script>
+  <script>
+    window.SMPL_FORCED_MODE = 'MASTER';
+    if (!window.location.hash) window.location.hash = 'master-szymon';
+  </script>
+  <!-- PWA & Favicon Icons -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=15" />
+  <link rel="icon" type="image/png" sizes="32x32" href="css/favicon-32x32.png?v=15" />
+  <link rel="icon" type="image/png" sizes="16x16" href="css/favicon-16x16.png?v=15" />
+  <link rel="apple-touch-icon" sizes="180x180" href="css/apple-touch-icon.png?v=15" />
+  <link rel="manifest" href="manifest.json?v=56" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Score Match Liga" />
+</head>
+<body data-league="L1" class="mobile-bottom-safe">
+  <!-- Ekran Ładowania Master Admin SMPL (Desktop & Mobile PWA) -->
+  <div id="smpl-loading-screen" class="smpl-loader-overlay" role="status" aria-live="polite" style="position:fixed;inset:0;z-index:9999;background:#030712;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem;color:#f8fafc;">
+    <div class="smpl-loader-card" style="width:min(27.5rem,100%);padding:1.5rem 1.25rem;border-radius:1.5rem;background:rgba(15,23,42,0.88);border:1px solid rgba(251,191,36,0.34);text-align:center;">
+      <div class="smpl-loader-ring-wrap">
+        <div class="smpl-loader-ring"></div>
+        <div class="smpl-loader-ring-inner"></div>
+        <img src="css/icon-192.png" alt="Score Match Liga" class="smpl-loader-crest" width="60" height="60"/>
+      </div>
+      <div class="smpl-loader-badge">👑 Master Panel • Szymon Komenda</div>
+      <div class="smpl-loader-title">Konsola Założyciela</div>
+      <div class="smpl-loader-subtitle">Pełna kontrola nad dywizjami, graczami, sezonami i Vanessą Gemini AI...</div>
+      <div class="smpl-loader-bar-track"><div class="smpl-loader-bar-fill"></div></div>
+      <div id="smpl-loader-status-text" class="smpl-loader-status">Autoryzacja Master...</div>
+      <div class="smpl-loader-credit-box" style="margin-top:1rem;padding:0.75rem;border-radius:1rem;border:1px solid rgba(251,191,36,0.36);background:rgba(15,23,42,0.85);">
+        <div class="smpl-loader-credit-eyebrow">⚡ Oficjalna Aplikacja WWW &amp; Telefon PWA</div>
+        <div class="smpl-loader-credit-text">Stronę przygotował <strong class="smpl-loader-author-name" style="color:#fbbf24;">Szymon Komenda</strong> dla <strong class="smpl-loader-community-name" style="color:#34d399;">Score Match Polska</strong></div>
+      </div>
+      <div class="smpl-loader-device-pills">
+        <span class="smpl-loader-device-pill">📱 Telefon &amp; PWA</span>
+        <span class="smpl-loader-device-pill">💻 Strona WWW</span>
+        <span class="smpl-loader-device-pill">👑 Master Admin</span>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.__SMPL_LOADER_BOOT = Date.now();
+    setTimeout(function () {
+      var l = document.getElementById('smpl-loading-screen');
+      if (l) { l.style.opacity = '0'; l.style.pointerEvents = 'none'; setTimeout(function () { if (l.parentNode) l.parentNode.removeChild(l); }, 450); }
+    }, 4500);
+  </script>
+
+  <div class="stadium-backdrop"></div>
+  <div class="stadium-grid-overlay"></div>
+
+  <!-- Pełnoekranowy etap logowania / rejestracji przed wejściem do portalu -->
+  <div id="fullscreen-auth-gate" class="fixed inset-0 z-50 overflow-y-auto auth-gate-arena auth-gate-spotlights flex flex-col justify-center items-center p-3 sm:p-6" style="display: none;"></div>
+
+  <header id="top-auth-bar" class="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-white/10"></header>
+
+  <div id="main-portal-container" class="relative z-10 max-w-7xl mx-auto px-3 sm:px-6 pt-5 pb-14">
+    <div id="portal-announcement-bar" class="hidden mb-4 p-3.5 rounded-2xl bg-amber-500/15 border border-amber-400/50 text-xs sm:text-sm text-amber-100 font-semibold"></div>
+    <section id="league-selector-container" class="mb-6"></section>
+    <nav id="main-tabs-nav" class="mb-6 sticky top-[49px] z-30 bg-obsidian/85 backdrop-blur-xl py-2 px-2 rounded-2xl border border-white/10"></nav>
+    <main id="app-main-view" class="min-h-[480px]"></main>
+  </div>
+
+  <div id="mobile-bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-white/15 px-2 py-1.5 grid grid-cols-6 gap-1 text-[10px] font-display font-bold"></div>
+  <div id="global-modal-root"></div>
+  <div id="smpl-ai-widget-root"></div>
+  <div id="smpl-notif-center-root"></div>
+  <div id="toast-container" class="fixed top-16 right-4 flex flex-col gap-2 max-w-sm"></div>
+
+  <script src="js/crests-and-media.js"></script>
+  <script src="js/archive-data.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/expansion-studio.js?v=56"></script>
+  <script src="js/ranks.js?v=56"></script>
+  <script src="js/seed-data.js"></script>
+  <script src="js/api-client.js?v=56"></script>
+  <script src="js/ui-views.js?v=56"></script>
+  <script src="js/ui-forms-admin.js?v=56"></script>
+  <script src="js/notifications.js?v=56"></script>
+  <script src="js/ai-assistant.js?v=56"></script>
+  <script src="js/wow-overhaul.js?v=56"></script>
+  <script src="js/app.js?v=56"></script>
+</body>
+</html>

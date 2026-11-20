@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pl" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, user-scalable=yes" />
+  <title>Score Match Liga — Oficjalny Portal Rozgrywek i Historia Ligi</title>
+
+  <!-- Fonty (opcjonalne — bez internetu aplikacja używa fontów systemowych) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+
+  <!-- Pełny lokalny arkusz stylów (100% niezależny od zewnętrznych CDN, działa również offline) -->
+  <link rel="stylesheet" href="css/styles.css?v=56" />
+  <link rel="stylesheet" href="css/smpl-wow-overhaul.css?v=56" />
+  <script>
+    (function () {
+      try {
+        var pref = localStorage.getItem('smpl_theme_pref') || 'auto-system';
+        var design = localStorage.getItem('smpl_portal_design') || 'wow';
+        if (design !== 'classic') design = 'wow';
+        var eff = pref;
+        if (pref === 'auto-time') {
+          var h = new Date().getHours();
+          eff = (h >= 6 && h < 12) ? 'dawn' : (h >= 12 && h < 18) ? 'light' : (h >= 18 && h < 22) ? 'twilight' : 'dark';
+        } else if (pref === 'auto-system' || (pref !== 'dark' && pref !== 'light' && pref !== 'prestige' && pref !== 'twilight' && pref !== 'dawn')) {
+          eff = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+        }
+        var isLight = (eff === 'light' || eff === 'dawn');
+        document.documentElement.setAttribute('data-smpl-overhaul', design);
+        document.documentElement.setAttribute('data-smpl-theme', eff);
+        document.documentElement.setAttribute('data-smpl-theme-pref', pref);
+        document.documentElement.className = isLight ? 'light' : 'dark';
+      } catch (e) {}
+    })();
+  </script>
+  <!-- PWA & Favicon Icons -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=15" />
+  <link rel="icon" type="image/png" sizes="32x32" href="css/favicon-32x32.png?v=15" />
+  <link rel="icon" type="image/png" sizes="16x16" href="css/favicon-16x16.png?v=15" />
+  <link rel="apple-touch-icon" sizes="180x180" href="css/apple-touch-icon.png?v=15" />
+  <link rel="manifest" href="manifest.json?v=56" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Score Match Liga" />
+</head>
+<body data-league="L1" class="mobile-bottom-safe">
+  <!-- Ekran Ładowania Score Match Liga (Desktop & Mobile PWA) -->
+  <div id="smpl-loading-screen" class="smpl-loader-overlay" role="status" aria-live="polite" style="position:fixed;inset:0;z-index:9999;background:#030712;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem;color:#f8fafc;">
+    <div class="smpl-loader-card" style="width:min(27.5rem,100%);padding:1.5rem 1.25rem;border-radius:1.5rem;background:rgba(15,23,42,0.88);border:1px solid rgba(251,191,36,0.34);text-align:center;">
+      <div class="smpl-loader-ring-wrap">
+        <div class="smpl-loader-ring"></div>
+        <div class="smpl-loader-ring-inner"></div>
+        <img src="css/icon-192.png" alt="Score Match Liga" class="smpl-loader-crest" width="60" height="60"/>
+      </div>
+      <div class="smpl-loader-badge">● Score Match Polska • Oficjalny Portal</div>
+      <div class="smpl-loader-title">Score Match Liga</div>
+      <div class="smpl-loader-subtitle">Przygotowujemy tabele na żywo, karty UT, terminarz i statystyki...</div>
+      <div class="smpl-loader-bar-track"><div class="smpl-loader-bar-fill"></div></div>
+      <div id="smpl-loader-status-text" class="smpl-loader-status">Synchronizacja areny...</div>
+      <div class="smpl-loader-credit-box" style="margin-top:1rem;padding:0.75rem;border-radius:1rem;border:1px solid rgba(251,191,36,0.36);background:rgba(15,23,42,0.85);">
+        <div class="smpl-loader-credit-eyebrow">⚡ Oficjalna Aplikacja WWW &amp; Telefon PWA</div>
+        <div class="smpl-loader-credit-text">Stronę przygotował <strong class="smpl-loader-author-name" style="color:#fbbf24;">Szymon Komenda</strong> dla <strong class="smpl-loader-community-name" style="color:#34d399;">Score Match Polska</strong></div>
+      </div>
+      <div class="smpl-loader-device-pills">
+        <span class="smpl-loader-device-pill">📱 Telefon &amp; PWA</span>
+        <span class="smpl-loader-device-pill">💻 Strona WWW</span>
+        <span class="smpl-loader-device-pill">🤖 Vanessa Gemini AI</span>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.__SMPL_LOADER_BOOT = Date.now();
+    setTimeout(function () {
+      var st = document.getElementById('smpl-loader-status-text');
+      if (st) st.textContent = 'Ładowanie archiwum S1–S55 i rozgrywek...';
+    }, 450);
+    setTimeout(function () {
+      var l = document.getElementById('smpl-loading-screen');
+      if (l) { l.style.opacity = '0'; l.style.pointerEvents = 'none'; setTimeout(function () { if (l.parentNode) l.parentNode.removeChild(l); }, 450); }
+    }, 4500);
+  </script>
+
+  <!-- PWA Install Banner na smartfony -->
+  <div id="pwa-install-banner" class="relative z-30 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white px-4 py-2.5 shadow-xl flex items-center justify-between gap-3 text-xs border-b border-white/20" style="display: none;">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <img src="css/icon-192.png?v=15" class="w-8 h-8 rounded-lg shadow-md flex-shrink-0" alt="SMPL App"/>
+      <div class="min-w-0">
+        <strong class="font-display uppercase tracking-wide block truncate">Zainstaluj aplikację Score Match Liga</strong>
+        <span class="text-[11px] text-blue-100 hidden sm:inline">Otrzymuj natychmiastowe powiadomienia o wynikach, nagrodach i nowych kolejkach!</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <button type="button" onclick="SMPL_NOTIF.promptInstall()" class="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-black text-xs uppercase shadow transition">
+        📲 Zainstaluj
+      </button>
+      <button type="button" onclick="SMPL_NOTIF.dismissInstallBanner()" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center">
+        ✕
+      </button>
+    </div>
+  </div>
+  <!-- Światła stadionowe i siatka boiska w tle -->
+  <div class="stadium-backdrop"></div>
+  <div class="stadium-grid-overlay"></div>
+
+  <!-- Pełnoekranowy etap logowania / rejestracji przed wejściem do portalu -->
+  <div id="fullscreen-auth-gate" class="fixed inset-0 z-50 overflow-y-auto auth-gate-arena auth-gate-spotlights flex flex-col justify-center items-center p-3 sm:p-6" style="display: none;"></div>
+
+  <!-- Górny pasek portalu -->
+  <header id="top-auth-bar" class="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-white/10"></header>
+
+  <!-- Główny kontener portalu SMPL -->
+  <div id="main-portal-container" class="relative z-10 max-w-7xl mx-auto px-3 sm:px-6 pt-5 pb-14">
+
+    <div id="portal-announcement-bar" class="hidden mb-4 p-3.5 rounded-2xl bg-amber-500/15 border border-amber-400/50 text-xs sm:text-sm text-amber-100 font-semibold"></div>
+
+    <!-- Broadcast Hero Banner & Season Hub ("Studio Mistrzów") -->
+    <section class="hero-showcase-banner rounded-3xl p-5 sm:p-7 mb-6 relative overflow-hidden">
+      <div class="wow-hero-grid flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-5">
+        <div class="max-w-3xl min-w-0">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div class="inline-flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span id="hero-portal-badge" class="px-2.5 sm:px-3 py-1 rounded-full bg-white/10 border border-white/20 font-display font-bold text-[10px] sm:text-[11px] text-league-primary uppercase tracking-widest">
+                ⚽ SCORE MATCH LIGA (SMPL)
+              </span>
+              <span class="hidden sm:inline-flex px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 font-display font-bold text-[11px] text-emerald-300 uppercase">
+                OFICJALNA LIGA • S1–S56
+              </span>
+              <span class="hidden md:inline-flex px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 font-display font-bold text-[11px] text-rose-300 uppercase">
+                💀 CZARNA LISTA LIGI
+              </span>
+            </div>
+            <button
+              id="smpl-hero-collapse-btn"
+              type="button"
+              onclick="SMPL_APP.toggleHeroExpand()"
+              class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 font-display font-bold text-[10px] uppercase border border-white/20 transition flex-shrink-0"
+              aria-expanded="false"
+            >
+              Rozwiń Hub S1–S56 ▾
+            </button>
+          </div>
+          <h1 id="hero-portal-title" class="font-display font-black text-xl sm:text-4xl text-white uppercase tracking-tight leading-tight">
+            SCORE MATCH LIGA <span class="text-league-primary">— OFICJALNY PORTAL</span>
+          </h1>
+          <div class="mt-3 grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2">
+            <button type="button" onclick="SMPL_APP.switchTab('submit')" class="btn-league inline-flex items-center justify-center text-center whitespace-nowrap px-2 py-2 sm:px-3.5 rounded-xl font-display font-black text-[10px] sm:text-xs uppercase tracking-wider shadow-lg min-w-0">
+              ➕ Wpisz Wynik
+            </button>
+            <button type="button" onclick="SMPL_APP.switchTab('profile')" class="inline-flex items-center justify-center text-center whitespace-nowrap px-2 py-2 sm:px-3.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 font-display font-bold text-[10px] sm:text-xs uppercase tracking-wider transition min-w-0">
+              🎴 Karta UT &amp; Trofea
+            </button>
+            <button type="button" onclick="SMPL_APP.switchTab('register')" class="inline-flex items-center justify-center text-center whitespace-nowrap px-2 py-2 sm:px-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white border border-white/15 font-display font-bold text-[10px] sm:text-xs uppercase tracking-wider transition min-w-0">
+              📝 Zapisy
+            </button>
+          </div>
+          <div class="smpl-hero-expandable">
+            <p id="hero-portal-subtitle" class="text-xs sm:text-sm text-slate-300 mt-2.5 leading-relaxed">
+              Oficjalny hub polskich rozgrywek ligowych Score! Match. Dostęp do <strong>wszystkich sezonów w jednym miejscu</strong>: od Sezonu 1 po trwający Sezon 56. Automatyczne tabele, terminarze (Ekstraklasa, 2. Liga, 3. Liga), Czyste Konta <strong>„Żelazna Kurtyna”</strong>, Karty UT &amp; Trofea, plebiscyt <strong>Złota Piłka</strong>, Wielki Ranking Wszech Czasów oraz <strong>Oficjalna Czarna Lista Ligi</strong> z dożywotnimi banami.
+            </p>
+
+            <!-- Interaktywny Selektor Wszystkich Sezonów -->
+            <div class="mt-3.5 pt-3 border-t border-white/10 flex flex-wrap items-center gap-2">
+              <span class="text-xs font-display uppercase font-bold text-slate-400 mr-1">Wybierz Sezon:</span>
+              <button type="button" onclick="SMPL_APP.switchGlobalSeason('CURRENT_56')" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black text-xs uppercase shadow-lg transition">
+                ⚡ Aktualna Tabela
+              </button>
+              <button type="button" onclick="SMPL_APP.switchGlobalSeason('ARCHIVE_55')" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-400/30 font-display font-bold text-xs uppercase transition">
+                ⏪ Sezon 55 (Ostatni)
+              </button>
+              <button type="button" onclick="SMPL_APP.switchGlobalSeason('ARCHIVE_ALL')" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/15 font-display font-bold text-xs uppercase transition">
+                🏛️ Wszystkie Sezony (S1–S55)
+              </button>
+              <button type="button" onclick="SMPL_APP.switchGlobalSeason('ALL_TIME')" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-blue-300 border border-blue-400/30 font-display font-bold text-xs uppercase transition">
+                👑 Ranking Wszech Czasów
+              </button>
+              <button type="button" onclick="SMPL_APP.switchGlobalSeason('BLACKLIST')" class="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/40 font-display font-black text-xs uppercase transition">
+                💀 Czarna Lista
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prawa Kolumna: Broadcast Live HUD (Studio Mistrzów) -->
+        <div id="wow-hero-live-hud" class="hidden"></div>
+      </div>
+    </section>
+
+    <!-- Wybór 3 Poziomów Rozgrywkowych (Ekstraklasa, 2. Liga, 3. Liga) z Herbami -->
+    <section id="league-selector-container" class="mb-6"></section>
+
+    <!-- Pasek Nawigacji Modułów -->
+    <nav id="main-tabs-nav" class="smpl-nav-bar mb-6 sticky top-[49px] z-30 bg-obsidian/85 backdrop-blur-xl py-2 px-2 rounded-2xl border border-white/10"></nav>
+
+    <!-- Główny Widok Dynamiczny -->
+    <main id="app-main-view" class="min-h-[480px]"></main>
+
+    <!-- Stopka Portalu (Zabezpieczenie Prawne Fair Use / Antyhazard / RODO) -->
+    <footer class="mt-12 pt-6 border-t border-white/10 text-xs text-slate-400 space-y-3">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+          <span class="font-display font-bold text-white">SCORE MATCH POLSKA</span>
+          <span>• Stronę przygotował <strong class="text-amber-300">Szymon Komenda</strong> dla <strong class="text-emerald-300">Score Match Polska</strong></span>
+        </div>
+        <div class="flex flex-wrap items-center gap-4">
+          <button type="button" onclick="SMPL_APP.switchTab('blacklist')" class="text-rose-400 hover:text-white underline font-semibold">💀 Czarna Lista (Dożywotni Ban)</button>
+          <button type="button" onclick="SMPL_APP.switchTab('archive')" class="text-blue-300 hover:text-white underline font-semibold">🏛️ Cała Historia (S1–S55)</button>
+          <button type="button" onclick="SMPL_APP.switchTab('goldenball')" class="text-amber-300 hover:text-white underline font-semibold">🏆 Złota Piłka SMPL</button>
+          <button type="button" onclick="SMPL_APP.switchTab('updates')" class="text-amber-200 hover:text-white underline font-semibold">🆕 Co Nowego (Update V...)</button>
+          <button type="button" onclick="SMPL_APP.switchTab('support')" class="text-amber-300 hover:text-white underline font-semibold">☕ Wesprzyj Twórcę i Ligę</button>
+          <button type="button" onclick="SMPL_APP.switchTab('legal')" class="text-emerald-300 hover:text-white underline font-semibold">⚖️ Regulamin, Prawo i RODO</button>
+          <button type="button" onclick="SMPL_APP.openAiAssistant()" class="text-pink-300 hover:text-white underline font-semibold">🤖 Vanessa AI (Pomoc)</button>
+          <button type="button" onclick="SMPL_APP.toggleSettingsDrawer()" class="text-amber-300 hover:text-white underline font-semibold">⚙️ Motyw i Ustawienia</button>
+          <button type="button" onclick="SMPL_APP.openPlayerSelectModal()" class="hover:text-white underline">👤 Konto Gracza</button>
+        </div>
+      </div>
+      <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-white/10 text-[11px] text-slate-400 leading-relaxed">
+        <strong class="text-slate-200">⚖️ Zastrzeżenie Prawne (Fair Use &amp; Brak Powiązania / Klauzula Antyhazardowa / RODO):</strong>
+        Portal SMPL to w 100% niekomercyjna inicjatywa społecznościowa fanów. Gra <em>Score! Match</em>, jej grafiki i znaki towarowe należą wyłącznie do <strong>First Touch Games Ltd.</strong> Rozgrywki mają charakter wyłącznie zręcznościowy (Skill-Based) i są <strong>całkowicie bezpłatne (0 zł wpisowego, brak nagród pieniężnych i gier losowych w rozumieniu Ustawy z dnia 19 listopada 2009 r. o grach hazardowych)</strong>. Każdy uczestnik posiada pełne prawo wglądu, edycji oraz natychmiastowego usunięcia swojego konta i wizerunku zgodnie z RODO (Art. 17 GDPR).
+      </div>
+    </footer>
+  </div>
+
+  <!-- Dolny pasek nawigacji mobilnej (Mobile-First dla smartfonów) -->
+  <div id="mobile-bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-white/15 px-2 py-1.5 grid grid-cols-6 gap-1 text-[10px] font-display font-bold"></div>
+
+  <!-- Kontener Modali, Widżetu AI, Skrzynki Powiadomień i Toastów (zawsze na wierzchu) -->
+  <div id="global-modal-root"></div>
+  <div id="smpl-ai-widget-root"></div>
+  <div id="smpl-notif-center-root"></div>
+  <div id="toast-container" class="fixed top-16 right-4 flex flex-col gap-2 max-w-sm"></div>
+
+  <!-- Skrypty Aplikacji Score Match Liga -->
+  <script>
+    window.__SMPL_BOOT_ERRORS = [];
+    window.addEventListener('error', function (ev) {
+      if (ev && ev.message) window.__SMPL_BOOT_ERRORS.push(ev.message);
+    });
+  </script>
+  <script src="js/crests-and-media.js"></script>
+  <script src="js/archive-data.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/expansion-studio.js?v=56"></script>
+  <script src="js/ranks.js?v=56"></script>
+  <script src="js/seed-data.js"></script>
+  <script src="js/api-client.js?v=56"></script>
+  <script src="js/ui-views.js?v=56"></script>
+  <script src="js/ui-forms-admin.js?v=56"></script>
+  <script src="js/notifications.js?v=56"></script>
+  <script src="js/ai-assistant.js?v=56"></script>
+  <script src="js/wow-overhaul.js?v=56"></script>
+  <script src="js/app.js?v=56"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(function () {
+        var gate = document.getElementById('fullscreen-auth-gate');
+        var view = document.getElementById('app-main-view');
+        var gateHidden = !gate || gate.style.display === 'none' || !gate.innerHTML.trim();
+        var viewEmpty = !view || !view.innerHTML.trim();
+        if (gateHidden && viewEmpty && view) {
+          var errs = (window.__SMPL_BOOT_ERRORS || []).join(' | ');
+          view.innerHTML = '<div style="padding:24px;border-radius:18px;background:rgba(15,23,42,0.95);border:1px solid rgba(251,191,36,0.5);color:#f8fafc;max-width:720px;margin:20px auto;text-align:center;">' +
+            '<h2 style="font-size:18px;font-weight:800;color:#fbbf24;margin-bottom:8px;">🔄 Odśwież pamięć przeglądarki (Ctrl + F5)</h2>' +
+            '<p style="font-size:13px;color:#cbd5e1;line-height:1.55;">Przeglądarka użyła starej wersji plików z pamięci podręcznej. Naciśnij <strong>Ctrl + F5</strong> (lub zamknij okno i uruchom ponownie <code>URUCHOM-SCORE-MATCH-LIGA.bat</code>), aby załadować ekran logowania.</p>' +
+            (errs ? '<p style="font-size:11px;color:#fca5a5;margin-top:10px;">Szczegóły: ' + errs + '</p>' : '') +
+            '</div>';
+        }
+      }, 250);
+    });
+  </script>
+</body>
+</html>

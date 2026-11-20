@@ -1,0 +1,15 @@
+{
+  "name": "smpl-portal",
+  "version": "56.0.0",
+  "description": "Score Match Liga Polska (SMPL) — Oficjalny Portal Rozgrywek, Pucharów, Rankingów i Pełnej Historii Ligi",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-all.ps1",
+    "build:zip": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-hostido-zip.ps1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

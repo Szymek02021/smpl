@@ -1,0 +1,763 @@
+/* ==========================================================================
+   SCORE MATCH LIGA (SMPL) — PRZEBUDOWA „STUDIO MISTRZÓW” (SEPARATNY PLIK WOW)
+   Styl: Połączenie Luxury Royal (UEFA Champions League) + EA FC TOTY Hologramy
+   5 pełnych motywów opartych na zmiennych CSS:
+     1) dark     — Noc Mistrzów (Obsidian & Królewskie Złoto)
+     2) light    — Jasny Prestiż (Porcelana, Granat & Błękit Stadionowy)
+     3) prestige — Szmaragdowy Pałac VIP (Głęboka Zieleń, Platyna & Szampan)
+     4) twilight — Wieczorne Jupitery (Ametystowy Neon UCL & Cyjan)
+     5) dawn     — Poranny Stadion (Ciepły Złoty Świt)
+
+   Bezpieczne wycofanie: usunięcie importu tego pliku oraz js/wow-overhaul.js
+   przywraca w 100% klasyczny wygląd sprzed przebudowy (dodatkowo kopia:
+   BACKUP-PRZED-PRZEBUDOWA-V42.zip).
+   ========================================================================== */
+
+:root {
+  --wow-bg-base: #050811;
+  --wow-bg-image: url('../img/wow-stadium-night.jpg');
+  --wow-bg-veil: linear-gradient(180deg, rgba(4, 7, 16, 0.56) 0%, rgba(6, 10, 22, 0.80) 52%, rgba(4, 6, 14, 0.96) 100%);
+  --wow-spotlight-a: radial-gradient(ellipse 70% 44% at 15% -4%, rgba(245, 158, 11, 0.24) 0%, transparent 58%);
+  --wow-spotlight-b: radial-gradient(ellipse 68% 44% at 86% -2%, rgba(34, 211, 238, 0.18) 0%, transparent 58%);
+
+  --wow-surface: linear-gradient(155deg, rgba(16, 24, 46, 0.92) 0%, rgba(7, 11, 22, 0.96) 60%, rgba(10, 16, 32, 0.94) 100%);
+  --wow-surface-elevated: rgba(15, 23, 42, 0.94);
+  --wow-surface-soft: rgba(10, 16, 30, 0.78);
+  --wow-border: rgba(255, 255, 255, 0.14);
+  --wow-border-accent: rgba(251, 191, 36, 0.44);
+  --wow-shadow: 0 22px 54px rgba(0, 0, 0, 0.68), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+
+  --wow-topbar-bg: linear-gradient(180deg, rgba(8, 12, 24, 0.94) 0%, rgba(6, 10, 20, 0.88) 100%);
+  --wow-nav-bg: rgba(10, 15, 30, 0.90);
+  --wow-dock-bg: linear-gradient(180deg, rgba(8, 12, 24, 0.95) 0%, rgba(4, 7, 16, 0.98) 100%);
+  --wow-drawer-bg: linear-gradient(160deg, rgba(16, 24, 48, 0.98) 0%, rgba(6, 10, 20, 0.99) 100%);
+
+  --wow-text: #F8FAFC;
+  --wow-text-muted: #94A3B8;
+  --wow-accent-gold: #F59E0B;
+  --wow-accent-prism: #22D3EE;
+  --wow-table-head: linear-gradient(180deg, rgba(22, 33, 62, 0.96) 0%, rgba(12, 18, 36, 0.96) 100%);
+
+  --wow-hero-bg: url('../img/wow-hero-night.jpg');
+  --wow-hero-veil: linear-gradient(96deg, rgba(4, 7, 16, 0.94) 0%, rgba(7, 12, 26, 0.84) 48%, rgba(7, 13, 28, 0.34) 100%);
+  --wow-hero-text: #FFFFFF;
+  --wow-hero-sub: #CBD5E1;
+  --wow-hero-border: rgba(251, 191, 36, 0.45);
+  --wow-hud-bg: rgba(7, 12, 26, 0.78);
+  --wow-hud-border: rgba(34, 211, 238, 0.32);
+}
+
+/* ==========================================================================
+   2. MOTYW: SZMARAGDOWY PAŁAC VIP (PRESTIGE)
+   ========================================================================== */
+html[data-smpl-theme="prestige"] {
+  --wow-bg-base: #02160E;
+  --wow-bg-veil: linear-gradient(180deg, rgba(2, 28, 18, 0.52) 0%, rgba(4, 34, 22, 0.78) 54%, rgba(2, 16, 11, 0.96) 100%);
+  --wow-spotlight-a: radial-gradient(ellipse 78% 48% at 14% -2%, rgba(16, 185, 129, 0.36) 0%, transparent 60%);
+  --wow-spotlight-b: radial-gradient(ellipse 72% 46% at 86% 0%, rgba(250, 204, 21, 0.26) 0%, transparent 58%);
+
+  --wow-surface: linear-gradient(155deg, rgba(6, 48, 34, 0.92) 0%, rgba(3, 24, 16, 0.96) 62%, rgba(5, 36, 25, 0.95) 100%);
+  --wow-surface-elevated: rgba(7, 44, 30, 0.95);
+  --wow-surface-soft: rgba(4, 30, 20, 0.84);
+  --wow-border: rgba(52, 211, 153, 0.34);
+  --wow-border-accent: rgba(250, 204, 21, 0.58);
+  --wow-shadow: 0 22px 54px rgba(1, 14, 9, 0.75), 0 0 34px rgba(16, 185, 129, 0.20), inset 0 1px 0 rgba(167, 243, 208, 0.22);
+
+  --wow-topbar-bg: linear-gradient(180deg, rgba(4, 28, 19, 0.96) 0%, rgba(2, 18, 12, 0.93) 100%);
+  --wow-nav-bg: rgba(5, 34, 23, 0.92);
+  --wow-dock-bg: linear-gradient(180deg, rgba(4, 28, 19, 0.96) 0%, rgba(2, 14, 10, 0.98) 100%);
+  --wow-drawer-bg: linear-gradient(160deg, rgba(6, 44, 30, 0.98) 0%, rgba(2, 16, 11, 0.99) 100%);
+
+  --wow-accent-gold: #FDE047;
+  --wow-accent-prism: #10B981;
+  --wow-table-head: linear-gradient(180deg, rgba(7, 56, 38, 0.96) 0%, rgba(4, 30, 21, 0.96) 100%);
+
+  --wow-hero-veil: linear-gradient(96deg, rgba(2, 24, 16, 0.95) 0%, rgba(6, 48, 32, 0.78) 50%, rgba(4, 34, 22, 0.32) 100%);
+  --wow-hero-border: rgba(52, 211, 153, 0.65);
+  --wow-hud-bg: rgba(3, 30, 20, 0.84);
+  --wow-hud-border: rgba(250, 204, 21, 0.48);
+}
+
+/* ==========================================================================
+   3. MOTYW: WIECZORNE JUPITERY NEON UCL (TWILIGHT)
+   ========================================================================== */
+html[data-smpl-theme="twilight"] {
+  --wow-bg-base: #0A0622;
+  --wow-bg-veil: linear-gradient(180deg, rgba(18, 10, 56, 0.54) 0%, rgba(20, 12, 58, 0.78) 54%, rgba(9, 5, 30, 0.96) 100%);
+  --wow-spotlight-a: radial-gradient(ellipse 78% 48% at 14% -2%, rgba(56, 189, 248, 0.36) 0%, transparent 60%);
+  --wow-spotlight-b: radial-gradient(ellipse 74% 48% at 86% 0%, rgba(236, 72, 153, 0.32) 0%, transparent 58%);
+
+  --wow-surface: linear-gradient(155deg, rgba(32, 20, 78, 0.92) 0%, rgba(14, 10, 42, 0.96) 60%, rgba(24, 16, 62, 0.94) 100%);
+  --wow-surface-elevated: rgba(30, 20, 72, 0.95);
+  --wow-surface-soft: rgba(18, 12, 48, 0.84);
+  --wow-border: rgba(56, 189, 248, 0.36);
+  --wow-border-accent: rgba(236, 72, 153, 0.56);
+  --wow-shadow: 0 22px 54px rgba(4, 2, 18, 0.78), 0 0 36px rgba(139, 92, 246, 0.24), inset 0 1px 0 rgba(165, 243, 252, 0.22);
+
+  --wow-topbar-bg: linear-gradient(180deg, rgba(18, 12, 52, 0.96) 0%, rgba(11, 7, 34, 0.93) 100%);
+  --wow-nav-bg: rgba(20, 13, 58, 0.92);
+  --wow-dock-bg: linear-gradient(180deg, rgba(18, 12, 52, 0.96) 0%, rgba(9, 6, 28, 0.98) 100%);
+  --wow-drawer-bg: linear-gradient(160deg, rgba(30, 19, 76, 0.98) 0%, rgba(12, 8, 38, 0.99) 100%);
+
+  --wow-accent-gold: #38BDF8;
+  --wow-accent-prism: #F472B6;
+  --wow-table-head: linear-gradient(180deg, rgba(38, 26, 92, 0.96) 0%, rgba(18, 13, 52, 0.96) 100%);
+
+  --wow-hero-veil: linear-gradient(96deg, rgba(14, 9, 44, 0.95) 0%, rgba(30, 18, 76, 0.78) 50%, rgba(18, 10, 52, 0.34) 100%);
+  --wow-hero-border: rgba(56, 189, 248, 0.66);
+  --wow-hud-bg: rgba(18, 12, 54, 0.84);
+  --wow-hud-border: rgba(244, 114, 182, 0.52);
+}
+
+/* ==========================================================================
+   4. MOTYW: JASNY PRESTIŻ — PORCELANA & GRANAT (LIGHT)
+   ========================================================================== */
+html[data-smpl-theme="light"] {
+  --wow-bg-base: #EEF3FA;
+  --wow-bg-image: url('../img/wow-stadium-day.jpg');
+  --wow-bg-veil: linear-gradient(180deg, rgba(246, 249, 255, 0.72) 0%, rgba(238, 244, 252, 0.86) 52%, rgba(226, 234, 246, 0.95) 100%);
+  --wow-spotlight-a: radial-gradient(ellipse 72% 42% at 14% 0%, rgba(37, 99, 235, 0.14) 0%, transparent 58%);
+  --wow-spotlight-b: radial-gradient(ellipse 68% 42% at 86% 0%, rgba(217, 119, 6, 0.14) 0%, transparent 58%);
+
+  --wow-surface: linear-gradient(160deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 249, 254, 0.94) 100%);
+  --wow-surface-elevated: rgba(255, 255, 255, 0.98);
+  --wow-surface-soft: rgba(241, 245, 249, 0.92);
+  --wow-border: rgba(15, 23, 42, 0.12);
+  --wow-border-accent: rgba(37, 99, 235, 0.34);
+  --wow-shadow: 0 14px 36px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+
+  --wow-topbar-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(244, 247, 252, 0.92) 100%);
+  --wow-nav-bg: rgba(255, 255, 255, 0.94);
+  --wow-dock-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(239, 244, 250, 0.98) 100%);
+  --wow-drawer-bg: linear-gradient(160deg, #FFFFFF 0%, #F1F5F9 100%);
+
+  --wow-text: #0F172A;
+  --wow-text-muted: #475569;
+  --wow-accent-gold: #B45309;
+  --wow-accent-prism: #1D4ED8;
+  --wow-table-head: linear-gradient(180deg, #E2E8F0 0%, #EFF4FA 100%);
+
+  --wow-hero-bg: url('../img/wow-hero-day.jpg');
+  --wow-hero-veil: linear-gradient(96deg, rgba(255, 255, 255, 0.93) 0%, rgba(244, 248, 254, 0.80) 52%, rgba(240, 245, 252, 0.25) 100%);
+  --wow-hero-text: #0F172A;
+  --wow-hero-sub: #334155;
+  --wow-hero-border: rgba(30, 58, 138, 0.24);
+  --wow-hud-bg: rgba(255, 255, 255, 0.86);
+  --wow-hud-border: rgba(37, 99, 235, 0.26);
+}
+
+/* ==========================================================================
+   5. MOTYW: PORANNY STADION — ZŁOTY ŚWIT (DAWN)
+   ========================================================================== */
+html[data-smpl-theme="dawn"] {
+  --wow-bg-base: #FCF7EE;
+  --wow-bg-image: url('../img/wow-stadium-day.jpg');
+  --wow-bg-veil: linear-gradient(180deg, rgba(255, 249, 236, 0.72) 0%, rgba(252, 244, 228, 0.86) 54%, rgba(244, 235, 217, 0.95) 100%);
+  --wow-spotlight-a: radial-gradient(ellipse 74% 44% at 14% 0%, rgba(245, 158, 11, 0.22) 0%, transparent 58%);
+  --wow-spotlight-b: radial-gradient(ellipse 68% 44% at 86% 0%, rgba(14, 165, 233, 0.16) 0%, transparent 58%);
+
+  --wow-surface: linear-gradient(160deg, rgba(255, 253, 248, 0.96) 0%, rgba(253, 247, 235, 0.94) 100%);
+  --wow-surface-elevated: rgba(255, 254, 250, 0.98);
+  --wow-surface-soft: rgba(250, 243, 230, 0.92);
+  --wow-border: rgba(120, 53, 15, 0.14);
+  --wow-border-accent: rgba(217, 119, 6, 0.38);
+  --wow-shadow: 0 14px 36px rgba(92, 54, 14, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+
+  --wow-topbar-bg: linear-gradient(180deg, rgba(255, 252, 245, 0.96) 0%, rgba(253, 246, 232, 0.93) 100%);
+  --wow-nav-bg: rgba(255, 252, 245, 0.94);
+  --wow-dock-bg: linear-gradient(180deg, rgba(255, 252, 245, 0.96) 0%, rgba(249, 240, 222, 0.98) 100%);
+  --wow-drawer-bg: linear-gradient(160deg, #FFFDF8 0%, #FAF1DF 100%);
+
+  --wow-text: #1C1917;
+  --wow-text-muted: #57534E;
+  --wow-accent-gold: #B45309;
+  --wow-accent-prism: #0284C7;
+  --wow-table-head: linear-gradient(180deg, #F5E6C8 0%, #FAF0DB 100%);
+
+  --wow-hero-bg: url('../img/wow-hero-day.jpg');
+  --wow-hero-veil: linear-gradient(96deg, rgba(255, 251, 242, 0.93) 0%, rgba(253, 244, 224, 0.78) 52%, rgba(252, 246, 232, 0.25) 100%);
+  --wow-hero-text: #1C1917;
+  --wow-hero-sub: #44403C;
+  --wow-hero-border: rgba(217, 119, 6, 0.34);
+  --wow-hud-bg: rgba(255, 252, 246, 0.88);
+  --wow-hud-border: rgba(217, 119, 6, 0.34);
+}
+
+/* ==========================================================================
+   SPÓJNE ZASTOSOWANIE ZMIENNYCH NA WSZYSTKICH POWIERZCHNIACH PORTALU
+   ========================================================================== */
+html[data-smpl-theme] body {
+  background-color: var(--wow-bg-base);
+  color: var(--wow-text);
+  transition: background-color 0.28s ease, color 0.28s ease;
+}
+
+html[data-smpl-theme] .stadium-backdrop {
+  background-color: var(--wow-bg-base) !important;
+  background-image:
+    var(--wow-spotlight-a),
+    var(--wow-spotlight-b),
+    var(--wow-bg-veil),
+    var(--wow-bg-image) !important;
+  background-size: cover !important;
+  background-position: center center !important;
+}
+
+html[data-smpl-theme] .smpl-topbar-chrome {
+  background: var(--wow-topbar-bg) !important;
+  border-bottom: 1px solid var(--wow-border) !important;
+}
+
+html[data-smpl-theme] .smpl-nav-chrome {
+  background: var(--wow-nav-bg) !important;
+  border: 1px solid var(--wow-border) !important;
+  box-shadow: var(--wow-shadow) !important;
+}
+
+html[data-smpl-theme] .smpl-dock-chrome {
+  background: var(--wow-dock-bg) !important;
+  border-top: 1px solid var(--wow-border) !important;
+}
+
+html[data-smpl-theme] .smpl-settings-drawer {
+  background: var(--wow-drawer-bg) !important;
+  border: 1px solid var(--wow-border-accent) !important;
+  color: var(--wow-text);
+}
+
+html[data-smpl-theme] .glass-panel {
+  background: var(--wow-surface) !important;
+  border: 1px solid var(--wow-border) !important;
+  box-shadow: var(--wow-shadow) !important;
+  color: var(--wow-text);
+}
+
+html[data-smpl-theme] .glass-panel-league {
+  background: var(--wow-surface) !important;
+  border: 1px solid var(--league-border) !important;
+  box-shadow: var(--wow-shadow), 0 0 28px var(--league-glow) !important;
+  color: var(--wow-text);
+}
+
+html[data-smpl-theme] .smpl-table-header {
+  background: var(--wow-table-head) !important;
+}
+
+/* Szklane powierzchnie motywowe w prestige/twilight dla dark-hardcoded kart wewnętrznych */
+html[data-smpl-theme="prestige"] .bg-slate-950\/80,
+html[data-smpl-theme="prestige"] .bg-slate-950\/85,
+html[data-smpl-theme="prestige"] .bg-slate-950\/90,
+html[data-smpl-theme="prestige"] .bg-slate-900\/80,
+html[data-smpl-theme="prestige"] .bg-slate-900\/90 {
+  background-color: rgba(4, 26, 18, 0.86) !important;
+}
+
+html[data-smpl-theme="twilight"] .bg-slate-950\/80,
+html[data-smpl-theme="twilight"] .bg-slate-950\/85,
+html[data-smpl-theme="twilight"] .bg-slate-950\/90,
+html[data-smpl-theme="twilight"] .bg-slate-900\/80,
+html[data-smpl-theme="twilight"] .bg-slate-900\/90 {
+  background-color: rgba(14, 11, 42, 0.86) !important;
+}
+
+/* Pełna naprawa trybu JASNEGO w Hero + Panelach Aktywnych Lig (koniec z czarnymi łatami) */
+html[data-smpl-theme="light"] .hero-showcase-banner,
+html[data-smpl-theme="dawn"] .hero-showcase-banner {
+  background-color: #FFFFFF !important;
+  background-image: var(--wow-hero-veil), var(--wow-hero-bg) !important;
+  border: 1.5px solid var(--wow-hero-border) !important;
+  box-shadow: 0 20px 46px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+  color: var(--wow-hero-text) !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner h1,
+html[data-smpl-theme="dawn"] .hero-showcase-banner h1,
+html[data-smpl-theme="light"] .hero-showcase-banner #hero-portal-title,
+html[data-smpl-theme="dawn"] .hero-showcase-banner #hero-portal-title,
+html[data-smpl-theme="light"] .hero-showcase-banner .text-white,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-white {
+  color: var(--wow-hero-text) !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .text-league-primary,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-league-primary {
+  color: var(--wow-accent-prism) !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .text-slate-300,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-slate-300,
+html[data-smpl-theme="light"] .hero-showcase-banner .text-slate-200,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-slate-200,
+html[data-smpl-theme="light"] .hero-showcase-banner .text-slate-400,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-slate-400 {
+  color: var(--wow-hero-sub) !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .text-amber-200,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-amber-200,
+html[data-smpl-theme="light"] .hero-showcase-banner .text-amber-300,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-amber-300 {
+  color: #B45309 !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .text-emerald-300,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-emerald-300,
+html[data-smpl-theme="light"] .hero-showcase-banner .text-emerald-400,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-emerald-400 {
+  color: #047857 !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .text-blue-300,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .text-blue-300 {
+  color: #1D4ED8 !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .bg-amber-500\/20,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .bg-amber-500\/20 {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(180, 83, 9, 0.36) !important;
+  color: #92400E !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .bg-white\/10,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .bg-white\/10,
+html[data-smpl-theme="light"] .hero-showcase-banner .bg-slate-900\/90,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .bg-slate-900\/90,
+html[data-smpl-theme="light"] .hero-showcase-banner .bg-slate-900,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .bg-slate-900 {
+  background-color: rgba(15, 23, 42, 0.08) !important;
+  border-color: rgba(15, 23, 42, 0.16) !important;
+  color: #0F172A !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .smpl-hero-metric-chip,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .smpl-hero-metric-chip {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.94) 0%, rgba(241, 245, 249, 0.92) 100%) !important;
+  border: 1px solid var(--wow-border) !important;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
+}
+
+html[data-smpl-theme="prestige"] .hero-showcase-banner .smpl-hero-metric-chip {
+  background: linear-gradient(155deg, rgba(6, 46, 32, 0.88) 0%, rgba(3, 22, 15, 0.94) 100%) !important;
+  border-color: rgba(52, 211, 153, 0.28) !important;
+}
+
+html[data-smpl-theme="twilight"] .hero-showcase-banner .smpl-hero-metric-chip {
+  background: linear-gradient(155deg, rgba(28, 19, 72, 0.88) 0%, rgba(12, 8, 36, 0.94) 100%) !important;
+  border-color: rgba(56, 189, 248, 0.30) !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .btn-league,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .btn-league,
+html[data-smpl-theme="light"] .hero-showcase-banner .bg-emerald-600,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .bg-emerald-600 {
+  color: #FFFFFF !important;
+}
+
+html[data-smpl-theme="light"] .hero-showcase-banner .bg-rose-950\/60,
+html[data-smpl-theme="dawn"] .hero-showcase-banner .bg-rose-950\/60 {
+  background-color: rgba(225, 29, 72, 0.12) !important;
+  color: #9F1239 !important;
+}
+
+/* W trybie jasnym aktywna karta ligi nie jest ciężką czarną cegłą, lecz eleganckim royal-granatowym/kremowym akcentem */
+html[data-smpl-theme="light"] .league-tab-card.active-l1,
+html[data-smpl-theme="dawn"] .league-tab-card.active-l1 {
+  background: linear-gradient(135deg, #FFFDF5 0%, #FEF3C7 100%) !important;
+  border-color: #D97706 !important;
+  box-shadow: 0 10px 26px rgba(217, 119, 6, 0.22) !important;
+  color: #1F2937 !important;
+}
+html[data-smpl-theme="light"] .league-tab-card.active-l2,
+html[data-smpl-theme="dawn"] .league-tab-card.active-l2 {
+  background: linear-gradient(135deg, #F8FAFF 0%, #DBEAFE 100%) !important;
+  border-color: #2563EB !important;
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.20) !important;
+  color: #0F172A !important;
+}
+html[data-smpl-theme="light"] .league-tab-card.active-l3,
+html[data-smpl-theme="dawn"] .league-tab-card.active-l3 {
+  background: linear-gradient(135deg, #FFF8F1 0%, #FED7AA 100%) !important;
+  border-color: #C2410C !important;
+  box-shadow: 0 10px 26px rgba(194, 65, 12, 0.18) !important;
+  color: #1C1917 !important;
+}
+html[data-smpl-theme="light"] .league-tab-card[class*="active-"] .text-white,
+html[data-smpl-theme="dawn"] .league-tab-card[class*="active-"] .text-white {
+  color: #0F172A !important;
+}
+html[data-smpl-theme="light"] .league-tab-card[class*="active-"] .text-slate-300,
+html[data-smpl-theme="dawn"] .league-tab-card[class*="active-"] .text-slate-300 {
+  color: #475569 !important;
+}
+html[data-smpl-theme="light"] .league-tab-card[class*="active-"] .smpl-division-pill,
+html[data-smpl-theme="dawn"] .league-tab-card[class*="active-"] .smpl-division-pill {
+  background-color: rgba(15, 23, 42, 0.08) !important;
+  color: #0F172A !important;
+}
+
+/* ==========================================================================
+   6. NOWE GRAFIKI AAA + HYBRID LUXURY / EA FC TOTY EFFECTS
+   ========================================================================== */
+html[data-smpl-overhaul="wow"] .auth-gate-arena {
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(245, 158, 11, 0.26) 0%, transparent 45%),
+    radial-gradient(ellipse at 80% 0%, rgba(34, 211, 238, 0.22) 0%, transparent 45%),
+    linear-gradient(180deg, rgba(4, 7, 15, 0.44) 0%, rgba(5, 9, 18, 0.72) 52%, rgba(4, 6, 13, 0.92) 100%),
+    url('../img/wow-auth-tunnel.jpg') !important;
+}
+
+html[data-smpl-overhaul="wow"] .hero-showcase-banner {
+  background-image: var(--wow-hero-veil), var(--wow-hero-bg) !important;
+  background-size: cover !important;
+  background-position: right center !important;
+  border-color: var(--wow-hero-border);
+}
+
+html[data-smpl-overhaul="wow"] .goldenball-showcase-banner,
+html[data-smpl-overhaul="wow"] .competitions-showcase-banner {
+  background-image:
+    linear-gradient(96deg, rgba(6, 7, 14, 0.94) 0%, rgba(15, 12, 18, 0.80) 52%, rgba(10, 9, 14, 0.34) 100%),
+    url('../img/wow-gala-stage.jpg') !important;
+}
+
+html[data-smpl-overhaul="wow"] .h2h-showcase-banner {
+  background-image:
+    linear-gradient(100deg, rgba(6, 10, 22, 0.90) 0%, rgba(9, 14, 30, 0.68) 50%, rgba(7, 11, 24, 0.42) 100%),
+    url('../img/wow-h2h-clash.jpg') !important;
+}
+
+html[data-smpl-overhaul="wow"] .ut-card-foil-surface {
+  background-image:
+    linear-gradient(175deg, rgba(8, 12, 24, 0.54) 0%, rgba(7, 11, 22, 0.72) 56%, rgba(5, 8, 15, 0.90) 100%),
+    url('../img/wow-ut-foil.jpg') !important;
+  border: 1.5px solid rgba(34, 211, 238, 0.48) !important;
+  box-shadow:
+    0 24px 56px rgba(0, 0, 0, 0.78),
+    0 0 34px rgba(34, 211, 238, 0.22),
+    inset 0 1px 0 rgba(251, 191, 36, 0.42) !important;
+}
+
+/* Prismatic TOTY Glow wokół Karty UT & Podium TOP 3 */
+html[data-smpl-overhaul="wow"] .smpl-ut-card-holo::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(125deg, rgba(251, 191, 36, 0.65), rgba(34, 211, 238, 0.55), rgba(16, 185, 129, 0.55), rgba(251, 191, 36, 0.65));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+html[data-smpl-overhaul="wow"] .smpl-podium-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+html[data-smpl-overhaul="wow"] .smpl-podium-card:hover {
+  transform: translateY(-4px);
+}
+html[data-smpl-overhaul="wow"] .smpl-podium-gold {
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.56), 0 0 34px rgba(245, 158, 11, 0.24), inset 0 1px 0 rgba(253, 224, 71, 0.45) !important;
+}
+html[data-smpl-overhaul="wow"] .smpl-podium-silver {
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48), 0 0 28px rgba(56, 189, 248, 0.18), inset 0 1px 0 rgba(226, 232, 240, 0.36) !important;
+}
+
+/* ==========================================================================
+   7. UKŁAD „MATCHDAY COMMAND CENTER” (KOMPAKTOWY HERO SPLIT + SEGMENTED PRO BAR)
+   ========================================================================== */
+html[data-smpl-overhaul="wow"] .hero-showcase-banner {
+  padding: 0.9rem 1.25rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+html[data-smpl-overhaul="wow"] #smpl-hero-telemetry-hud {
+  margin-top: 0.65rem !important;
+  padding-top: 0.65rem !important;
+}
+
+html[data-smpl-overhaul="wow"] .smpl-hero-metric-chip {
+  padding: 0.45rem 0.72rem !important;
+}
+
+/* Auth Gate lepiej wycentrowany bez obcinania przycisku na dole laptopa + safe-area iPhone */
+html[data-smpl-overhaul="wow"] .auth-gate-arena {
+  padding-top: max(0.75rem, calc(0.75rem + var(--smpl-safe-top, 0px))) !important;
+  padding-bottom: max(1.25rem, calc(1rem + var(--sab, 0px))) !important;
+}
+
+/* Powiadomienia Toast poniżej górnego paska nawigacji (również z iPhone notch / Dynamic Island / baner PWA) */
+html[data-smpl-overhaul="wow"] #toast-container {
+  top: max(4.3rem, calc(var(--smpl-toast-top, var(--smpl-topbar-h, calc(52px + var(--smpl-safe-top, 0px)))) + 0.65rem)) !important;
+}
+
+html[data-smpl-overhaul="wow"] .wow-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  html[data-smpl-overhaul="wow"] .wow-hero-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.95fr);
+    gap: 1.25rem;
+  }
+}
+
+html[data-smpl-overhaul="wow"] .wow-hero-hud-card {
+  background: var(--wow-hud-bg);
+  border: 1px solid var(--wow-hud-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 1.15rem;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+html[data-smpl-theme="light"] .wow-hero-hud-card,
+html[data-smpl-theme="dawn"] .wow-hero-hud-card {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* Kompaktowy Segmented Pro League Switcher (zamiast wielkich cegieł) */
+html[data-smpl-overhaul="wow"] #league-selector-container {
+  margin-bottom: 0.85rem !important;
+}
+
+html[data-smpl-overhaul="wow"] .wow-league-seg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+@media (max-width: 639px) {
+  html[data-smpl-overhaul="wow"] .wow-league-seg-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+}
+
+html[data-smpl-overhaul="wow"] .wow-league-seg-card {
+  padding: 0.62rem 0.85rem !important;
+  border-radius: 1rem !important;
+  gap: 0.65rem !important;
+  min-height: 0 !important;
+}
+
+html[data-smpl-overhaul="wow"] .wow-league-seg-card .wow-seg-crest {
+  width: 2.35rem;
+  height: 2.7rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45));
+}
+
+@media (max-width: 639px) {
+  html[data-smpl-overhaul="wow"] .wow-league-seg-card {
+    padding: 0.5rem 0.62rem !important;
+    gap: 0.45rem !important;
+  }
+  html[data-smpl-overhaul="wow"] .wow-league-seg-card .wow-seg-crest {
+    width: 1.85rem;
+    height: 2.15rem;
+  }
+  html[data-smpl-overhaul="wow"] .wow-league-seg-card .wow-seg-meta {
+    display: none;
+  }
+}
+
+html[data-smpl-overhaul="wow"] .wow-league-seg-card[class*="active-"]::before {
+  content: "";
+  position: absolute;
+  left: 0.9rem;
+  right: 0.9rem;
+  bottom: 0;
+  height: 2.5px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, var(--league-primary), var(--wow-accent-prism), transparent);
+  box-shadow: 0 0 12px var(--league-glow);
+}
+
+/* Kompaktowa nawigacja zakładek w trybie WOW */
+html[data-smpl-overhaul="wow"] #main-tabs-nav {
+  margin-bottom: 1rem !important;
+}
+
+/* Tryb Klasyczny (1-klik przełącznik powrotu w ⚙️ Menu) */
+html[data-smpl-overhaul="classic"] #wow-hero-live-hud {
+  display: none !important;
+}
+
+/* Subtelne podświetlenie wierszy tabeli Broadcast Shine */
+html[data-smpl-overhaul="wow"] .smpl-standings-table tbody tr {
+  transition: background-color 0.16s ease, transform 0.16s ease;
+}
+html[data-smpl-overhaul="wow"] .smpl-standings-table tbody tr:hover {
+  background: rgba(251, 191, 36, 0.06);
+}
+html[data-smpl-theme="light"] .smpl-standings-table tbody tr:hover,
+html[data-smpl-theme="dawn"] .smpl-standings-table tbody tr:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* Kontrast wewnętrznych przycisków HUD oraz niestandardowych lig L4+ w trybie jasnym */
+html[data-smpl-theme="light"] .wow-hero-hud-card .bg-white\/5,
+html[data-smpl-theme="dawn"] .wow-hero-hud-card .bg-white\/5,
+html[data-smpl-theme="light"] .wow-hero-hud-card .bg-white\/10,
+html[data-smpl-theme="dawn"] .wow-hero-hud-card .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.055) !important;
+  border-color: rgba(15, 23, 42, 0.14) !important;
+}
+html[data-smpl-theme="light"] .wow-hero-hud-card .bg-white\/5:hover,
+html[data-smpl-theme="dawn"] .wow-hero-hud-card .bg-white\/5:hover {
+  background-color: rgba(15, 23, 42, 0.10) !important;
+}
+
+html[data-smpl-theme="light"] .league-tab-card.active-l4,
+html[data-smpl-theme="dawn"] .league-tab-card.active-l4 {
+  background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%) !important;
+  border-color: #059669 !important;
+  box-shadow: 0 10px 24px rgba(5, 150, 105, 0.18) !important;
+  color: #064E3B !important;
+}
+html[data-smpl-theme="light"] .league-tab-card.active-l5,
+html[data-smpl-theme="dawn"] .league-tab-card.active-l5,
+html[data-smpl-theme="light"] .league-tab-card.active-l6,
+html[data-smpl-theme="dawn"] .league-tab-card.active-l6,
+html[data-smpl-theme="light"] .league-tab-card.active-l-custom,
+html[data-smpl-theme="dawn"] .league-tab-card.active-l-custom {
+  background: linear-gradient(135deg, #FAF5FF 0%, #E9D5FF 100%) !important;
+  border-color: #7C3AED !important;
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.18) !important;
+  color: #2E1065 !important;
+}
+
+/* Ochrona jasnych napisów na ciemnym karbonie UT Foil w trybie jasnym */
+html[data-smpl-theme="light"] .ut-card-foil-surface .text-white,
+html[data-smpl-theme="dawn"] .ut-card-foil-surface .text-white {
+  color: #FFFFFF !important;
+}
+html[data-smpl-theme="light"] .ut-card-foil-surface .text-slate-300,
+html[data-smpl-theme="dawn"] .ut-card-foil-surface .text-slate-300,
+html[data-smpl-theme="light"] .ut-card-foil-surface .text-slate-400,
+html[data-smpl-theme="dawn"] .ut-card-foil-surface .text-slate-400 {
+  color: #CBD5E1 !important;
+}
+html[data-smpl-theme="light"] .ut-card-foil-surface .text-amber-300,
+html[data-smpl-theme="dawn"] .ut-card-foil-surface .text-amber-300 {
+  color: #FCD34D !important;
+}
+html[data-smpl-theme="light"] .ut-card-foil-surface .text-emerald-300,
+html[data-smpl-theme="dawn"] .ut-card-foil-surface .text-emerald-300 {
+  color: #6EE7B7 !important;
+}
+html[data-smpl-theme="light"] .ut-card-foil-surface .bg-slate-950\/80,
+html[data-smpl-theme="dawn"] .ut-card-foil-surface .bg-slate-950\/80,
+html[data-smpl-theme="light"] .ut-card-foil-surface .bg-slate-900\/80,
+html[data-smpl-theme="dawn"] .ut-card-foil-surface .bg-slate-900\/80 {
+  background-color: rgba(10, 15, 30, 0.85) !important;
+  color: #F8FAFC !important;
+}
+
+/* ============================================================================
+ * STUDIO MISTRZÓW PRO — BROADCAST GOLD & HOLO (Mobile-First UX v52)
+ * ============================================================================ */
+
+/* Górny złoty wskaźnik świetlny aktywnej zakładki na dolnym pasku mobilnym */
+#mobile-bottom-nav button.mob-tab-active,
+#mobile-bottom-nav button[aria-current="page"],
+#mobile-bottom-nav button.text-league-primary,
+#mobile-bottom-nav button[class*="bg-"]:not([aria-current="false"]) {
+  position: relative;
+  border-top: 2px solid #FBBF24;
+  box-shadow: 0 -2px 10px rgba(251, 191, 36, 0.45);
+}
+
+#mobile-bottom-nav button.mob-tab-active::before,
+#mobile-bottom-nav button[aria-current="page"]::before,
+#mobile-bottom-nav button.text-league-primary::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 18%;
+  right: 18%;
+  height: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, #FDE68A, #F59E0B, transparent);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.75);
+  pointer-events: none;
+}
+
+/* Wyróżnienie 1. miejsca (Lidera) w tabeli ligowej w stylu Broadcast Gold */
+.smpl-standings-table tbody tr:first-child:not(:has(td[colspan])) {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.14) 0%, rgba(251, 191, 36, 0.04) 48%, transparent 100%);
+  border-left: 3px solid #F59E0B;
+}
+
+.smpl-standings-table tbody tr:first-child > td:first-child:not([colspan]) {
+  border-left: 3px solid #F59E0B;
+}
+
+html[data-smpl-theme="light"] .smpl-standings-table tbody tr:first-child:not(:has(td[colspan])),
+html[data-smpl-theme="dawn"] .smpl-standings-table tbody tr:first-child:not(:has(td[colspan])) {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.13) 0%, rgba(251, 191, 36, 0.04) 50%, transparent 100%);
+}
+
+/* ============================================================================
+ * ZAKŁADKA DOBROWOLNEGO WSPARCIA (DONATE — STUDIO MISTRZÓW PRO v54)
+ * ============================================================================ */
+.smpl-support-hero {
+  background:
+    radial-gradient(circle at 12% 15%, rgba(251, 191, 36, 0.18), transparent 48%),
+    radial-gradient(circle at 88% 82%, rgba(16, 185, 129, 0.16), transparent 52%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(2, 6, 23, 0.98) 100%);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(251, 191, 36, 0.28);
+}
+
+html[data-smpl-theme="light"] .smpl-support-hero,
+html[data-smpl-theme="dawn"] .smpl-support-hero {
+  background:
+    radial-gradient(circle at 12% 15%, rgba(245, 158, 11, 0.16), transparent 52%),
+    radial-gradient(circle at 88% 82%, rgba(16, 185, 129, 0.14), transparent 55%),
+    linear-gradient(135deg, #FFFBEB 0%, #F8FAFC 55%, #ECFDF5 100%);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+}
+
+.smpl-support-tier-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.smpl-support-tier-card:hover {
+  transform: translateY(-2px);
+}
+
+.smpl-support-tier-active {
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.65), 0 12px 28px rgba(245, 158, 11, 0.22);
+}
+
+.smpl-support-tab-pill {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(16, 185, 129, 0.14));
+  border-color: rgba(251, 191, 36, 0.45) !important;
+  color: #FDE68A !important;
+}
+
+.smpl-support-tab-pill:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.32), rgba(16, 185, 129, 0.22));
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.25);
+}
+
+html[data-smpl-theme="light"] .smpl-support-tab-pill,
+html[data-smpl-theme="dawn"] .smpl-support-tab-pill {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(16, 185, 129, 0.14));
+  color: #92400E !important;
+  border-color: rgba(217, 119, 6, 0.5) !important;
+}
+
+
+

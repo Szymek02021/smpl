@@ -1,0 +1,57 @@
+# ==============================================================================
+# Score Match Liga Polska (SMPL) — Bezpieczny .gitignore
+# NIGDY nie wrzucaj na GitHub bazy danych graczy, sekretow AI/VAPID ani tokenow!
+# ==============================================================================
+
+# --- Baza danych produkcji i sekrety (KRYTYCZNE!) ---
+data/smpl-db.json
+data/smpl-db.*.json
+data/smpl-sezon*.json
+data/.smpl-*
+data/snapshots/
+data/audit.log
+data/*.json
+data/*.log
+data/*.bak
+data/*.tmp
+
+# Zezwol na plik ochronny Apache/LiteSpeed i pusty znacznik folderu data/
+!data/.htaccess
+!data/.gitkeep
+
+# --- Sekrety i zmienne srodowiskowe ---
+.env
+.env.*
+*.key
+*.pem
+
+# --- Paczki wdrozeniowe, archiwa, duze wideo i kopie zapasowe ---
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.bak
+*.log
+*.tmp
+
+# --- Lokalne foldery robocze / eksporty ---
+public_html_NAPRAWIONE/
+PACZKA-NA-SERWER-*/
+PAKIET-VIP-*/
+dist/
+build/
+tmp/
+node_modules/
+
+# --- Pliki systemowe Windows / macOS / edytorow ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+.vscode/.history/

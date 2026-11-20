@@ -1,0 +1,86 @@
+# ==============================================================================
+# OFICJALNA POLSKA LIGA SCORE! MATCH (SMPL) — SEZON 56
+# Automatyczna konfiguracja serwera WWW (Apache / LiteSpeed / cPanel / DirectAdmin)
+# ==============================================================================
+
+DirectoryIndex index.html index.php
+Options -Indexes
+AddDefaultCharset UTF-8
+ErrorDocument 404 /index.html
+
+# Blokada bezposredniego podgladu plikow dokumentacji, skryptow i kopii
+<FilesMatch "\.(md|bat|ps1|sh|log|bak)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<FilesMatch "^(package\.json|server\.js|server\.ps1|netlify\.toml|vercel\.json)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header set Access-Control-Allow-Origin "*"
+  Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+  Header set Access-Control-Allow-Headers "Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token"
+  <FilesMatch "\.(json|php)$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Header set X-LiteSpeed-Cache-Control "no-cache"
+  </FilesMatch>
+  <FilesMatch "\.(html|css|js)$">
+    Header set Cache-Control "no-cache, must-revalidate, max-age=0"
+  </FilesMatch>
+  <FilesMatch "^(sw\.js|manifest\.json|index\.html)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set X-LiteSpeed-Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+# Zwiększenie limitu dla wgrywanych screenów z gry Score! Match (dla starszych serwerów mod_php)
+<IfModule mod_php7.c>
+  php_value upload_max_filesize 32M
+  php_value post_max_size 32M
+  php_value memory_limit 256M
+</IfModule>
+<IfModule mod_php8.c>
+  php_value upload_max_filesize 32M
+  php_value post_max_size 32M
+  php_value memory_limit 256M
+</IfModule>
+
+# Automatyczne przekierowanie wywołań /api/state do api.php, obsługa wielkości liter i fallback SPA/PWA (LiteSpeed/Apache)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^api/state$ api.php [L,QSA]
+
+  # Przekierowania niewrażliwe na wielkość liter dla dedykowanych stron HTML
+  RewriteCond %{REQUEST_URI} !^/PANEL-ADMINA\.html$
+  RewriteRule ^panel-admina\.html$ /PANEL-ADMINA.html [NC,L]
+
+  RewriteCond %{REQUEST_URI} !^/MASTER-SZYMON-KOMENDA\.html$
+  RewriteRule ^master-szymon-komenda\.html$ /MASTER-SZYMON-KOMENDA.html [NC,L]
+
+  RewriteCond %{REQUEST_URI} !^/REJESTRACJA\.html$
+  RewriteRule ^rejestracja\.html$ /REJESTRACJA.html [NC,L]
+
+  # Bezpieczny fallback SPA dla zainstalowanych aplikacji PWA (eliminacja 404 na LiteSpeed)
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !^/(api\.php|data/|js/|css/|img/|\.well-known/)
+  RewriteRule ^ /index.html [L]
+</IfModule>
+
+# Kompresja GZIP dla szybszego ładowania i mniejszego transferu
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript application/json image/svg+xml
+</IfModule>
