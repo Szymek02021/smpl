@@ -518,9 +518,10 @@ window.SMPL_STUDIO = (function () {
     var sCS = 0;
     var sWoLost = 0;
     var roundStats = {};
-    var oppIdsWin = {};
+    var winOppList = [];
     var maxUnbeaten = 0;
     var curUnbeaten = 0;
+    var rpw = Math.max(4, Number((s.weeklyConfig && s.weeklyConfig.roundsPerWeek) || 4));
 
     var sortedMatches = matches.slice().sort(function (a, b) {
       return Number(a.round || 0) - Number(b.round || 0);
@@ -546,7 +547,7 @@ window.SMPL_STUDIO = (function () {
       if (ga === 0) sCS++;
       if (gf > ga) {
         sWins++;
-        oppIdsWin[oppId] = true;
+        winOppList.push(oppId);
       }
       if (gf >= ga) {
         curUnbeaten++;
@@ -554,46 +555,85 @@ window.SMPL_STUDIO = (function () {
       } else {
         curUnbeaten = 0;
       }
-      var wk = Math.ceil(Number(m.round || 1) / 8);
+      var wk = Math.ceil(Number(m.round || 1) / rpw);
       if (!roundStats[wk]) roundStats[wk] = { played: 0, wins: 0 };
       roundStats[wk].played++;
       if (gf > ga) roundStats[wk].wins++;
     });
 
-    var hasCleanSweepWeek = Object.keys(roundStats).some(function (wk) {
+    var cleanSweepWeeksCount = Object.keys(roundStats).filter(function (wk) {
       return roundStats[wk].played >= 4 && roundStats[wk].wins === roundStats[wk].played;
-    });
+    }).length;
 
-    var l1LeaderIds = {};
+    var divTopIds = {};
+    var playerDiv = String(player.leagueId || 'L1');
     if (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.calculateStandings === 'function') {
-      var l1Tbl = window.SMPL_ENGINE.calculateStandings(s, 'L1') || [];
-      l1Tbl.slice(0, 3).forEach(function (r) { l1LeaderIds[String(r.playerId)] = true; });
+      var divTbl = window.SMPL_ENGINE.calculateStandings(s, playerDiv) || [];
+      divTbl.slice(0, 5).forEach(function (r) { divTopIds[String(r.playerId)] = true; });
     }
-    var beatTop3 = Object.keys(oppIdsWin).some(function (oid) { return l1LeaderIds[oid] && oid !== pid; });
+    var giantWinsCount = winOppList.filter(function (oid) { return divTopIds[oid] && oid !== pid; }).length;
 
     var histMatches = archRow ? Number(archRow.matches || 0) : 0;
     var totalMatches = histMatches + sPlayed;
+    var histWins = archRow ? Number(archRow.wins || 0) : 0;
+    var totalWins = histWins + sWins;
     var histGoals = archRow ? Number(archRow.gf || 0) : 0;
     var totalGoals = histGoals + sGoals;
-    var totalGolds = (archRow ? Number(archRow.gold || 0) : 0) + (Array.isArray(player.trophies) ? player.trophies.filter(function (t) { return t && (/Mistrz|Złoto|Zloto/i.test(String(t.title || '')) || t.rarity === 'MYTHIC'); }).length : 0);
+    var histL1Seasons = archRow ? Number(archRow.l1Seasons || 0) : 0;
+
+    var archGolds = archRow ? Number(archRow.gold || 0) : 0;
+    var archMedals = archRow ? Number(archRow.medals || (Number(archRow.gold || 0) + Number(archRow.silver || 0) + Number(archRow.bronze || 0))) : 0;
+    var liveGolds = 0;
+    var liveMedals = 0;
+    if (Array.isArray(player.trophies)) {
+      player.trophies.forEach(function (t) {
+        if (!t) return;
+        var tid = String(t.id || '');
+        var txt = String(t.title || '') + ' ' + String(t.season || '');
+        var isHist = tid.indexOf('TR_HIST_') === 0 || tid.indexOf('ARCH_') === 0 || /Archiwum|Sezon\s+([1-9]|[1-4][0-9]|5[0-4])\b|\bS([1-9]|[1-4][0-9]|5[0-4])\b/i.test(txt);
+        if (isHist) return;
+        if (/Mistrz|Złoto|Zloto/i.test(String(t.title || '')) || t.rarity === 'MYTHIC') {
+          liveGolds++;
+          liveMedals++;
+        } else if (/Wicemistrz|Srebro|Brąz|Braz|3\.\s*miejsce|2\.\s*miejsce/i.test(String(t.title || ''))) {
+          liveMedals++;
+        }
+      });
+    }
+    var totalGolds = archGolds + liveGolds;
+    var totalMedals = archMedals + liveMedals;
 
     var comp = s.competitions || {};
     var didVoteGb = Boolean(s.goldenBall && Array.isArray(s.goldenBall.votes) && s.goldenBall.votes.some(function (v) { return v && String(v.voterPlayerId || '') === pid; }));
-    var didTyper = (comp.typerPredictions || []).some(function (v) { return v && String(v.voterPlayerId || '') === pid; });
+    var typerCount = (comp.typerPredictions || []).filter(function (v) { return v && String(v.voterPlayerId || '') === pid; }).length;
+
+    function calcPct(val, target) {
+      if (target <= 0) return 0;
+      return Math.max(0, Math.min(100, Math.round((Number(val || 0) / target) * 100)));
+    }
 
     var defs = [
-      { id: 'M100', icon: '💯', title: 'Klub 100 Meczow', desc: '100+ oficjalnych meczow w historii S1–S56', done: totalMatches >= 100, progress: totalMatches + '/100' },
-      { id: 'M300', icon: '🎖️', title: 'Klub 300 Weterana', desc: '300+ rozegranych spotkan ligowych', done: totalMatches >= 300, progress: totalMatches + '/300' },
-      { id: 'M500', icon: '🏛️', title: 'Panteon 500+', desc: '500+ oficjalnych meczow w karierze', done: totalMatches >= 500, progress: totalMatches + '/500' },
-      { id: 'M1000', icon: '🌌', title: 'Niesmiertelny 1000', desc: '1000+ meczow na arenach SMPL!', done: totalMatches >= 1000, progress: totalMatches + '/1000' },
-      { id: 'CS5', icon: '🧤', title: 'Mur Betonowy', desc: 'Min. 5 czystych kont w jednym sezonie', done: sCS >= 5, progress: sCS + '/5' },
-      { id: 'SWEEP', icon: '⚡', title: 'Perfekcyjny Tydzien', desc: 'Komplet zwyciestw w tygodniu (min. 4 mecze)', done: hasCleanSweepWeek, progress: hasCleanSweepWeek ? 'Zdobyto' : '0/1' },
-      { id: 'STREAK5', icon: '🔥', title: 'Nietykalny 5+', desc: 'Seria min. 5 meczow bez porazki w sezonie', done: maxUnbeaten >= 5, progress: maxUnbeaten + '/5' },
-      { id: 'GIANT', icon: '⚔️', title: 'Kat Gigantow', desc: 'Zwyciestwo z zawodnikiem TOP 3 Ekstraklasy', done: beatTop3, progress: beatTop3 ? 'Zdobyto' : '0/1' },
-      { id: 'GOALS40', icon: '🎯', title: 'Snajper Sezonu', desc: '25+ bramek w biezacym sezonie lub 400+ w karierze', done: sGoals >= 25 || totalGoals >= 400, progress: sGoals + ' / ' + totalGoals },
-      { id: 'FAIRPLAY', icon: '🟢', title: 'Czysta Karta Terminarza', desc: 'Min. 10 meczow w sezonie bez walkowera', done: sPlayed >= 10 && sWoLost === 0, progress: sPlayed + '/10 (WO: ' + sWoLost + ')' },
-      { id: 'GOLD', icon: '👑', title: 'Krol Korony', desc: 'Min. 1 zloty medal ligowy w historii kariery', done: totalGolds >= 1, progress: totalGolds + 'x Zloto' },
-      { id: 'FAN', icon: '🗳️', title: 'Glos Spolecznosci', desc: 'Udzial w Typerze Kolejki i Zlotej Pilce', done: didVoteGb && didTyper, progress: (didTyper ? 'Typer ✓ ' : '') + (didVoteGb ? 'ZP ✓' : '') }
+      { id: 'M500', tier: 'WETERAN', icon: '🎖️', title: 'Klub 500 Weterana', desc: '500+ oficjalnych meczów w historii SMPL', done: totalMatches >= 500, progress: totalMatches + '/500', pct: calcPct(totalMatches, 500) },
+      { id: 'M1000', tier: 'ELITA', icon: '🏛️', title: 'Panteon 1000', desc: '1 000+ oficjalnych meczów w karierze', done: totalMatches >= 1000, progress: totalMatches + '/1000', pct: calcPct(totalMatches, 1000) },
+      { id: 'M1500', tier: 'LEGEND', icon: '💎', title: 'Klub 1500 Tytanów', desc: '1 500+ oficjalnych meczów na arenach SMPL', done: totalMatches >= 1500, progress: totalMatches + '/1500', pct: calcPct(totalMatches, 1500) },
+      { id: 'M2000', tier: 'MYTHIC', icon: '🌌', title: 'Nieśmiertelny 2000', desc: '2 000+ oficjalnych meczów — mityczny rekord!', done: totalMatches >= 2000, progress: totalMatches + '/2000', pct: calcPct(totalMatches, 2000) },
+
+      { id: 'W500', tier: 'ELITA', icon: '⚔️', title: 'Klub 500 Zwycięstw', desc: '500+ wygranych spotkań w historii kariery', done: totalWins >= 500, progress: totalWins + '/500 W', pct: calcPct(totalWins, 500) },
+      { id: 'W750', tier: 'MYTHIC', icon: '🦁', title: 'Legenda 750 Zwycięstw', desc: '750+ wygranych meczów — rekordowy szczyt!', done: totalWins >= 750, progress: totalWins + '/750 W', pct: calcPct(totalWins, 750) },
+      { id: 'GOALS1200', tier: 'ELITA', icon: '🎯', title: 'Kanonier 1200+', desc: '1 200+ goli w karierze lub 40+ w sezonie', done: totalGoals >= 1200 || sGoals >= 40, progress: totalGoals + '/1200 (sez: ' + sGoals + '/40)', pct: Math.max(calcPct(totalGoals, 1200), calcPct(sGoals, 40)) },
+      { id: 'GOALS1800', tier: 'MYTHIC', icon: '☄️', title: 'Król Kanonierów 1800', desc: '1 800+ goli w karierze lub 50+ w sezonie', done: totalGoals >= 1800 || sGoals >= 50, progress: totalGoals + '/1800 (sez: ' + sGoals + '/50)', pct: Math.max(calcPct(totalGoals, 1800), calcPct(sGoals, 50)) },
+
+      { id: 'GOLD3', tier: 'LEGEND', icon: '👑', title: 'Potrójny Mistrz', desc: 'Min. 3 złote medale ligowe w historii kariery', done: totalGolds >= 3, progress: totalGolds + '/3 Złota', pct: calcPct(totalGolds, 3) },
+      { id: 'GOLD7', tier: 'MYTHIC', icon: '🏆', title: 'Dynastia Mistrzów 7×', desc: 'Min. 7 złotych medali ligowych w karierze', done: totalGolds >= 7, progress: totalGolds + '/7 Złot', pct: calcPct(totalGolds, 7) },
+      { id: 'MEDALS10', tier: 'LEGEND', icon: '🥇', title: 'Kolekcjoner Podium', desc: 'Min. 10 medali ligowych (Złoto/Srebro/Brąz)', done: totalMedals >= 10, progress: totalMedals + '/10 medali', pct: calcPct(totalMedals, 10) },
+      { id: 'ELITE20', tier: 'LEGEND', icon: '🏟️', title: 'Filar Ekstraklasy 20+', desc: 'Min. 20 pełnych sezonów w Ekstraklasie (L1)', done: histL1Seasons >= 20, progress: histL1Seasons + '/20 sez. L1', pct: calcPct(histL1Seasons, 20) },
+
+      { id: 'CS10', tier: 'SEASON', icon: '🧤', title: 'Żelazna Kurtyna 10+', desc: 'Min. 10 czystych kont w jednym sezonie', done: sCS >= 10, progress: sCS + '/10 CS', pct: calcPct(sCS, 10) },
+      { id: 'STREAK10', tier: 'SEASON', icon: '🔥', title: 'Niepokonany 10+', desc: 'Seria min. 10 meczów bez porażki w sezonie', done: maxUnbeaten >= 10, progress: maxUnbeaten + '/10 serii', pct: calcPct(maxUnbeaten, 10) },
+      { id: 'SWEEP2', tier: 'SEASON', icon: '⚡', title: 'Podwójny Perfekt', desc: 'Min. 2 perfekcyjne tygodnie (komplet ≥4 W)', done: cleanSweepWeeksCount >= 2, progress: cleanSweepWeeksCount + '/2 tyg.', pct: calcPct(cleanSweepWeeksCount, 2) },
+      { id: 'GIANT3', tier: 'SEASON', icon: '🐉', title: 'Kat Gigantów 3×', desc: 'Min. 3 zwycięstwa w sezonie z TOP 5 swojej ligi', done: giantWinsCount >= 3, progress: giantWinsCount + '/3 vs TOP 5', pct: calcPct(giantWinsCount, 3) },
+      { id: 'FAIRPLAY25', tier: 'SEASON', icon: '🟢', title: 'Żelazny Terminarz 25+', desc: 'Min. 25 rozegranych meczów w sezonie bez WO', done: sPlayed >= 25 && sWoLost === 0, progress: sPlayed + '/25 (WO: ' + sWoLost + ')', pct: sWoLost === 0 ? calcPct(sPlayed, 25) : 0 },
+      { id: 'FAN_PRO', tier: 'SEASON', icon: '🗳️', title: 'Głos Społeczności Pro', desc: 'Głos w Złotej Piłce + min. 5 typów w Typerze', done: didVoteGb && typerCount >= 5, progress: 'Typer ' + typerCount + '/5 • ZP ' + (didVoteGb ? '✓' : '0/1'), pct: Math.min(100, Math.round(((Math.min(typerCount, 5) + (didVoteGb ? 1 : 0)) / 6) * 100)) }
     ];
 
     var unlockedCount = defs.filter(function (d) { return d.done; }).length;
@@ -2919,6 +2959,22 @@ window.SMPL_STUDIO = (function () {
    * Uwaga: opisujemy wyłącznie funkcje i poprawki dla graczy (zero wewnętrznych detali serwera).
    */
   var BUILTIN_PLAYER_UPDATES = [
+    {
+      id: 'BUILTIN_V2_7',
+      version: 'V2.7',
+      date: '2026-11-20',
+      category: 'ULEPSZENIA',
+      title: 'Nowe, Hardkorowe Kamienie Milowe (18 Wyzwań Legend SMPL!)',
+      summary: 'Podnieśliśmy poprzeczkę Kamieni Milowych na Kartach UT i w profilu! Koniec ze zbyt łatwymi progami typu 100 meczów — teraz na weteranów i debiutantów czeka 18 prawdziwych wyzwań kariery oraz sezonu z paskami postępu.',
+      highlights: [
+        'Nowa drabinka stażu meczowego: Klub 500 → Panteon 1000 → Klub 1500 Tytanów (dziś tylko 4 aktywnych graczy!) → mityczny Nieśmiertelny 2000 (cel na lata dla całej ligi!).',
+        'Nowe rekordy kariery: Klub 500 i Legenda 750 Zwycięstw, Kanonier 1200+ i Król Kanonierów 1800 Goli (albo 40/50+ bramek w 1 sezonie!), Potrójny Mistrz (3× Złoto), Dynastia Mistrzów (7× Złoto), Kolekcjoner Podium (10+ medali) oraz Filar Ekstraklasy (20 sezonów w L1).',
+        '2×–2,5× trudniejsze wyzwania sezonowe: Żelazna Kurtyna 10+ (10 czystych kont), Niepokonany 10+ (seria 10 meczów bez porażki), Podwójny Perfekt (2 tygodnie z kompletem ≥4 wygranych), Kat Gigantów 3× (3 wygrane z TOP 5 swojej ligi), Żelazny Terminarz 25+ (25 meczów bez WO) oraz Głos Społeczności Pro (Złota Piłka + 5 typów w Typerze).',
+        'Każda odznaka na Karcie UT ma teraz wizualny pasek postępu (0–100%) oraz rangę trudności (WETERAN / ELITA / LEGENDA / MITYCZNY / SEZON).'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
     {
       id: 'BUILTIN_V2_6',
       version: 'V2.6',

@@ -2240,19 +2240,54 @@ window.SMPL_VIEWS = (function () {
             <h3 class="font-display font-black text-sm sm:text-base uppercase text-amber-300">
               🏅 Kamienie Milowe &amp; Odznaki (${utAchievements.unlockedCount}/${utAchievements.totalCount})
             </h3>
-            <span class="text-xs text-slate-400">Automatyczne osiągnięcia</span>
+            <span class="text-[11px] font-display uppercase tracking-wider text-amber-200/80">Hardcore Wyzwania SMPL</span>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            ${(utAchievements.items || []).map((ac) => `
-              <div class="p-2.5 rounded-xl border ${ac.done ? 'bg-amber-500/15 border-amber-400/50 text-white' : 'bg-slate-950/70 border-white/10 text-slate-400'}">
-                <div class="flex items-center justify-between gap-1 text-xs font-display font-bold">
-                  <span>${ac.icon} ${escapeHtml(ac.title)}</span>
-                  <span>${ac.done ? '✅' : '🔒'}</span>
+            ${(utAchievements.items || []).map((ac) => {
+              const pct = Math.max(0, Math.min(100, Number(ac.pct != null ? ac.pct : (ac.done ? 100 : 0))));
+              const isMythic = ac.tier === 'MYTHIC';
+              const isLegend = ac.tier === 'LEGEND';
+              const tierLabel = isMythic ? 'MITYCZNY' : (isLegend ? 'LEGENDA' : (ac.tier === 'ELITA' ? 'ELITA' : (ac.tier === 'WETERAN' ? 'WETERAN' : 'SEZON')));
+              const tierCls = isMythic
+                ? 'bg-purple-500/20 text-purple-300 border-purple-400/40'
+                : isLegend
+                ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                : ac.tier === 'ELITA'
+                ? 'bg-sky-500/20 text-sky-300 border-sky-400/40'
+                : ac.tier === 'WETERAN'
+                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/35'
+                : 'bg-slate-800/80 text-slate-300 border-white/15';
+              const barBg = ac.done
+                ? 'linear-gradient(90deg, #10b981, #34d399)'
+                : isMythic
+                ? 'linear-gradient(90deg, #9333ea, #c084fc)'
+                : isLegend
+                ? 'linear-gradient(90deg, #d97706, #fbbf24)'
+                : 'linear-gradient(90deg, #0284c7, #38bdf8)';
+              return `
+                <div class="p-2.5 rounded-xl border flex flex-col justify-between ${ac.done ? (isMythic ? 'bg-purple-500/15 border-purple-400/55 text-white' : 'bg-amber-500/15 border-amber-400/50 text-white') : 'bg-slate-950/75 border-white/10 text-slate-400'}">
+                  <div>
+                    <div class="flex items-center justify-between gap-1 text-[11px] font-display font-bold leading-tight">
+                      <span>${ac.icon} ${escapeHtml(ac.title)}</span>
+                      <span>${ac.done ? '✅' : '🔒'}</span>
+                    </div>
+                    <div class="mt-1">
+                      <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-display font-black uppercase tracking-wider border ${tierCls}">${tierLabel}</span>
+                    </div>
+                    <div class="text-[10px] mt-1 leading-snug ${ac.done ? 'text-slate-200' : 'text-slate-400'}">${escapeHtml(ac.desc)}</div>
+                  </div>
+                  <div class="mt-2">
+                    <div class="flex items-center justify-between gap-1 text-[10px] font-mono-num ${ac.done ? 'text-emerald-300 font-bold' : 'text-slate-300'}">
+                      <span class="truncate">${escapeHtml(ac.progress || '')}</span>
+                      <span class="shrink-0">${pct}%</span>
+                    </div>
+                    <div class="w-full h-1.5 rounded-full bg-slate-800/90 overflow-hidden mt-1">
+                      <div class="h-full rounded-full" style="width: ${pct}%; background: ${barBg};"></div>
+                    </div>
+                  </div>
                 </div>
-                <div class="text-[10px] mt-1">${escapeHtml(ac.desc)}</div>
-                <div class="text-[10px] font-mono-num mt-1 ${ac.done ? 'text-emerald-300 font-bold' : 'text-slate-500'}">${escapeHtml(ac.progress || '')}</div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         </div>
 
