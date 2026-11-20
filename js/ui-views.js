@@ -659,6 +659,13 @@ window.SMPL_VIEWS = (function () {
                             <div class="text-xs text-slate-400 flex items-center gap-2 flex-wrap">
                               <span>@${escapeHtml(row.nick)}</span>
                               ${renderClanBadgeHtml(pObj || row, state, true)}
+                              ${(() => {
+                                const pS55Badge = (row.M === 0 && window.SMPL_DB && typeof window.SMPL_DB.findPlayerS55Record === 'function')
+                                  ? window.SMPL_DB.findPlayerS55Record(state, pObj || row)
+                                  : null;
+                                if (!pS55Badge || !pS55Badge.inProgress || pS55Badge.M <= 0) return '';
+                                return `<button type="button" onclick="event.stopPropagation(); SMPL_APP.setArchiveMode('SEASONS'); SMPL_APP.setArchiveSeason(55); SMPL_APP.setArchiveLeague('${pS55Badge.leagueId}'); SMPL_APP.switchTab('archive');" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/35 text-[10px] font-display font-bold text-amber-300 transition" title="Obecny dorobek gracza na półmetku Sezonu 55 (${escapeHtml(pS55Badge.leagueLabel)})">⏳ S55: ${pS55Badge.leagueId} #${pS55Badge.pos} • ${pS55Badge.PKT} pkt (${pS55Badge.M}M)</button>`;
+                              })()}
                               <span class="text-[10px] text-slate-500 hidden sm:inline">• ${escapeHtml(row.zone.label)}</span>
                             </div>
                           </div>
@@ -1765,6 +1772,9 @@ window.SMPL_VIEWS = (function () {
       ? (() => {
           const opAvatar = ownPoolReg.avatar || (window.SMPL_MEDIA ? window.SMPL_MEDIA.generatePlayerAvatar(ownPoolReg.name, ownPoolReg.nick, 8) : '');
           const opBio = ownPoolReg.bio ? String(ownPoolReg.bio).trim() : '';
+          const opS55 = (window.SMPL_DB && typeof window.SMPL_DB.findPlayerS55Record === 'function')
+            ? window.SMPL_DB.findPlayerS55Record(state, ownPoolReg)
+            : null;
           return `
             <div class="glass-panel-league rounded-2xl p-4 sm:p-5 mb-6 border border-emerald-400/40 bg-emerald-950/35 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div class="flex items-center gap-3.5 min-w-0">
@@ -1772,6 +1782,15 @@ window.SMPL_VIEWS = (function () {
                 <div class="min-w-0">
                   <div class="text-[10px] font-display font-black uppercase text-emerald-300">✅ TWOJE KONTO W PULI GRACZY (${escapeHtml(ownPoolReg.status === 'APPROVED_POOL' ? 'GOTOWE DO LIGI' : 'OCZEKUJĄCE')})</div>
                   <div class="font-display font-black text-base text-white truncate">${escapeHtml(ownPoolReg.name)} <span class="text-amber-300 text-xs">@${escapeHtml(ownPoolReg.nick)}</span></div>
+                  ${
+                    opS55 && opS55.M > 0
+                      ? `<div class="mt-1.5 inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-[11px] font-semibold text-amber-200">
+                           <span>⏳ Twój obecny wynik w S55 (${escapeHtml(opS55.leagueLabel)}):</span>
+                           <strong class="text-white">#${opS55.pos} • ${opS55.PKT} pkt</strong>
+                           <span class="text-slate-300">(${opS55.M}M: ${opS55.W}W-${opS55.R}R-${opS55.P}P • ${opS55.BZ}:${opS55.BS} • 🧤 ${opS55.cs})</span>
+                         </div>`
+                      : ''
+                  }
                   ${
                     opBio
                       ? `<div class="text-xs text-slate-200 italic mt-0.5 break-words">📝 „${escapeHtml(opBio)}”</div>`
@@ -2130,62 +2149,124 @@ window.SMPL_VIEWS = (function () {
             </div>
           </div>
 
-          <!-- 2. DOROBEK WSZECH CZASÓW (ALL-TIME S1–S55) -->
-          <div class="glass-panel rounded-2xl p-5 sm:p-6 border border-white/10">
-            <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-white/10">
-              <h3 class="font-display font-black text-base text-white uppercase">
-                🏛️ Dorobek Historyczny w Score Match Liga (Cała Historia S1–S55)
-              </h3>
-              ${
-                p.historicalArchiveName
-                  ? `<span class="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-[11px] font-bold text-amber-300">
-                       🏛️ Połączono z archiwum: ${escapeHtml(p.historicalArchiveName)}
-                     </span>`
-                  : ''
-              }
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-              <div class="p-3 rounded-xl bg-slate-950 border border-white/10">
-                <div class="text-[10px] text-slate-400 uppercase">Rozegrane Sezony</div>
-                <div class="font-display font-black text-xl text-white mt-0.5">${allTime.seasons || 1}</div>
+          ${(() => {
+            const pS55 = (window.SMPL_DB && typeof window.SMPL_DB.findPlayerS55Record === 'function')
+              ? window.SMPL_DB.findPlayerS55Record(state, p)
+              : null;
+            const s55M = (pS55 && pS55.inProgress) ? Number(pS55.M || 0) : 0;
+            const s55W = (pS55 && pS55.inProgress) ? Number(pS55.W || 0) : 0;
+            const s55R = (pS55 && pS55.inProgress) ? Number(pS55.R || 0) : 0;
+            const s55P = (pS55 && pS55.inProgress) ? Number(pS55.P || 0) : 0;
+            const s55BZ = (pS55 && pS55.inProgress) ? Number(pS55.BZ || 0) : 0;
+            const totHistM = (allTime.matches || 0) + s55M + row.M;
+            const totHistW = (allTime.wins || 0) + s55W + row.W;
+            const totHistR = (allTime.draws || 0) + s55R + row.R;
+            const totHistP = (allTime.losses || 0) + s55P + row.P;
+            const totHistGF = (allTime.gf || 0) + s55BZ + row.BZ;
+
+            const s55CardHtml = (pS55 && pS55.M > 0)
+              ? `
+                <!-- 1B. OBECNE WYNIKI W SEZONIE 55 (PÓŁMETEK — AUTO-PODPIĘTE DO KONTA) -->
+                <div class="glass-panel rounded-2xl p-5 sm:p-6 border border-amber-400/40 bg-amber-500/5">
+                  <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-amber-400/20">
+                    <div>
+                      <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-[10px] font-display font-black uppercase tracking-wider text-amber-300">
+                        ⏳ SEZON 55 W TRAKCIE (PÓŁMETEK) • AUTO-PODPIĘTE DO KONTA
+                      </span>
+                      <h3 class="font-display font-black text-base text-white uppercase mt-1.5">
+                        📊 Obecny Wynik w Sezonie 55 — ${escapeHtml(pS55.leagueLabel)}
+                      </h3>
+                    </div>
+                    <button type="button" onclick="SMPL_APP.setArchiveMode('SEASONS'); SMPL_APP.setArchiveSeason(55); SMPL_APP.setArchiveLeague('${pS55.leagueId}'); SMPL_APP.switchTab('archive');" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 font-display font-bold text-[11px] uppercase transition">
+                      Tabela S55 →
+                    </button>
+                  </div>
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+                    <div class="p-2.5 rounded-xl bg-slate-950/90 border border-amber-400/30">
+                      <div class="text-[10px] text-slate-400 uppercase">Pozycja &amp; Punkty</div>
+                      <div class="font-display font-black text-lg text-amber-300 mt-0.5">#${pS55.pos} <span class="text-white">• ${pS55.PKT} pkt</span></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-950/90 border border-white/10">
+                      <div class="text-[10px] text-slate-400 uppercase">Mecze (W-R-P)</div>
+                      <div class="font-display font-black text-sm text-emerald-300 mt-1">${pS55.M}M • ${pS55.W}-${pS55.R}-${pS55.P}</div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-950/90 border border-white/10">
+                      <div class="text-[10px] text-slate-400 uppercase">Bramki (+/-)</div>
+                      <div class="font-display font-black text-sm text-white mt-1">${pS55.BZ}:${pS55.BS} <span class="${pS55.diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}">(${pS55.diff >= 0 ? '+' + pS55.diff : pS55.diff})</span></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-950/90 border border-white/10">
+                      <div class="text-[10px] text-slate-400 uppercase">Czyste Konta</div>
+                      <div class="font-display font-black text-lg text-emerald-300 mt-0.5">🧤 ${pS55.cs}/${pS55.csMatches}</div>
+                    </div>
+                  </div>
+                  ${pS55.note ? `<div class="mt-2.5 text-xs text-amber-200/95 font-semibold">${escapeHtml(pS55.note)}</div>` : ''}
+                </div>
+              `
+              : '';
+
+            return `
+              ${s55CardHtml}
+              <!-- 2. DOROBEK WSZECH CZASÓW (ALL-TIME S1–S55) -->
+              <div class="glass-panel rounded-2xl p-5 sm:p-6 border border-white/10">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-white/10">
+                  <h3 class="font-display font-black text-base text-white uppercase">
+                    🏛️ Dorobek Historyczny w Score Match Liga (Cała Historia S1–S55)
+                  </h3>
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    ${s55M > 0 ? `<span class="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/35 text-[10px] font-bold text-emerald-300">+${s55M}M / +${s55BZ} goli z S55</span>` : ''}
+                    ${
+                      p.historicalArchiveName
+                        ? `<span class="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-[11px] font-bold text-amber-300">
+                             🏛️ Połączono z archiwum: ${escapeHtml(p.historicalArchiveName)}
+                           </span>`
+                        : ''
+                    }
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                  <div class="p-3 rounded-xl bg-slate-950 border border-white/10">
+                    <div class="text-[10px] text-slate-400 uppercase">Ukończone Sezony</div>
+                    <div class="font-display font-black text-xl text-white mt-0.5">${allTime.seasons || 1}</div>
+                  </div>
+                  <div class="p-3 rounded-xl bg-slate-950 border border-white/10">
+                    <div class="text-[10px] text-slate-400 uppercase">Mecze w Historii</div>
+                    <div class="font-display font-black text-xl text-blue-400 mt-0.5">${totHistM}</div>
+                  </div>
+                  <div class="p-3 rounded-xl bg-slate-950 border border-white/10">
+                    <div class="text-[10px] text-slate-400 uppercase">Gole w Historii</div>
+                    <div class="font-display font-black text-xl text-amber-400 mt-0.5">⚽ ${totHistGF}</div>
+                  </div>
+                  <div class="p-3 rounded-xl bg-slate-950 border border-white/10">
+                    <div class="text-[10px] text-slate-400 uppercase">Punkty All-Time</div>
+                    <div class="font-display font-black text-xl text-emerald-400 mt-0.5">${(allTime.total || 0) + row.PKT}</div>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2.5 text-center text-xs">
+                  <div class="p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                    <div class="text-[10px] text-slate-400 uppercase">Bilans W-R-P</div>
+                    <div class="font-bold text-white mt-0.5">${totHistW}-${totHistR}-${totHistP}</div>
+                  </div>
+                  <div class="p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                    <div class="text-[10px] text-slate-400 uppercase">Skuteczność</div>
+                    <div class="font-bold text-emerald-300 mt-0.5">${
+                      totHistM > 0
+                        ? ((totHistW / totHistM) * 100).toFixed(1)
+                        : '0.0'
+                    }%</div>
+                  </div>
+                  <div class="p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                    <div class="text-[10px] text-slate-400 uppercase">Najlepsza pozycja</div>
+                    <div class="font-bold text-amber-300 truncate mt-0.5">${escapeHtml(allTime.bestPos || '-')}</div>
+                  </div>
+                  <div class="p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+                    <div class="text-[10px] text-slate-400 uppercase">Medale (S1–S54)</div>
+                    <div class="font-bold text-white mt-0.5">👑${allTime.gold || 0} 🥈${allTime.silver || 0} 🥉${allTime.bronze || 0}</div>
+                  </div>
+                </div>
+                ${renderPlayerSeasonsHistorySnippet(state, p.name, p.historicalArchiveName)}
               </div>
-              <div class="p-3 rounded-xl bg-slate-950 border border-white/10">
-                <div class="text-[10px] text-slate-400 uppercase">Mecze w Historii</div>
-                <div class="font-display font-black text-xl text-blue-400 mt-0.5">${(allTime.matches || 0) + row.M}</div>
-              </div>
-              <div class="p-3 rounded-xl bg-slate-950 border border-white/10">
-                <div class="text-[10px] text-slate-400 uppercase">Gole w Historii</div>
-                <div class="font-display font-black text-xl text-amber-400 mt-0.5">⚽ ${(allTime.gf || 0) + row.BZ}</div>
-              </div>
-              <div class="p-3 rounded-xl bg-slate-950 border border-white/10">
-                <div class="text-[10px] text-slate-400 uppercase">Punkty All-Time</div>
-                <div class="font-display font-black text-xl text-emerald-400 mt-0.5">${(allTime.total || 0) + row.PKT}</div>
-              </div>
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2.5 text-center text-xs">
-              <div class="p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
-                <div class="text-[10px] text-slate-400 uppercase">Bilans W-R-P</div>
-                <div class="font-bold text-white mt-0.5">${(allTime.wins || 0) + row.W}-${(allTime.draws || 0) + row.R}-${(allTime.losses || 0) + row.P}</div>
-              </div>
-              <div class="p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
-                <div class="text-[10px] text-slate-400 uppercase">Skuteczność</div>
-                <div class="font-bold text-emerald-300 mt-0.5">${
-                  (allTime.matches || 0) + row.M > 0
-                    ? ((((allTime.wins || 0) + row.W) / ((allTime.matches || 0) + row.M)) * 100).toFixed(1)
-                    : '0.0'
-                }%</div>
-              </div>
-              <div class="p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
-                <div class="text-[10px] text-slate-400 uppercase">Najlepsza pozycja</div>
-                <div class="font-bold text-amber-300 truncate mt-0.5">${escapeHtml(allTime.bestPos || '-')}</div>
-              </div>
-              <div class="p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
-                <div class="text-[10px] text-slate-400 uppercase">Medale (S1–S55)</div>
-                <div class="font-bold text-white mt-0.5">👑${allTime.gold || 0} 🥈${allTime.silver || 0} 🥉${allTime.bronze || 0}</div>
-              </div>
-            </div>
-            ${renderPlayerSeasonsHistorySnippet(state, p.name, p.historicalArchiveName)}
-          </div>
+            `;
+          })()}
 
           <!-- 3. INDYWIDUALNY TERMINARZ GRACZA (🏠 DOM — TY ZAPRASZASZ vs ✈️ WYJAZD) -->
           <div class="glass-panel rounded-2xl p-5 sm:p-6 border border-white/10">

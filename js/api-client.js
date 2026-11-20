@@ -1118,6 +1118,75 @@ window.SMPL_DB = (function () {
     };
   }
 
+  function findPlayerS55Record(customState, playerOrReg) {
+    if (!playerOrReg) return null;
+    const st = customState || state || {};
+    const seasonsList = (Array.isArray(st.historicalSeasons) && st.historicalSeasons.length > 0)
+      ? st.historicalSeasons
+      : ((window.SMPL_ARCHIVE_DATA && window.SMPL_ARCHIVE_DATA.HISTORICAL_SEASONS) || []);
+    const s55 = seasonsList.find(function (s) { return s && Number(s.seasonNumber) === 55; });
+    if (!s55 || !s55.leagues) return null;
+
+    const candidates = [];
+    const pushCand = function (raw) {
+      if (!raw || typeof raw !== 'string') return;
+      const fk = canonicalArchiveFold(raw);
+      if (fk && candidates.indexOf(fk) === -1) candidates.push(fk);
+    };
+    if (typeof playerOrReg === 'string') {
+      pushCand(playerOrReg);
+    } else {
+      pushCand(playerOrReg.historicalArchiveName);
+      pushCand(playerOrReg.name);
+      pushCand(playerOrReg.nick);
+    }
+    if (candidates.length === 0) return null;
+
+    const leagueIds = ['L1', 'L2', 'L3'];
+    for (let li = 0; li < leagueIds.length; li++) {
+      const lid = leagueIds[li];
+      const rows = s55.leagues[lid];
+      if (!Array.isArray(rows)) continue;
+      for (let ri = 0; ri < rows.length; ri++) {
+        const r = rows[ri];
+        if (!r || !r.name || isIgnoredArchiveName(r.name)) continue;
+        const rfk = canonicalArchiveFold(r.name);
+        if (candidates.indexOf(rfk) !== -1) {
+          let csVal = typeof r.cs === 'number' ? r.cs : null;
+          let csMVal = typeof r.csMatches === 'number' ? r.csMatches : null;
+          if (csVal === null && r.note) {
+            const mCs = String(r.note).match(/CS:\s*(\d+)\/(\d+)/i);
+            if (mCs) {
+              csVal = Number(mCs[1]);
+              csMVal = Number(mCs[2]);
+            }
+          }
+          return {
+            seasonNumber: 55,
+            inProgress: Boolean(s55.inProgress),
+            leagueId: lid,
+            leagueLabel: lid === 'L1' ? '🏆 Ekstraklasa (L1)' : (lid === 'L2' ? '🥈 2. Liga (L2)' : '🥉 3. Liga (L3)'),
+            pos: Number(r.pos || (ri + 1)),
+            name: String(r.name),
+            M: Number(r.M || 0),
+            W: Number(r.W || 0),
+            R: Number(r.R || 0),
+            P: Number(r.P || 0),
+            BZ: Number(r.BZ || 0),
+            BS: Number(r.BS || 0),
+            diff: Number(r.diff != null ? r.diff : (Number(r.BZ || 0) - Number(r.BS || 0))),
+            PKT: Number(r.PKT || 0),
+            cs: csVal != null ? csVal : 0,
+            csMatches: csMVal != null ? csMVal : Number(r.M || 0),
+            note: String(r.note || ''),
+            progressLabel: (s55.progressSummary && s55.progressSummary[lid]) || ''
+          };
+        }
+      }
+    }
+    return null;
+  }
+
   function syncAllPlayersHistoricalStatsInMemory(targetState, includeUnlinkedByName) {
     if (!targetState || !Array.isArray(targetState.players)) return 0;
     const archData = window.SMPL_ARCHIVE_DATA || {};
@@ -1140,17 +1209,19 @@ window.SMPL_DB = (function () {
       const explicitLink = p.historicalArchiveName && String(p.historicalArchiveName).trim()
         ? String(p.historicalArchiveName).trim()
         : '';
+      const s55Match = findPlayerS55Record(targetState, p);
       const isExplicitDebut = !explicitLink &&
+        !s55Match &&
         p.playedBefore === false &&
         p.historicalStats &&
         p.historicalStats.bestPos === 'Debiutant w Lidze';
       if (isExplicitDebut) return;
 
       const hasPriorStats = Boolean(p.historicalStats && Number(p.historicalStats.matches || 0) > 0);
-      const shouldSync = Boolean(explicitLink || hasPriorStats || p.playedBefore === true || (includeUnlinkedByName && p.playedBefore !== false));
+      const shouldSync = Boolean(explicitLink || s55Match || hasPriorStats || p.playedBefore === true || (includeUnlinkedByName && p.playedBefore !== false));
       if (!shouldSync) return;
 
-      const lookupRaw = explicitLink || p.name || '';
+      const lookupRaw = explicitLink || (s55Match ? s55Match.name : '') || p.name || '';
       const fk = canonicalArchiveFold(lookupRaw);
       if (!fk) return;
       const matched = catByFold[fk];
@@ -1233,7 +1304,7 @@ window.SMPL_DB = (function () {
     const archData = window.SMPL_ARCHIVE_DATA;
     if (!archData) return { updatedPlayers: 0 };
 
-    const archVer = archData.ARCHIVE_RECALC_VERSION || '2026-11-20-S55-MIDSEASON-V2';
+    const archVer = archData.ARCHIVE_RECALC_VERSION || '2026-11-20-S55-MIDSEASON-V3';
     const archSeasons = archData.HISTORICAL_SEASONS || [];
     const archGen = archData.GENERAL_RANKING || [];
     const arch5 = archData.FIVE_SEASON_RANKING || [];
@@ -1305,8 +1376,13 @@ window.SMPL_DB = (function () {
       targetState.archiveRecalcVersion = archVer;
     }
 
+    const s55LinkedCount = (targetState.players || []).filter(function (pl) {
+      return pl && !pl.isPlaceholder && Boolean(findPlayerS55Record(targetState, pl));
+    }).length;
+
     return {
       updatedPlayers: updatedPlayers,
+      s55LinkedCount: s55LinkedCount,
       allTimeCount: (targetState.allTimeRanking || []).length,
       careerCount: (targetState.careerRanking || []).length,
       fiveSeasonCount: (targetState.fiveSeasonRanking || []).length
@@ -1323,7 +1399,7 @@ window.SMPL_DB = (function () {
     __histCatalogCache = null;
     addLog(
       'ARCHIVE_FULL_RECALC',
-      `\uD83D\uDD04 Admin ${adminName} przeliczy\u0142 pe\u0142ne statystyki historyczne wszystkich zawodnik\u00F3w (S1\u2013S55+, wszystkie ligi L1\u2013L9): ${res.careerCount} graczy w Karierze, ${res.allTimeCount} w Ekstraklasie All-Time, zaktualizowano ${res.updatedPlayers} profili.`
+      `\uD83D\uDD04 Admin ${adminName} przeliczy\u0142 pe\u0142ne statystyki historyczne wszystkich zawodnik\u00F3w (S1\u2013S55+, wszystkie ligi L1\u2013L9): ${res.careerCount} graczy w Karierze, ${res.allTimeCount} w Ekstraklasie All-Time, zaktualizowano ${res.updatedPlayers} profili (podpi\u0119to bie\u017C\u0105ce wyniki S55 dla ${res.s55LinkedCount || 0} dopisanych kont).`
     );
     syncToBackend();
     return res;
@@ -11450,6 +11526,7 @@ state = enrichFromArchive(data.state);
     generateLeagueSchedule,
     addByeSlotPlayer,
     adminRecalculateAllHistoricalStats,
+    findPlayerS55Record,
     canonicalArchiveName,
     findArchiveEntryByName,
     setCustomCrest,

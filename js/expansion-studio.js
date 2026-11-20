@@ -573,12 +573,22 @@ window.SMPL_STUDIO = (function () {
     }
     var giantWinsCount = winOppList.filter(function (oid) { return divTopIds[oid] && oid !== pid; }).length;
 
+    var s55Live = (window.SMPL_DB && typeof window.SMPL_DB.findPlayerS55Record === 'function')
+      ? window.SMPL_DB.findPlayerS55Record(s, player)
+      : null;
+    var s55AddM = (s55Live && s55Live.inProgress) ? Number(s55Live.M || 0) : 0;
+    var s55AddW = (s55Live && s55Live.inProgress) ? Number(s55Live.W || 0) : 0;
+    var s55AddBZ = (s55Live && s55Live.inProgress) ? Number(s55Live.BZ || 0) : 0;
+    var s55LiveCS = (s55Live && s55Live.inProgress) ? Number(s55Live.cs || 0) : 0;
+    var bestSeasonCS = Math.max(sCS, s55LiveCS);
+    var bestSeasonGoals = Math.max(sGoals, s55AddBZ);
+
     var histMatches = archRow ? Number(archRow.matches || 0) : 0;
-    var totalMatches = histMatches + sPlayed;
+    var totalMatches = histMatches + s55AddM + sPlayed;
     var histWins = archRow ? Number(archRow.wins || 0) : 0;
-    var totalWins = histWins + sWins;
+    var totalWins = histWins + s55AddW + sWins;
     var histGoals = archRow ? Number(archRow.gf || 0) : 0;
-    var totalGoals = histGoals + sGoals;
+    var totalGoals = histGoals + s55AddBZ + sGoals;
     var histL1Seasons = archRow ? Number(archRow.l1Seasons || 0) : 0;
 
     var archGolds = archRow ? Number(archRow.gold || 0) : 0;
@@ -620,15 +630,15 @@ window.SMPL_STUDIO = (function () {
 
       { id: 'W500', tier: 'ELITA', icon: '⚔️', title: 'Klub 500 Zwycięstw', desc: '500+ wygranych spotkań w historii kariery', done: totalWins >= 500, progress: totalWins + '/500 W', pct: calcPct(totalWins, 500) },
       { id: 'W750', tier: 'MYTHIC', icon: '🦁', title: 'Legenda 750 Zwycięstw', desc: '750+ wygranych meczów — rekordowy szczyt!', done: totalWins >= 750, progress: totalWins + '/750 W', pct: calcPct(totalWins, 750) },
-      { id: 'GOALS1200', tier: 'ELITA', icon: '🎯', title: 'Kanonier 1200+', desc: '1 200+ goli w karierze lub 40+ w sezonie', done: totalGoals >= 1200 || sGoals >= 40, progress: totalGoals + '/1200 (sez: ' + sGoals + '/40)', pct: Math.max(calcPct(totalGoals, 1200), calcPct(sGoals, 40)) },
-      { id: 'GOALS1800', tier: 'MYTHIC', icon: '☄️', title: 'Król Kanonierów 1800', desc: '1 800+ goli w karierze lub 50+ w sezonie', done: totalGoals >= 1800 || sGoals >= 50, progress: totalGoals + '/1800 (sez: ' + sGoals + '/50)', pct: Math.max(calcPct(totalGoals, 1800), calcPct(sGoals, 50)) },
+      { id: 'GOALS1200', tier: 'ELITA', icon: '🎯', title: 'Kanonier 1200+', desc: '1 200+ goli w karierze lub 40+ w sezonie', done: totalGoals >= 1200 || bestSeasonGoals >= 40, progress: totalGoals + '/1200 (sez: ' + bestSeasonGoals + '/40)', pct: Math.max(calcPct(totalGoals, 1200), calcPct(bestSeasonGoals, 40)) },
+      { id: 'GOALS1800', tier: 'MYTHIC', icon: '☄️', title: 'Król Kanonierów 1800', desc: '1 800+ goli w karierze lub 50+ w sezonie', done: totalGoals >= 1800 || bestSeasonGoals >= 50, progress: totalGoals + '/1800 (sez: ' + bestSeasonGoals + '/50)', pct: Math.max(calcPct(totalGoals, 1800), calcPct(bestSeasonGoals, 50)) },
 
       { id: 'GOLD3', tier: 'LEGEND', icon: '👑', title: 'Potrójny Mistrz', desc: 'Min. 3 złote medale ligowe w historii kariery', done: totalGolds >= 3, progress: totalGolds + '/3 Złota', pct: calcPct(totalGolds, 3) },
       { id: 'GOLD7', tier: 'MYTHIC', icon: '🏆', title: 'Dynastia Mistrzów 7×', desc: 'Min. 7 złotych medali ligowych w karierze', done: totalGolds >= 7, progress: totalGolds + '/7 Złot', pct: calcPct(totalGolds, 7) },
       { id: 'MEDALS10', tier: 'LEGEND', icon: '🥇', title: 'Kolekcjoner Podium', desc: 'Min. 10 medali ligowych (Złoto/Srebro/Brąz)', done: totalMedals >= 10, progress: totalMedals + '/10 medali', pct: calcPct(totalMedals, 10) },
       { id: 'ELITE20', tier: 'LEGEND', icon: '🏟️', title: 'Filar Ekstraklasy 20+', desc: 'Min. 20 pełnych sezonów w Ekstraklasie (L1)', done: histL1Seasons >= 20, progress: histL1Seasons + '/20 sez. L1', pct: calcPct(histL1Seasons, 20) },
 
-      { id: 'CS10', tier: 'SEASON', icon: '🧤', title: 'Żelazna Kurtyna 10+', desc: 'Min. 10 czystych kont w jednym sezonie', done: sCS >= 10, progress: sCS + '/10 CS', pct: calcPct(sCS, 10) },
+      { id: 'CS10', tier: 'SEASON', icon: '🧤', title: 'Żelazna Kurtyna 10+', desc: 'Min. 10 czystych kont w jednym sezonie', done: bestSeasonCS >= 10, progress: bestSeasonCS + '/10 CS', pct: calcPct(bestSeasonCS, 10) },
       { id: 'STREAK10', tier: 'SEASON', icon: '🔥', title: 'Niepokonany 10+', desc: 'Seria min. 10 meczów bez porażki w sezonie', done: maxUnbeaten >= 10, progress: maxUnbeaten + '/10 serii', pct: calcPct(maxUnbeaten, 10) },
       { id: 'SWEEP2', tier: 'SEASON', icon: '⚡', title: 'Podwójny Perfekt', desc: 'Min. 2 perfekcyjne tygodnie (komplet ≥4 W)', done: cleanSweepWeeksCount >= 2, progress: cleanSweepWeeksCount + '/2 tyg.', pct: calcPct(cleanSweepWeeksCount, 2) },
       { id: 'GIANT3', tier: 'SEASON', icon: '🐉', title: 'Kat Gigantów 3×', desc: 'Min. 3 zwycięstwa w sezonie z TOP 5 swojej ligi', done: giantWinsCount >= 3, progress: giantWinsCount + '/3 vs TOP 5', pct: calcPct(giantWinsCount, 3) },
@@ -2959,6 +2969,22 @@ window.SMPL_STUDIO = (function () {
    * Uwaga: opisujemy wyłącznie funkcje i poprawki dla graczy (zero wewnętrznych detali serwera).
    */
   var BUILTIN_PLAYER_UPDATES = [
+    {
+      id: 'BUILTIN_V2_8',
+      version: 'V2.8',
+      date: '2026-11-20',
+      category: 'NOWOŚCI',
+      title: 'Automatyczne Podpięcie Wyników Sezonu 55 do Wszystkich Kont Graczy!',
+      summary: 'Każdy gracz, który ma już założone konto na portalu (w tabeli, Puli Graczy lub na liście oczekujących), automatycznie widzi teraz swój bieżący dorobek z półmetka Sezonu 55 na Karcie UT, w podglądzie profilu i w pasku Kamieni Milowych.',
+      highlights: [
+        'Nowy panel „⏳ Twoje Obecne Wyniki w Sezonie 55 (Półmetek)” na Karcie UT i w Puli Graczy: pozycja w lidze, punkty, bilans W-R-P, bramki, czyste konta i 1 kliknięcie do pełnej tabeli S55.',
+        'Przed startem Sezonu 56 przy dopisanych już zawodnikach w tabeli pojawia się elegancki znacznik z aktualną pozycją i punktami z Sezonu 55 (znika automatycznie po rozegraniu 1. kolejki S56).',
+        'Rozegrane mecze, wygrane, gole i czyste konta z Sezonu 55 zasilają już Twój dorobek kariery i paski postępu Kamieni Milowych (bez przedwczesnego naliczania medali końcowych przed 30. kolejką).',
+        'Automatyczne dopasowanie kont (również bez polskich znaków typu Pelka ↔ Pełka) łączy istniejące profile z ich historią S1–S55.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
     {
       id: 'BUILTIN_V2_7',
       version: 'V2.7',

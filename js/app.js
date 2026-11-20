@@ -7148,6 +7148,26 @@ window.SMPL_APP = (function () {
           </div>
         </div>
 
+        ${(() => {
+          const quickS55 = (window.SMPL_DB && typeof window.SMPL_DB.findPlayerS55Record === 'function')
+            ? window.SMPL_DB.findPlayerS55Record(state, p)
+            : null;
+          if (!quickS55 || quickS55.M <= 0) return '';
+          return `
+            <div class="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-400/35 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div>
+                <div class="text-[10px] font-display font-black uppercase text-amber-300">⏳ Obecny wynik w Sezonie 55 (Półmetek) • ${window.SMPL_VIEWS.escapeHtml(quickS55.leagueLabel)}</div>
+                <div class="text-white font-bold mt-0.5">
+                  #${quickS55.pos} • <span class="text-amber-300">${quickS55.PKT} pkt</span> • ${quickS55.M}M (${quickS55.W}W-${quickS55.R}R-${quickS55.P}P) • ${quickS55.BZ}:${quickS55.BS} • 🧤 ${quickS55.cs} CS
+                </div>
+              </div>
+              <button type="button" onclick="SMPL_APP.closeModal(); SMPL_APP.setArchiveMode('SEASONS'); SMPL_APP.setArchiveSeason(55); SMPL_APP.setArchiveLeague('${quickS55.leagueId}'); SMPL_APP.switchTab('archive');" class="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 font-display font-bold text-[10px] uppercase">
+                Tabela S55 →
+              </button>
+            </div>
+          `;
+        })()}
+
         <div class="flex flex-wrap justify-between gap-2 pt-3 border-t border-white/10">
           <button onclick="SMPL_APP.closeModal(); SMPL_APP.openPlayerProfileTab('${p.id}');" class="btn-league px-4 py-2 rounded-xl text-xs font-display uppercase">
             🎴 Otwórz Pełną Kartę UT & Gablotę Trofeów
