@@ -2377,7 +2377,7 @@ window.SMPL_VIEWS = (function () {
             <h3 class="font-display font-black text-sm sm:text-base uppercase text-blue-300">
               📈 Trajektoria Kariery S1–S55 (${utTrajectory.points.length} sezonów)
             </h3>
-            <span class="text-xs text-slate-400">Pozycja i dywizja</span>
+            <span class="text-xs text-slate-400">Wszystkie ligi L1–L9</span>
           </div>
           ${
             utTrajectory.points.length > 0 && window.SMPL_STUDIO && typeof window.SMPL_STUDIO.renderCareerTrajectorySvg === 'function'
@@ -3244,6 +3244,23 @@ window.SMPL_VIEWS = (function () {
                   ${allCareerPlayers.map((nm) => `<option value="${escapeHtml(nm)}" ${nm.toLowerCase() === activeCareerName.toLowerCase() ? 'selected' : ''}>${escapeHtml(nm)} (${allCareerNamesMap[nm]} sez.)</option>`).join('')}
                 </select>
               </div>
+
+              ${(() => {
+                if (!window.SMPL_STUDIO || typeof window.SMPL_STUDIO.computePlayerCareerTrajectory !== 'function' || typeof window.SMPL_STUDIO.renderCareerTrajectorySvg !== 'function') return '';
+                const archTraj = window.SMPL_STUDIO.computePlayerCareerTrajectory(activeCareerName, activeCareerName);
+                if (!archTraj || !archTraj.points || archTraj.points.length === 0) return '';
+                return `
+                  <div class="glass-panel rounded-2xl p-4 sm:p-5 border border-white/10">
+                    <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-white/10">
+                      <h4 class="font-display font-black text-sm sm:text-base uppercase text-blue-300">
+                        📈 Trajektoria Kariery — ${escapeHtml(activeCareerName)} (Wszystkie Ligi L1–L9)
+                      </h4>
+                      <span class="text-xs text-slate-400">${archTraj.points.length} sezonów w historii SMPL</span>
+                    </div>
+                    ${window.SMPL_STUDIO.renderCareerTrajectorySvg(archTraj.points)}
+                  </div>
+                `;
+              })()}
 
               <div class="glass-panel rounded-2xl overflow-hidden border border-white/10">
                 <div class="p-4 sm:px-6 border-b border-white/10 bg-slate-900/60 flex flex-wrap items-center justify-between gap-3">

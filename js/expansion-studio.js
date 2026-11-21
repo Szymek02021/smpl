@@ -654,12 +654,18 @@ window.SMPL_STUDIO = (function () {
 
   function computePlayerCareerTrajectory(playerName, archiveName) {
     var arch = getArchiveData();
-    if (!arch || !Array.isArray(arch.HISTORICAL_SEASONS)) return { points: [], summary: null };
+    var liveSeasons = (window.SMPL_DB && typeof window.SMPL_DB.getState === 'function')
+      ? (window.SMPL_DB.getState() && window.SMPL_DB.getState().historicalSeasons)
+      : null;
+    var srcSeasons = (Array.isArray(liveSeasons) && liveSeasons.length > 0)
+      ? liveSeasons
+      : (arch && Array.isArray(arch.HISTORICAL_SEASONS) ? arch.HISTORICAL_SEASONS : []);
+    if (!srcSeasons.length) return { points: [], summary: null };
     var targets = [foldName(archiveName || ''), foldName(playerName || '')].filter(Boolean);
     if (!targets.length) return { points: [], summary: null };
 
     var points = [];
-    var seasonsSorted = arch.HISTORICAL_SEASONS.slice().sort(function (a, b) {
+    var seasonsSorted = srcSeasons.slice().sort(function (a, b) {
       return Number(a.seasonNumber || 0) - Number(b.seasonNumber || 0);
     });
 
@@ -673,7 +679,7 @@ window.SMPL_STUDIO = (function () {
         if (!Array.isArray(tbl)) continue;
         for (var ri = 0; ri < tbl.length; ri++) {
           var row = tbl[ri];
-          if (!row || !row.name) continue;
+          if (!row || !row.name || Number(row.M || 0) <= 0) continue;
           if (targets.indexOf(foldName(row.name)) >= 0) {
             found = {
               seasonNumber: Number(seas.seasonNumber || 0),
@@ -704,66 +710,123 @@ window.SMPL_STUDIO = (function () {
 
   function renderCareerTrajectorySvg(points) {
     if (!points || !points.length) {
-      return '<div class="text-xs text-slate-400 p-4 rounded-xl border border-slate-700/60 bg-slate-900/50">Brak historycznych wystepow tego gracza w bazie S1–S55. Rozegraj swoj pierwszy sezon, aby zbudowac wykres kariery!</div>';
+      return '<div class="text-xs text-slate-400 p-4 rounded-xl border border-slate-700/60 bg-slate-900/50">Brak historycznych występów tego gracza w bazie S1–S55. Rozegraj swój pierwszy sezon, aby zbudować wykres kariery!</div>';
     }
-    var W = 680;
-    var H = 220;
-    var padL = 48;
-    var padR = 20;
-    var padT = 22;
-    var padB = 34;
-    var plotW = W - padL - padR;
-    var plotH = H - padT - padB;
 
-    // Skala globalna: L1 pos 1..16 -> y od 0..15, L2 pos 1..16 -> y od 17..32, L3 pos 1..16 -> y od 34..49
+    var TIER_STYLES = {
+      1: { label: 'L1', name: 'Ekstraklasa', color: '#facc15', fill: 'rgba(250,204,21,0.11)', fillIdle: 'rgba(250,204,21,0.035)' },
+      2: { label: 'L2', name: '2. Liga',     color: '#38bdf8', fill: 'rgba(56,189,248,0.10)', fillIdle: 'rgba(56,189,248,0.03)' },
+      3: { label: 'L3', name: '3. Liga',     color: '#fb923c', fill: 'rgba(251,146,60,0.10)', fillIdle: 'rgba(251,146,60,0.03)' },
+      4: { label: 'L4', name: '4. Liga',     color: '#34d399', fill: 'rgba(52,211,153,0.10)', fillIdle: 'rgba(52,211,153,0.025)' },
+      5: { label: 'L5', name: '5. Liga',     color: '#2dd4bf', fill: 'rgba(45,212,191,0.10)', fillIdle: 'rgba(45,212,191,0.025)' },
+      6: { label: 'L6', name: '6. Liga',     color: '#a78bfa', fill: 'rgba(167,139,250,0.10)', fillIdle: 'rgba(167,139,250,0.025)' },
+      7: { label: 'L7', name: '7. Liga',     color: '#e879f9', fill: 'rgba(232,121,249,0.10)', fillIdle: 'rgba(232,121,249,0.025)' },
+      8: { label: 'L8', name: '8. Liga',     color: '#fb7185', fill: 'rgba(251,113,133,0.10)', fillIdle: 'rgba(251,113,133,0.025)' },
+      9: { label: 'L9', name: '9. Liga',     color: '#94a3b8', fill: 'rgba(148,163,184,0.10)', fillIdle: 'rgba(148,163,184,0.025)' }
+    };
+    function getTierStyle(n) {
+      return TIER_STYLES[n] || { label: 'L' + n, name: n + '. Liga', color: '#cbd5e1', fill: 'rgba(203,213,225,0.09)', fillIdle: 'rgba(203,213,225,0.025)' };
+    }
+
+    var playedTiersMap = {};
+    var maxLeagueInPts = 1;
+    var minLeagueInPts = 99;
+    points.forEach(function (pt) {
+      var ln = Number(String(pt.leagueId || 'L1').replace(/\D/g, '')) || 1;
+      if (ln < 1) ln = 1;
+      playedTiersMap[ln] = (playedTiersMap[ln] || 0) + 1;
+      if (ln > maxLeagueInPts) maxLeagueInPts = ln;
+      if (ln < minLeagueInPts) minLeagueInPts = ln;
+    });
+
+    // Pełna wiarygodna piramida wszystkich lig SMPL (L1–L9, lub więcej jeśli kiedyś powstanie L10+)
+    var totalTiers = Math.max(9, maxLeagueInPts);
+    var W = 680;
+    var bandH = 38;
+    var padL = 46;
+    var padR = 18;
+    var padT = 14;
+    var padB = 30;
+    var plotW = W - padL - padR;
+    var plotH = totalTiers * bandH;
+    var H = padT + plotH + padB;
+
+    var bandsSvg = '';
+    for (var t = 1; t <= totalTiers; t++) {
+      var st = getTierStyle(t);
+      var by = padT + (t - 1) * bandH;
+      var hasPlayed = Boolean(playedTiersMap[t]);
+      bandsSvg +=
+        '<rect x="' + padL + '" y="' + by.toFixed(1) + '" width="' + plotW + '" height="' + (bandH - 1.5).toFixed(1) + '" fill="' + (hasPlayed ? st.fill : st.fillIdle) + '" rx="3"/>' +
+        (t > 1 ? '<line x1="' + padL + '" y1="' + by.toFixed(1) + '" x2="' + (padL + plotW) + '" y2="' + by.toFixed(1) + '" stroke="rgba(148,163,184,0.16)" stroke-dasharray="3 3" stroke-width="1"/>' : '') +
+        '<text x="8" y="' + (by + bandH * 0.62).toFixed(1) + '" fill="' + st.color + '" opacity="' + (hasPlayed ? '1' : '0.42') + '" font-size="11" font-weight="' + (hasPlayed ? '800' : '600') + '" font-family="sans-serif">' + st.label + '</text>';
+    }
+
     function mapPoint(pt, idx) {
-      var x = points.length === 1 ? (padL + plotW / 2) : (padL + (idx / (points.length - 1)) * plotW);
+      var x = points.length === 1 ? (padL + plotW / 2) : (padL + 10 + (idx / (points.length - 1)) * (plotW - 20));
       var lNum = Number(String(pt.leagueId || 'L1').replace(/\D/g, '')) || 1;
-      var tierOffset = (Math.min(3, Math.max(1, lNum)) - 1) * 17;
-      var rankScore = Math.min(49, tierOffset + Math.min(16, Math.max(1, pt.pos)) - 1);
-      var y = padT + (rankScore / 49) * plotH;
-      var color = lNum === 1 ? '#facc15' : (lNum === 2 ? '#38bdf8' : '#fb923c');
-      return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)), color: color, pt: pt, lNum: lNum };
+      if (lNum < 1) lNum = 1;
+      var clampedPos = Math.min(16, Math.max(1, Number(pt.pos || 1)));
+      var bandTop = padT + (lNum - 1) * bandH;
+      var innerPad = 5;
+      var y = bandTop + innerPad + ((clampedPos - 1) / 15) * (bandH - innerPad * 2 - 1.5);
+      var st = getTierStyle(lNum);
+      return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)), color: st.color, tierName: st.name, pt: pt, lNum: lNum };
     }
 
     var coords = points.map(mapPoint);
     var polyPts = coords.map(function (c) { return c.x + ',' + c.y; }).join(' ');
 
-    var l1H = (16 / 49) * plotH;
-    var l2Y = padT + (17 / 49) * plotH;
-    var l2H = (16 / 49) * plotH;
-    var l3Y = padT + (34 / 49) * plotH;
-    var l3H = (15 / 49) * plotH;
-
+    var dotR = coords.length > 35 ? 3.8 : (coords.length > 20 ? 4.4 : 5.2);
     var dotsSvg = coords.map(function (c) {
-      var tip = 'Sezon ' + c.pt.seasonNumber + (c.pt.inProgress ? ' (półmetek)' : '') + ' (' + c.pt.leagueId + '): #' + c.pt.pos + ' • ' + c.pt.PKT + ' pkt (' + c.pt.W + 'W-' + c.pt.R + 'R-' + c.pt.P + 'P)';
-      return '<circle cx="' + c.x + '" cy="' + c.y + '" r="' + (coords.length > 25 ? 3.5 : 4.8) + '" fill="' + c.color + '" stroke="#0f172a" stroke-width="1.5"><title>' + escHtml(tip) + '</title></circle>';
+      var tip = 'Sezon ' + c.pt.seasonNumber + (c.pt.inProgress ? ' (półmetek)' : '') + ' — ' + c.tierName + ' (' + c.pt.leagueId + '): #' + c.pt.pos + ' • ' + c.pt.PKT + ' pkt (' + c.pt.W + 'W-' + c.pt.R + 'R-' + c.pt.P + 'P, ' + c.pt.BZ + ':' + c.pt.BS + ')';
+      var clickAttr = ' onclick="SMPL_APP.setArchiveMode(\'SEASONS\'); SMPL_APP.setArchiveSeason(' + Number(c.pt.seasonNumber) + '); SMPL_APP.setArchiveLeague(\'' + escHtml(c.pt.leagueId) + '\'); SMPL_APP.switchTab(\'archive\');"';
+      return '<circle cx="' + c.x + '" cy="' + c.y + '" r="' + dotR + '" fill="' + c.color + '" stroke="#090d16" stroke-width="1.6" style="cursor:pointer"' + clickAttr + '><title>' + escHtml(tip) + '</title></circle>';
     }).join('');
 
-    var labelIdxs = [0];
-    if (coords.length > 4) labelIdxs.push(Math.floor(coords.length / 2));
-    if (coords.length > 1) labelIdxs.push(coords.length - 1);
+    var labelIdxs = [];
+    if (coords.length <= 6) {
+      for (var li2 = 0; li2 < coords.length; li2++) labelIdxs.push(li2);
+    } else {
+      var steps = 5;
+      for (var si = 0; si <= steps; si++) {
+        var idxVal = Math.round((si / steps) * (coords.length - 1));
+        if (labelIdxs.indexOf(idxVal) === -1) labelIdxs.push(idxVal);
+      }
+    }
     var xLabelsSvg = labelIdxs.map(function (idx) {
       var c = coords[idx];
-      return '<text x="' + c.x + '" y="' + (H - 10) + '" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="sans-serif">S' + c.pt.seasonNumber + '</text>';
+      return '<text x="' + c.x + '" y="' + (H - 9) + '" fill="#94a3b8" font-size="10" font-weight="600" text-anchor="middle" font-family="sans-serif">S' + c.pt.seasonNumber + '</text>';
     }).join('');
+
+    var tierBreakdownPills = Object.keys(playedTiersMap)
+      .map(function (k) { return Number(k); })
+      .sort(function (a, b) { return a - b; })
+      .map(function (tn) {
+        var st = getTierStyle(tn);
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-display font-bold border" style="color:' + st.color + ';border-color:' + st.color + '55;background:' + st.fill + ';">' + st.label + ': ' + playedTiersMap[tn] + ' sez.</span>';
+      })
+      .join('');
+
+    var spanText = minLeagueInPts === maxLeagueInPts
+      ? ('L' + minLeagueInPts)
+      : ('L' + maxLeagueInPts + ' → L' + minLeagueInPts);
 
     return '' +
       '<div class="smpl-career-chart-wrap">' +
-        '<svg viewBox="0 0 ' + W + ' ' + H + '" class="w-full h-auto" role="img" aria-label="Wykres kariery S1-S55">' +
-          '<rect x="' + padL + '" y="' + padT + '" width="' + plotW + '" height="' + l1H.toFixed(1) + '" fill="rgba(250,204,21,0.08)" rx="4"/>' +
-          '<rect x="' + padL + '" y="' + l2Y.toFixed(1) + '" width="' + plotW + '" height="' + l2H.toFixed(1) + '" fill="rgba(56,189,248,0.06)" rx="4"/>' +
-          '<rect x="' + padL + '" y="' + l3Y.toFixed(1) + '" width="' + plotW + '" height="' + l3H.toFixed(1) + '" fill="rgba(251,146,60,0.06)" rx="4"/>' +
-          '<text x="8" y="' + (padT + 14) + '" fill="#fde047" font-size="10" font-weight="bold">L1</text>' +
-          '<text x="8" y="' + (l2Y + 14).toFixed(1) + '" fill="#7dd3fc" font-size="10" font-weight="bold">2.L</text>' +
-          '<text x="8" y="' + (l3Y + 14).toFixed(1) + '" fill="#fdba74" font-size="10" font-weight="bold">3.L</text>' +
-          '<polyline fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="2" stroke-linejoin="round" points="' + polyPts + '"/>' +
+        '<svg viewBox="0 0 ' + W + ' ' + H + '" class="w-full h-auto mx-auto" style="max-height:430px;" role="img" aria-label="Wykres kariery S1-S55 we wszystkich ligach L1-L' + totalTiers + '">' +
+          bandsSvg +
+          '<polyline fill="none" stroke="rgba(255,255,255,0.58)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" points="' + polyPts + '"/>' +
           dotsSvg +
           xLabelsSvg +
         '</svg>' +
-        '<div class="text-xs text-slate-400 mt-1 flex flex-wrap gap-3 justify-between">' +
-          '<span>📈 Najedz na punkt, aby zobaczyc wynik w sezonie S1–S55</span>' +
-          '<span>Sezonow w archiwum: <strong class="text-amber-300">' + points.length + '</strong></span>' +
+        '<div class="mt-2.5 pt-2.5 border-t border-white/10 space-y-2">' +
+          '<div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">' +
+            '<span>📈 Zakres lig w karierze: <strong class="text-amber-300">' + spanText + '</strong> <span class="text-slate-400">(skala pełna L1–L' + totalTiers + ')</span></span>' +
+            '<span>Sezonów w archiwum: <strong class="text-amber-300">' + points.length + '</strong></span>' +
+          '</div>' +
+          '<div class="flex flex-wrap items-center gap-1.5">' + tierBreakdownPills + '</div>' +
+          '<div class="text-[11px] text-slate-400">💡 Najedź na punkt, aby zobaczyć szczegóły sezonu (lub kliknij, aby otworzyć tabelę tamtej ligi).</div>' +
         '</div>' +
       '</div>';
   }
@@ -2969,6 +3032,22 @@ window.SMPL_STUDIO = (function () {
    * Uwaga: opisujemy wyłącznie funkcje i poprawki dla graczy (zero wewnętrznych detali serwera).
    */
   var BUILTIN_PLAYER_UPDATES = [
+    {
+      id: 'BUILTIN_V2_9',
+      version: 'V2.9',
+      date: '2026-11-20',
+      category: 'ULEPSZENIA',
+      title: 'Pełna Trajektoria Kariery dla Wszystkich Lig (L1–L9) — 100% Wiarygodności!',
+      summary: 'Przebudowaliśmy wykres Trajektorii Kariery S1–S55 na Kartach UT oraz w Archiwum! Zamiast spłaszczania niższych lig do L3, wykres pokazuje teraz pełną piramidę wszystkich 9 historycznych szczebli SMPL (od L1 Ekstraklasy aż po L7, L8 i L9).',
+      highlights: [
+        'Każdy poziom rozgrywkowy (L1–L9) ma własny pas, unikalny kolor i dokładną skalę miejsc 1–16 — jeśli zaczynałeś w L7 lub L8, wykres wiernie oddaje całą Twoją drogę w górę tabeli!',
+        'Pod wykresem dodaliśmy kolorowe podsumowanie zakresu lig kariery (np. L8 → L2 lub L7 → L1) oraz dokładny rozkład liczby sezonów w każdej dywizji.',
+        'Kliknięcie dowolnego punktu na wykresie przenosi teraz od razu do oficjalnej tabeli tamtego sezonu i dywizji w Archiwum.',
+        'Pełna Trajektoria Kariery L1–L9 jest teraz widoczna także w zakładce Archiwum → Kariera Zawodnika dla wszystkich 377 graczy w historii SMPL!'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
     {
       id: 'BUILTIN_V2_8',
       version: 'V2.8',
