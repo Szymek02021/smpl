@@ -1918,7 +1918,12 @@ window.SMPL_VIEWS = (function () {
                    </button>
                    <button onclick="SMPL_APP.openAwardTrophyModal('${p.id}')" class="btn-league px-3.5 py-2.5 rounded-xl text-xs font-display uppercase self-end">
                      🏆 Nadaj Trofeum
-                   </button>`
+                   </button>
+                   ${session && session.adminRole === 'MASTER_ADMIN'
+                     ? `<button type="button" onclick="SMPL_APP.openMasterGrantCoinsModal('${p.id}')" class="px-3.5 py-2.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/50 font-display font-black text-xs uppercase self-end shadow">
+                          👑 +Coins
+                        </button>`
+                     : ''}`
                 : ''
             }
           </div>

@@ -565,6 +565,16 @@ function smpl_validate_coadmin_admins_guard($prevDb, $newDb, $callerAdminId) {
     if (!smpl_json_eq($prevSupportCfg, $newSupportCfg)) {
         return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może edytować linki i ustawienia zakładki Wsparcia (Donate).';
     }
+    // Ochrona bonusowych SMPL Coins — wyłącznie Master Admin może przyznawać lub zmieniać bonusCoins
+    $prevBonusCoins = (isset($prevDb['competitions']['playerShop']['bonusCoins']) && is_array($prevDb['competitions']['playerShop']['bonusCoins']))
+        ? $prevDb['competitions']['playerShop']['bonusCoins']
+        : array();
+    $newBonusCoins = (isset($newDb['competitions']['playerShop']['bonusCoins']) && is_array($newDb['competitions']['playerShop']['bonusCoins']))
+        ? $newDb['competitions']['playerShop']['bonusCoins']
+        : array();
+    if (!smpl_json_eq($prevBonusCoins, $newBonusCoins)) {
+        return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może przyznawać lub zmieniać bonusowe SMPL Coins.';
+    }
     return null;
 }
 
@@ -4945,6 +4955,89 @@ if ($method === 'POST') {
                 }
             }
             $logText = '🎁 ' . $actorName . ' podarował prezent dla ' . $recName . ': ' . $giftLabel . '.';
+        } elseif ($op === 'master_grant_coins') {
+            if (!$isAdmActor || !isset($adminTokenInfo['role']) || (string)$adminTokenInfo['role'] !== 'MASTER_ADMIN') {
+                http_response_code(403);
+                echo json_encode(array('ok' => false, 'error' => '⛔ Wyłącznie Master Admin (Szymon Komenda) może przyznawać lub zerować SMPL Coins graczom!'));
+                exit;
+            }
+            $targetPid = isset($body['playerId']) ? trim((string)$body['playerId']) : '';
+            if ($targetPid === '') {
+                http_response_code(400);
+                echo json_encode(array('ok' => false, 'error' => 'Wskaż zawodnika, któremu chcesz przyznać SMPL Coins.'));
+                exit;
+            }
+            $targetPlIdx = -1;
+            $targetPlName = 'Gracz';
+            if (isset($prevDb['players']) && is_array($prevDb['players'])) {
+                foreach ($prevDb['players'] as $pi => $plItem) {
+                    if (is_array($plItem) && isset($plItem['id']) && (string)$plItem['id'] === $targetPid) {
+                        $targetPlIdx = $pi;
+                        $targetPlName = isset($plItem['name']) ? (string)$plItem['name'] : 'Gracz';
+                        break;
+                    }
+                }
+            }
+            if ($targetPlIdx === -1) {
+                http_response_code(404);
+                echo json_encode(array('ok' => false, 'error' => 'Nie znaleziono wskazanego zawodnika w bazie ligi.'));
+                exit;
+            }
+            if (!isset($prevDb['competitions']['playerShop']) || !is_array($prevDb['competitions']['playerShop'])) {
+                $prevDb['competitions']['playerShop'] = array('unlocks' => array(), 'bonusCoins' => array(), 'giftHistory' => array());
+            }
+            if (!isset($prevDb['competitions']['playerShop']['bonusCoins']) || !is_array($prevDb['competitions']['playerShop']['bonusCoins'])) {
+                $prevDb['competitions']['playerShop']['bonusCoins'] = array();
+            }
+            $mode = isset($body['mode']) ? strtolower(trim((string)$body['mode'])) : 'add';
+            $curBonus = isset($prevDb['competitions']['playerShop']['bonusCoins'][$targetPid])
+                ? (int)$prevDb['competitions']['playerShop']['bonusCoins'][$targetPid]
+                : 0;
+            $cleanReason = mb_substr(trim(strip_tags((string)(isset($body['reason']) ? $body['reason'] : ''))), 0, 140, 'UTF-8');
+            $maxSafe = 1000000000;
+            $appliedDelta = 0;
+            if ($mode === 'reset_bonus') {
+                $appliedDelta = -$curBonus;
+                $nextBonus = 0;
+            } elseif ($mode === 'set_bonus') {
+                $rawSet = isset($body['amount']) && is_numeric($body['amount']) ? (int)round((float)$body['amount']) : 0;
+                $nextBonus = max(-$maxSafe, min($maxSafe, $rawSet));
+                $appliedDelta = $nextBonus - $curBonus;
+            } else {
+                $rawDelta = isset($body['delta']) && is_numeric($body['delta'])
+                    ? (int)round((float)$body['delta'])
+                    : (isset($body['amount']) && is_numeric($body['amount']) ? (int)round((float)$body['amount']) : 0);
+                if ($rawDelta === 0) {
+                    http_response_code(400);
+                    echo json_encode(array('ok' => false, 'error' => 'Podaj liczbę SMPL Coins różną od 0 (np. 1000 lub -500).'));
+                    exit;
+                }
+                $nextBonus = max(-$maxSafe, min($maxSafe, $curBonus + $rawDelta));
+                $appliedDelta = $nextBonus - $curBonus;
+            }
+            $prevDb['competitions']['playerShop']['bonusCoins'][$targetPid] = $nextBonus;
+            $newBalance = smpl_compute_player_coins_server($prevDb, $targetPid);
+            if ($appliedDelta > 0) {
+                if (!isset($prevDb['players'][$targetPlIdx]['notifications']) || !is_array($prevDb['players'][$targetPlIdx]['notifications'])) {
+                    $prevDb['players'][$targetPlIdx]['notifications'] = array();
+                }
+                array_unshift($prevDb['players'][$targetPlIdx]['notifications'], array(
+                    'id' => 'NOTIF_MCOINS_' . time() . '_' . mt_rand(10, 99),
+                    'type' => 'MASTER_COINS',
+                    'icon' => '👑',
+                    'title' => 'Otrzymałeś +' . $appliedDelta . ' SMPL Coins od Master Admina!',
+                    'text' => 'Master Admin ' . $actorName . ' doładował Twoje konto w Sklepiku SMPL o +' . $appliedDelta . ' Coins (saldo: ' . $newBalance . ' Coins).' . ($cleanReason !== '' ? ' Powód: ' . $cleanReason : ''),
+                    'time' => $nowStr,
+                    'read' => false
+                ));
+                $prevDb['players'][$targetPlIdx]['notifications'] = array_slice($prevDb['players'][$targetPlIdx]['notifications'], 0, 50);
+            }
+            if ($mode === 'reset_bonus') {
+                $logText = '👑🧹 Master Admin ' . $actorName . ' wyzerował bonusowe SMPL Coins gracza ' . $targetPlName . ' (nowe saldo: ' . $newBalance . ' Coins).';
+            } else {
+                $signTxt = ($appliedDelta >= 0 ? '+' : '') . $appliedDelta;
+                $logText = '👑🪙 Master Admin ' . $actorName . ' zmienił SMPL Coins gracza ' . $targetPlName . ' o ' . $signTxt . ' (saldo: ' . $newBalance . ' Coins)' . ($cleanReason !== '' ? ' [' . $cleanReason . ']' : '') . '.';
+            }
         } elseif ($op === 'tv_clip_add') {
             $title = mb_substr(trim(strip_tags((string)(isset($body['title']) ? $body['title'] : ''))), 0, 100, 'UTF-8');
             $url = trim((string)(isset($body['url']) ? $body['url'] : ''));

@@ -1136,8 +1136,11 @@ window.SMPL_APP = (function () {
                          ? `<button type="button" onclick="SMPL_APP.closeSettingsDrawer(); SMPL_APP.openPlayerProfileTab('${myAdminPlTop.id}');" class="smpl-drawer-action-row">
                               <span>🎴 Moja Karta (${esc(myAdminActiveLgTop)})</span><span>›</span>
                             </button>
-                            <button type="button" onclick="SMPL_APP.closeSettingsDrawer(); SMPL_APP.openAssignHistoricalStatsModal('${myAdminPlTop.id}');" class="smpl-drawer-action-row">
-                              <span>🏛️ Moje S1–S55</span><span>›</span>
+                            <button type="button" onclick="SMPL_APP.closeSettingsDrawer(); SMPL_APP.openCoinShopModal();" class="smpl-drawer-action-row text-amber-200">
+                              <span>🪙 Sklepik Coins</span><span>›</span>
+                            </button>
+                            <button type="button" onclick="SMPL_APP.closeSettingsDrawer(); SMPL_APP.openAssignHistoricalStatsModal('${myAdminPlTop.id}');" class="smpl-drawer-action-row col-span-2">
+                              <span>🏛️ Moje S1–S55 (Statystyki Historyczne)</span><span>›</span>
                             </button>`
                          : `<button type="button" onclick="SMPL_APP.closeSettingsDrawer(); SMPL_APP.openAdminJoinAsPlayerModal('L1');" class="smpl-drawer-action-row col-span-2">
                               <span>🛡️ Dołącz jako Gracz (np. L1)</span><span>›</span>
@@ -9307,8 +9310,14 @@ window.SMPL_APP = (function () {
     }
     const state = window.SMPL_DB.getState();
     const session = window.SMPL_DB.getSession();
-    const pid = (session && session.activePlayerId) || null;
+    const isMasterOwner = Boolean(session && window.SMPL_DB && window.SMPL_DB.isStrictAdminSession(session) && session.adminRole === 'MASTER_ADMIN');
+    const resolvedPl = resolveNotificationTargetPlayer(state, session);
+    const pid = (resolvedPl && resolvedPl.id) || (session && session.activePlayerId) || null;
     if (!pid || !window.SMPL_STUDIO) {
+      if (isMasterOwner && window.SMPL_STUDIO) {
+        openMasterGrantCoinsModal('');
+        return;
+      }
       showToast('Sklepik SMPL Loyalty Coins dostępny jest dla przypisanych zawodników.', 'error');
       return;
     }
@@ -9480,6 +9489,45 @@ window.SMPL_APP = (function () {
       }).join('');
     }
 
+    const masterPlayersForCoins = isMasterOwner
+      ? (state.players || [])
+          .filter((p) => p && !p.isPlaceholder && !p.gdprDeleted)
+          .slice()
+          .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pl'))
+      : [];
+    const masterCoinsOptsHtml = masterPlayersForCoins.map((p) => {
+      const pCoins = window.SMPL_STUDIO.calculatePlayerCoinsBreakdown(state, p.id);
+      const isSelf = String(p.id) === String(pid);
+      return '<option value="' + studioEsc(p.id) + '"' + (isSelf ? ' selected' : '') + '>'
+        + studioEsc(p.name) + (isSelf ? ' [TY]' : '') + ' (' + studioEsc(p.leagueId || 'POOL') + ') — ' + pCoins.balance + ' Coins'
+        + '</option>';
+    }).join('');
+    const masterCoinsVaultHtml = isMasterOwner
+      ? '<div class="p-3 rounded-xl bg-amber-500/10 border border-amber-400/45 space-y-2.5 text-[11px]">' +
+          '<div class="flex flex-wrap items-center justify-between gap-2">' +
+            '<span class="font-display font-black text-amber-300 uppercase">👑 Skarbiec Master Admina — Dodaj Coinsy Bez Limitu (Test Sklepiku)</span>' +
+            '<div class="flex flex-wrap items-center gap-1">' +
+              '<button type="button" onclick="SMPL_APP.masterQuickGrantCoins(\'' + studioEsc(pid) + '\', 500, true)" class="px-2 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/45 font-bold">+500</button>' +
+              '<button type="button" onclick="SMPL_APP.masterQuickGrantCoins(\'' + studioEsc(pid) + '\', 2500, true)" class="px-2 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/45 font-bold">+2 500</button>' +
+              '<button type="button" onclick="SMPL_APP.masterQuickGrantCoins(\'' + studioEsc(pid) + '\', 10000, true)" class="px-2 py-1 rounded-lg bg-amber-400/25 hover:bg-amber-400/40 text-amber-100 border border-amber-400/55 font-black">+10 000</button>' +
+              '<button type="button" onclick="SMPL_APP.masterQuickGrantCoins(\'' + studioEsc(pid) + '\', 100000, true)" class="px-2 py-1 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/40 text-emerald-200 border border-emerald-400/50 font-black">+100 000</button>' +
+              (coins.breakdown.adminBonusCoins
+                ? '<button type="button" onclick="SMPL_APP.masterResetPlayerBonusCoins(\'' + studioEsc(pid) + '\', true)" class="px-2 py-1 rounded-lg bg-rose-600/25 hover:bg-rose-600/40 text-rose-200 border border-rose-400/40 font-bold" title="Zeruje Twoje bonusowe Coins od Mastera">🧹 Zeruj (' + coins.breakdown.adminBonusCoins + ')</button>'
+                : '') +
+            '</div>' +
+          '</div>' +
+          '<form onsubmit="SMPL_APP.masterSubmitGrantCoinsForm(event, true)" class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 items-center">' +
+            '<select name="playerId" class="sm:col-span-5 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-white/15 text-white font-semibold">' + masterCoinsOptsHtml + '</select>' +
+            '<input type="number" name="delta" step="1" value="5000" required placeholder="Kwota bez limitu (lub -500)" class="sm:col-span-3 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-amber-400/40 text-amber-200 font-mono-num font-bold"/>' +
+            '<input type="text" name="reason" maxlength="100" placeholder="Powód (opcj., np. Test)" class="sm:col-span-2 px-2 py-1.5 rounded-lg bg-slate-950 border border-white/15 text-slate-200"/>' +
+            '<button type="submit" class="sm:col-span-2 btn-league px-2.5 py-1.5 rounded-lg font-display font-black uppercase">🪙 Dodaj</button>' +
+          '</form>' +
+        '</div>'
+      : '';
+    const adminBonusPart = coins.breakdown.adminBonusCoins
+      ? (', <strong class="text-amber-300">Bonus Master (' + (coins.breakdown.adminBonusCoins >= 0 ? '+' : '') + coins.breakdown.adminBonusCoins + ')</strong>')
+      : '';
+
     const html = `
       <div class="p-5 sm:p-6 space-y-4">
         <div class="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
@@ -9489,9 +9537,10 @@ window.SMPL_APP = (function () {
           </div>
           <button type="button" onclick="SMPL_APP.closeModal()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-bold">✕</button>
         </div>
+        ${masterCoinsVaultHtml}
         <div class="p-3 rounded-xl bg-slate-950/80 border border-white/10 text-[11px] text-slate-300 space-y-1.5">
           <div><strong class="text-amber-300">Ekonomia Wielo-Sezonowa:</strong> +6/mecz • +5/CK • +35 za 10 meczów bez WO • Typer +12/+4 • ZP +10 • Puskás +15 • Wyzwania do +65/tydz. <em>Odblokowane nagrody i Coins przechodzą na kolejne sezony!</em></div>
-          <div>Twoje źródła: Mecze (${coins.breakdown.matchesCoins}), Czyste Konta (${coins.breakdown.cleanSheetCoins}), Terminowość (${coins.breakdown.timelyBonusCoins}), Typer/ZP/Puskás (${coins.breakdown.typerCoins + coins.breakdown.puskasCoins + coins.breakdown.goldenBallCoins}), Wyzwania (${coins.breakdown.questCoins || 0}), Prezenty (${coins.breakdown.giftCoinsReceived || 0}), Poprz. sezony (${coins.breakdown.carryoverCoins || 0}).</div>
+          <div>Twoje źródła: Mecze (${coins.breakdown.matchesCoins}), Czyste Konta (${coins.breakdown.cleanSheetCoins}), Terminowość (${coins.breakdown.timelyBonusCoins}), Typer/ZP/Puskás (${coins.breakdown.typerCoins + coins.breakdown.puskasCoins + coins.breakdown.goldenBallCoins}), Wyzwania (${coins.breakdown.questCoins || 0}), Prezenty (${coins.breakdown.giftCoinsReceived || 0}), Poprz. sezony (${coins.breakdown.carryoverCoins || 0})${adminBonusPart}.</div>
           <div class="text-slate-400">Aktywne teraz: Ramka <strong class="text-white">${studioEsc(cos.frame)}</strong> • Tło <strong class="text-white">${studioEsc(cos.bgStyle)}</strong> • Skórka PNG <strong class="text-white">${studioEsc(cos.posterTheme || 'default')}</strong> • Odznaka <strong class="text-white">${studioEsc(cos.badgeLabel || 'brak')}</strong> • Blask <strong class="text-white">${studioEsc(cos.nickEffect || 'brak')}</strong> • Dźwięk <strong class="text-white">${studioEsc(cos.joinSound)}</strong></div>
         </div>
         <div class="flex flex-wrap gap-1.5">${tabsHtml}</div>
@@ -9593,6 +9642,141 @@ window.SMPL_APP = (function () {
     } catch (err) {
       showToast((err && err.message) || 'Nie udało się wysłać prezentu.', 'error');
     }
+  }
+
+  function masterQuickGrantCoins(playerId, delta, reopenShop, reason) {
+    try {
+      const res = window.SMPL_DB.masterGrantPlayerCoins({
+        playerId: playerId,
+        delta: Number(delta || 0),
+        mode: 'add',
+        reason: reason || ''
+      });
+      if (Number(delta || 0) > 0 && window.SMPL_NOTIF && typeof window.SMPL_NOTIF.playShopSound === 'function') {
+        window.SMPL_NOTIF.playShopSound('arcade_levelup', false);
+      }
+      const sign = res.delta >= 0 ? '+' : '';
+      showToast('👑🪙 ' + res.playerName + ': ' + sign + res.delta + ' SMPL Coins (nowe saldo: ' + res.balance + ' Coins)!');
+      renderAll();
+      if (reopenShop) openCoinShopModal();
+      if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
+        res.remotePromise.then((srv) => {
+          if (srv && srv.ok === false && srv.error) {
+            showToast('⚠️ Serwer odrzucił zmianę Coins: ' + srv.error, 'error');
+            renderAll();
+          }
+        });
+      }
+    } catch (err) {
+      showToast((err && err.message) || 'Nie udało się przyznać SMPL Coins.', 'error');
+    }
+  }
+
+  function masterSubmitGrantCoinsForm(event, reopenShop) {
+    if (event && event.preventDefault) event.preventDefault();
+    const form = event && event.target ? event.target : null;
+    if (!form) return;
+    const playerId = form.playerId ? form.playerId.value : '';
+    const rawDelta = form.delta ? Number(form.delta.value || 0) : 0;
+    const reason = form.reason ? form.reason.value : '';
+    if (!playerId) {
+      showToast('Wybierz zawodnika z listy.', 'error');
+      return;
+    }
+    if (!rawDelta || !isFinite(rawDelta)) {
+      showToast('Podaj liczbę SMPL Coins różną od 0 (np. 5000 lub -500).', 'error');
+      return;
+    }
+    masterQuickGrantCoins(playerId, Math.round(rawDelta), Boolean(reopenShop), reason);
+  }
+
+  function masterResetPlayerBonusCoins(playerId, reopenShop) {
+    try {
+      const res = window.SMPL_DB.masterGrantPlayerCoins({
+        playerId: playerId,
+        mode: 'reset_bonus'
+      });
+      showToast('👑🧹 Wyzerowano bonusowe SMPL Coins dla ' + res.playerName + ' (saldo: ' + res.balance + ' Coins).');
+      renderAll();
+      if (reopenShop) openCoinShopModal();
+      if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
+        res.remotePromise.then((srv) => {
+          if (srv && srv.ok === false && srv.error) {
+            showToast('⚠️ Serwer odrzucił zerowanie Coins: ' + srv.error, 'error');
+            renderAll();
+          }
+        });
+      }
+    } catch (err) {
+      showToast((err && err.message) || 'Nie udało się wyzerować bonusowych Coins.', 'error');
+    }
+  }
+
+  function openMasterGrantCoinsModal(defaultPlayerId) {
+    const state = window.SMPL_DB.getState();
+    const session = window.SMPL_DB.getSession();
+    const isMasterOwner = Boolean(session && window.SMPL_DB && window.SMPL_DB.isStrictAdminSession(session) && session.adminRole === 'MASTER_ADMIN');
+    if (!isMasterOwner) {
+      showToast('⛔ Skarbiec SMPL Coins dostępny jest wyłącznie dla Master Admina.', 'error');
+      return;
+    }
+    const players = (state.players || [])
+      .filter((p) => p && !p.isPlaceholder && !p.gdprDeleted)
+      .slice()
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pl'));
+    const chosenId = defaultPlayerId || (players[0] ? players[0].id : '');
+    const chosenPl = players.find((p) => String(p.id) === String(chosenId)) || players[0] || null;
+    const chosenBal = chosenPl && window.SMPL_STUDIO
+      ? window.SMPL_STUDIO.calculatePlayerCoinsBreakdown(state, chosenPl.id)
+      : { balance: 0, breakdown: { adminBonusCoins: 0 } };
+    const optsHtml = players.map((p) => {
+      const b = window.SMPL_STUDIO ? window.SMPL_STUDIO.calculatePlayerCoinsBreakdown(state, p.id) : { balance: 0 };
+      const sel = chosenPl && String(p.id) === String(chosenPl.id) ? ' selected' : '';
+      return '<option value="' + studioEsc(p.id) + '"' + sel + '>' + studioEsc(p.name) + ' (' + studioEsc(p.leagueId || 'POOL') + ') — ' + b.balance + ' Coins</option>';
+    }).join('');
+    const html = `
+      <div class="p-5 sm:p-6 space-y-4">
+        <div class="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
+          <div>
+            <span class="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-display font-black text-[10px] uppercase">👑 TYLKO MASTER ADMIN • BEZ LIMITU</span>
+            <h3 class="font-display font-black text-lg text-amber-300 uppercase mt-1">🪙 Przyznaj SMPL Coins Graczowi</h3>
+          </div>
+          <button type="button" onclick="SMPL_APP.closeModal()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-bold">✕</button>
+        </div>
+        ${chosenPl ? `
+          <div class="p-3 rounded-xl bg-slate-950/90 border border-amber-400/30 text-xs text-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div>Wybrany gracz: <strong class="text-white">${studioEsc(chosenPl.name)}</strong> • Saldo: <strong class="text-amber-300">${chosenBal.balance} Coins</strong> (Bonus Master: ${chosenBal.breakdown.adminBonusCoins || 0})</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="SMPL_APP.masterQuickGrantCoins('${studioEsc(chosenPl.id)}', 500, false); SMPL_APP.openMasterGrantCoinsModal('${studioEsc(chosenPl.id)}');" class="px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/45 font-bold">+500</button>
+              <button type="button" onclick="SMPL_APP.masterQuickGrantCoins('${studioEsc(chosenPl.id)}', 2500, false); SMPL_APP.openMasterGrantCoinsModal('${studioEsc(chosenPl.id)}');" class="px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/45 font-bold">+2 500</button>
+              <button type="button" onclick="SMPL_APP.masterQuickGrantCoins('${studioEsc(chosenPl.id)}', 10000, false); SMPL_APP.openMasterGrantCoinsModal('${studioEsc(chosenPl.id)}');" class="px-2.5 py-1 rounded-lg bg-amber-400/30 hover:bg-amber-400/45 text-amber-100 border border-amber-400/55 font-black">+10 000</button>
+              <button type="button" onclick="SMPL_APP.masterQuickGrantCoins('${studioEsc(chosenPl.id)}', 100000, false); SMPL_APP.openMasterGrantCoinsModal('${studioEsc(chosenPl.id)}');" class="px-2.5 py-1 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/40 text-emerald-200 border border-emerald-400/50 font-black">+100 000</button>
+            </div>
+          </div>
+        ` : ''}
+        <form onsubmit="SMPL_APP.masterSubmitGrantCoinsForm(event, false); SMPL_APP.closeModal();" class="space-y-3 text-xs">
+          <div>
+            <label class="block text-[11px] font-bold uppercase text-slate-300 mb-1">Zawodnik</label>
+            <select name="playerId" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white font-semibold">${optsHtml || '<option value="">Brak zawodników w bazie</option>'}</select>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold uppercase text-amber-300 mb-1">Liczba SMPL Coins (bez limitu, ujemna = odejmij)</label>
+              <input type="number" name="delta" step="1" value="5000" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-amber-400/40 text-amber-200 font-mono-num font-bold"/>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold uppercase text-slate-300 mb-1">Powód / notatka (opcjonalnie)</label>
+              <input type="text" name="reason" maxlength="140" placeholder="np. Test Sklepiku / Nagroda Specjalna" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white"/>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+            ${chosenPl && chosenBal.breakdown.adminBonusCoins ? `<button type="button" onclick="SMPL_APP.masterResetPlayerBonusCoins('${studioEsc(chosenPl.id)}', false); SMPL_APP.openMasterGrantCoinsModal('${studioEsc(chosenPl.id)}');" class="px-3 py-2 rounded-xl bg-rose-600/25 hover:bg-rose-600/40 text-rose-200 border border-rose-500/40 font-bold">🧹 Wyzeruj Bonus (${chosenBal.breakdown.adminBonusCoins})</button>` : '<span></span>'}
+            <button type="submit" class="btn-league px-4 py-2 rounded-xl font-display font-black uppercase">🪙 Przyznaj SMPL Coins</button>
+          </div>
+        </form>
+      </div>
+    `;
+    openModal(html);
   }
 
   function openSmplWrappedModal(playerId) {
@@ -10971,6 +11155,10 @@ window.SMPL_APP = (function () {
     handleClaimShopQuest,
     toggleShopGiftType,
     handleSendShopGift,
+    masterQuickGrantCoins,
+    masterSubmitGrantCoinsForm,
+    masterResetPlayerBonusCoins,
+    openMasterGrantCoinsModal,
     openSmplWrappedModal,
     openVacationModeModal,
     submitVacationModeForm,

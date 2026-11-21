@@ -6224,8 +6224,8 @@ state = enrichFromArchive(data.state);
     if (!c.fanPolls || typeof c.fanPolls !== 'object') c.fanPolls = {};
     if (!Array.isArray(c.totwHistory)) c.totwHistory = [];
     if (!c.playerShop || typeof c.playerShop !== 'object') c.playerShop = def.playerShop;
-    if (!c.playerShop.unlocks || typeof c.playerShop.unlocks !== 'object') c.playerShop.unlocks = {};
-    if (!c.playerShop.bonusCoins || typeof c.playerShop.bonusCoins !== 'object') c.playerShop.bonusCoins = {};
+    if (!c.playerShop.unlocks || typeof c.playerShop.unlocks !== 'object' || Array.isArray(c.playerShop.unlocks)) c.playerShop.unlocks = {};
+    if (!c.playerShop.bonusCoins || typeof c.playerShop.bonusCoins !== 'object' || Array.isArray(c.playerShop.bonusCoins)) c.playerShop.bonusCoins = {};
     if (!Array.isArray(c.playerShop.giftHistory)) c.playerShop.giftHistory = [];
     if (!c.smplTV || typeof c.smplTV !== 'object') c.smplTV = def.smplTV;
     if (!c.smplTV.liveStream || typeof c.smplTV.liveStream !== 'object') c.smplTV.liveStream = def.smplTV.liveStream;
@@ -7364,6 +7364,81 @@ state = enrichFromArchive(data.state);
       ? sendCompetitionActionToServer({ op: 'shop_gift', toPlayerId: String(recipient.id), giftType: gType, amount: giftCost, itemId: itemId, note: cleanNote }, actor.isAdmin)
       : Promise.resolve({ ok: true, localOnly: true });
     return { ok: true, gift: entry, unlock: senderU, remotePromise: remotePromise };
+  }
+
+  function masterGrantPlayerCoins({ playerId, delta, amount, mode, reason }) {
+    const sess = assertMasterAdminAuthenticated();
+    const comp = ensureCompetitionsStructure(state);
+    if (!comp.playerShop || typeof comp.playerShop !== 'object') {
+      comp.playerShop = { unlocks: {}, bonusCoins: {}, giftHistory: [] };
+    }
+    if (!comp.playerShop.bonusCoins || typeof comp.playerShop.bonusCoins !== 'object' || Array.isArray(comp.playerShop.bonusCoins)) {
+      comp.playerShop.bonusCoins = {};
+    }
+    const targetPid = String(playerId || '').trim();
+    if (!targetPid) throw new Error('Wybierz zawodnika, któremu chcesz przyznać SMPL Coins.');
+    const targetPlayer = (state.players || []).find((p) => p && String(p.id) === targetPid);
+    if (!targetPlayer) throw new Error('Nie znaleziono wskazanego zawodnika w bazie ligi.');
+
+    const cleanMode = String(mode || 'add').trim().toLowerCase();
+    const cleanReason = String(reason || '').replace(/<[^>]*>/g, '').trim().slice(0, 140);
+    const curBonus = Number(comp.playerShop.bonusCoins[targetPid] || 0);
+    const maxSafe = 1000000000;
+    let nextBonus = curBonus;
+    let appliedDelta = 0;
+
+    if (cleanMode === 'reset_bonus') {
+      nextBonus = 0;
+      appliedDelta = -curBonus;
+    } else if (cleanMode === 'set_bonus') {
+      const rawSet = Math.round(Number(amount !== undefined ? amount : delta || 0) || 0);
+      nextBonus = Math.max(-maxSafe, Math.min(maxSafe, rawSet));
+      appliedDelta = nextBonus - curBonus;
+    } else {
+      const rawDelta = Math.round(Number(delta !== undefined ? delta : amount || 0) || 0);
+      if (!rawDelta) throw new Error('Podaj liczbę SMPL Coins różną od 0 (np. 1000 lub -500).');
+      nextBonus = Math.max(-maxSafe, Math.min(maxSafe, curBonus + rawDelta));
+      appliedDelta = nextBonus - curBonus;
+    }
+
+    comp.playerShop.bonusCoins[targetPid] = nextBonus;
+    const balInfo = window.SMPL_STUDIO && typeof window.SMPL_STUDIO.calculatePlayerCoinsBreakdown === 'function'
+      ? window.SMPL_STUDIO.calculatePlayerCoinsBreakdown(state, targetPid)
+      : { balance: Math.max(0, nextBonus) };
+    const adminName = String((sess && sess.adminName) || 'Szymon Komenda');
+
+    if (appliedDelta > 0) {
+      pushPlayerNotification(targetPlayer, {
+        idPrefix: 'NOTIF_MCOINS',
+        type: 'MASTER_COINS',
+        icon: '👑',
+        title: `Otrzymałeś +${appliedDelta} SMPL Coins od Master Admina!`,
+        text: `Master Admin ${adminName} doładował Twoje konto w Sklepiku SMPL o +${appliedDelta} Coins (saldo: ${balInfo.balance} Coins).${cleanReason ? ' Powód: ' + cleanReason : ''}`
+      });
+    }
+    addLog(
+      'MASTER_COINS',
+      cleanMode === 'reset_bonus'
+        ? `👑🧹 Master Admin ${adminName} wyzerował bonusowe SMPL Coins gracza ${targetPlayer.name} (saldo: ${balInfo.balance} Coins).`
+        : `👑🪙 Master Admin ${adminName} zmienił SMPL Coins gracza ${targetPlayer.name} o ${appliedDelta >= 0 ? '+' : ''}${appliedDelta} (saldo: ${balInfo.balance} Coins)${cleanReason ? ' [' + cleanReason + ']' : ''}.`
+    );
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+
+    const remotePromise = isHttpProtocol()
+      ? sendCompetitionActionToServer(
+          { op: 'master_grant_coins', playerId: targetPid, delta: appliedDelta, amount: nextBonus, mode: cleanMode, reason: cleanReason },
+          true
+        )
+      : Promise.resolve({ ok: true, localOnly: true });
+    return {
+      ok: true,
+      playerId: targetPid,
+      playerName: targetPlayer.name,
+      bonusCoins: nextBonus,
+      balance: balInfo.balance,
+      delta: appliedDelta,
+      remotePromise: remotePromise
+    };
   }
 
   function addSmplTvClip({ title, url, playerName, tag }) {
@@ -11553,6 +11628,7 @@ state = enrichFromArchive(data.state);
     masterUpdateSupportConfig,
     masterAddSupporterEntry,
     masterRemoveSupporterEntry,
+    masterGrantPlayerCoins,
     masterSaveClan,
     masterDeleteClan,
     masterUpdateLeague,

@@ -4860,6 +4860,88 @@ window.SMPL_FORMS_ADMIN = (function () {
         </div>
 
         ${(() => {
+          const allCoinsPlayers = ((state && state.players) || [])
+            .filter((p) => p && !p.isPlaceholder && !p.gdprDeleted)
+            .slice()
+            .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pl'));
+          const bonusMap = (state && state.competitions && state.competitions.playerShop && state.competitions.playerShop.bonusCoins) || {};
+          const coinsPlOpts = allCoinsPlayers.map((p) => {
+            const cInfo = window.SMPL_STUDIO && typeof window.SMPL_STUDIO.calculatePlayerCoinsBreakdown === 'function'
+              ? window.SMPL_STUDIO.calculatePlayerCoinsBreakdown(state, p.id)
+              : { balance: 0 };
+            const bVal = Number(bonusMap[p.id] || 0);
+            const bTag = bVal !== 0 ? (' [bonus: ' + (bVal > 0 ? '+' : '') + bVal + ']') : '';
+            const isMasterPl = Boolean(session && p.adminId && String(p.adminId) === String(session.adminId));
+            return `<option value="${escapeHtml(p.id)}" ${isMasterPl ? 'selected' : ''}>${escapeHtml(p.name)}${isMasterPl ? ' [TY]' : ''} (${escapeHtml(p.leagueId || 'POOL')}) — saldo: ${cInfo.balance} Coins${bTag}</option>`;
+          }).join('');
+          const activeBonusChips = allCoinsPlayers
+            .filter((p) => Number(bonusMap[p.id] || 0) !== 0)
+            .map((p) => {
+              const bVal = Number(bonusMap[p.id] || 0);
+              return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400/15 border border-amber-400/40 text-[11px] text-amber-200 font-semibold">
+                <span>${escapeHtml(p.name)}: <strong class="text-white">${bVal > 0 ? '+' : ''}${bVal}</strong></span>
+                <button type="button" onclick="SMPL_APP.masterResetPlayerBonusCoins('${escapeHtml(p.id)}', false)" class="text-rose-300 hover:text-white font-black" title="Wyzeruj bonus tego gracza">✕</button>
+              </span>`;
+            }).join('');
+          return `
+            <!-- SKARBIEC SMPL COINS — DOŁADOWANIE GRACZY BEZ LIMITU (TYLKO MASTER ADMIN) -->
+            <div id="master-coins-vault-card" class="mt-6 glass-panel rounded-2xl p-5 sm:p-6 border-2 border-amber-400/50 bg-slate-950/90 space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
+                <div>
+                  <span class="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-display font-black text-[10px] uppercase">
+                    👑 TYLKO MASTER ADMIN • ZERO LIMITU • TESTOWANIE SKLEPIKU I NAGRODY SPECJALNE
+                  </span>
+                  <h4 class="font-display font-black text-base sm:text-lg text-amber-300 uppercase mt-1">
+                    🪙 Skarbiec SMPL Coins — Przyznawaj Coinsy Graczom Bez Limitu
+                  </h4>
+                  <p class="text-xs text-slate-300 mt-0.5">
+                    Dodawaj dowolną liczbę SMPL Coins sobie lub wybranemu zawodnikowi (np. +5 000, +100 000 albo odejmij wpisując liczbę ujemną). Zabezpieczone wyłącznie dla Master Admina w <code>api.php</code>.
+                  </p>
+                </div>
+                <button type="button" onclick="SMPL_APP.openCoinShopModal()" class="btn-league px-4 py-2 rounded-xl text-xs font-display font-black uppercase shadow-lg">
+                  🛍️ Otwórz Sklepik Coins
+                </button>
+              </div>
+
+              <form onsubmit="SMPL_APP.masterSubmitGrantCoinsForm(event, false)" class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                <div class="lg:col-span-4">
+                  <label class="block text-[11px] font-display uppercase text-slate-300 mb-1 font-bold">👤 Wybierz zawodnika</label>
+                  <select id="master-coins-player-sel" name="playerId" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white font-semibold">
+                    ${coinsPlOpts || '<option value="">Brak zawodników w bazie</option>'}
+                  </select>
+                </div>
+                <div class="lg:col-span-3">
+                  <label class="block text-[11px] font-display uppercase text-amber-300 mb-1 font-bold">🪙 Kwota Coins (bez limitu)</label>
+                  <input id="master-coins-delta-inp" type="number" name="delta" step="1" value="5000" required placeholder="np. 10000 lub -500" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-amber-400/45 text-xs text-amber-200 font-mono-num font-black"/>
+                </div>
+                <div class="lg:col-span-3">
+                  <label class="block text-[11px] font-display uppercase text-slate-300 mb-1 font-bold">📝 Powód (opcjonalnie)</label>
+                  <input type="text" name="reason" maxlength="140" placeholder="np. Test Sklepiku / Event SMPL" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white"/>
+                </div>
+                <div class="lg:col-span-2">
+                  <button type="submit" class="w-full btn-league px-3.5 py-2 rounded-xl font-display font-black text-xs uppercase shadow-lg">
+                    🪙 Dodaj Coins
+                  </button>
+                </div>
+              </form>
+
+              <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span class="text-slate-400 font-bold uppercase text-[10px] mr-1">Szybkie doładowanie wybranego:</span>
+                  <button type="button" onclick="var s=document.getElementById('master-coins-player-sel'); if(s&&s.value) SMPL_APP.masterQuickGrantCoins(s.value, 500, false);" class="px-2.5 py-1 rounded-lg bg-amber-400/15 hover:bg-amber-400/30 text-amber-200 border border-amber-400/40 font-bold">+500</button>
+                  <button type="button" onclick="var s=document.getElementById('master-coins-player-sel'); if(s&&s.value) SMPL_APP.masterQuickGrantCoins(s.value, 2500, false);" class="px-2.5 py-1 rounded-lg bg-amber-400/15 hover:bg-amber-400/30 text-amber-200 border border-amber-400/40 font-bold">+2 500</button>
+                  <button type="button" onclick="var s=document.getElementById('master-coins-player-sel'); if(s&&s.value) SMPL_APP.masterQuickGrantCoins(s.value, 10000, false);" class="px-2.5 py-1 rounded-lg bg-amber-400/25 hover:bg-amber-400/40 text-amber-100 border border-amber-400/55 font-black">+10 000</button>
+                  <button type="button" onclick="var s=document.getElementById('master-coins-player-sel'); if(s&&s.value) SMPL_APP.masterQuickGrantCoins(s.value, 100000, false);" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-400/50 font-black">+100 000</button>
+                  <button type="button" onclick="var s=document.getElementById('master-coins-player-sel'); if(s&&s.value) SMPL_APP.masterResetPlayerBonusCoins(s.value, false);" class="px-2.5 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/35 text-rose-200 border border-rose-500/40 font-bold">🧹 Wyzeruj Bonus</button>
+                </div>
+              </div>
+
+              ${activeBonusChips ? `<div class="pt-2 border-t border-white/10 space-y-1.5"><div class="text-[10px] font-display font-bold uppercase text-slate-400">Gracze z aktywnym Bonusem Master Admina (kliknij ✕, aby wyzerować):</div><div class="flex flex-wrap gap-1.5">${activeBonusChips}</div></div>` : ''}
+            </div>
+          `;
+        })()}
+
+        ${(() => {
           const supCfg =
             window.SMPL_DB && typeof window.SMPL_DB.getSupportConfig === 'function'
               ? window.SMPL_DB.getSupportConfig(state)

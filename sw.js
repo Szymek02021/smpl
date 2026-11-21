@@ -3,7 +3,7 @@
  * Obsługuje: Instalację na telefonie (PWA), tryb offline oraz powiadomienia Push
  */
 
-const CACHE_NAME = 'smpl-pwa-v62';
+const CACHE_NAME = 'smpl-pwa-v63';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,11 +11,11 @@ const ASSETS_TO_CACHE = [
   './PANEL-ADMINA.html',
   './REJESTRACJA.html',
   './manifest.json',
-  './manifest.json?v=62',
+  './manifest.json?v=63',
   './favicon.ico',
   './css/styles.css',
-  './css/styles.css?v=62',
-  './css/smpl-wow-overhaul.css?v=62',
+  './css/styles.css?v=63',
+  './css/smpl-wow-overhaul.css?v=63',
   './css/favicon-16x16.png',
   './css/favicon-32x32.png',
   './css/apple-touch-icon.png',
@@ -50,21 +50,21 @@ const ASSETS_TO_CACHE = [
   './img/vip-preview-pc.jpg',
   './img/vip-preview-cert.jpg',
   './img/vip-preview-crest.jpg',
-  './js/seed-data.js?v=62',
-  './js/archive-data.js?v=62',
-  './js/crests-and-media.js?v=62',
-  './js/engine.js?v=62',
-  './js/expansion-studio.js?v=62',
+  './js/seed-data.js?v=63',
+  './js/archive-data.js?v=63',
+  './js/crests-and-media.js?v=63',
+  './js/engine.js?v=63',
+  './js/expansion-studio.js?v=63',
   './js/ranks.js',
-  './js/ranks.js?v=62',
-  './js/api-client.js?v=62',
-  './js/ui-views.js?v=62',
-  './js/ui-forms-admin.js?v=62',
+  './js/ranks.js?v=63',
+  './js/api-client.js?v=63',
+  './js/ui-views.js?v=63',
+  './js/ui-forms-admin.js?v=63',
   './js/notifications.js',
-  './js/notifications.js?v=62',
-  './js/ai-assistant.js?v=62',
-  './js/wow-overhaul.js?v=62',
-  './js/app.js?v=62'
+  './js/notifications.js?v=63',
+  './js/ai-assistant.js?v=63',
+  './js/wow-overhaul.js?v=63',
+  './js/app.js?v=63'
 ];
 
 self.addEventListener('install', (event) => {

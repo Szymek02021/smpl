@@ -344,6 +344,15 @@ function validateCoAdminAdminsGuardLocal(prevDb, newDb, callerAdminId) {
   if (!deepJsonEqLocal(prevSup, newSup)) {
     return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może edytować linki i ustawienia zakładki Wsparcia (Donate).';
   }
+  const prevBonusCoins = (prevDb && prevDb.competitions && prevDb.competitions.playerShop && prevDb.competitions.playerShop.bonusCoins && typeof prevDb.competitions.playerShop.bonusCoins === 'object')
+    ? prevDb.competitions.playerShop.bonusCoins
+    : {};
+  const newBonusCoins = (newDb && newDb.competitions && newDb.competitions.playerShop && newDb.competitions.playerShop.bonusCoins && typeof newDb.competitions.playerShop.bonusCoins === 'object')
+    ? newDb.competitions.playerShop.bonusCoins
+    : {};
+  if (!deepJsonEqLocal(prevBonusCoins, newBonusCoins)) {
+    return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może przyznawać lub zmieniać bonusowe SMPL Coins.';
+  }
   return null;
 }
 
@@ -2832,6 +2841,58 @@ const server = http.createServer((req, res) => {
             });
             if (recipient.notifications.length > 50) recipient.notifications = recipient.notifications.slice(0, 50);
             logText = `🎁 ${actorName} podarował prezent dla ${recName}: ${giftLabel}.`;
+          } else if (op === 'master_grant_coins') {
+            if (!isAdmActor || !adm || String(adm.role || '') !== 'MASTER_ADMIN') {
+              return sendJson(res, 403, { ok: false, error: '⛔ Wyłącznie Master Admin (Szymon Komenda) może przyznawać lub zerować SMPL Coins graczom!' });
+            }
+            const targetPid = String(payload.playerId || '').trim();
+            if (!targetPid) return sendJson(res, 400, { ok: false, error: 'Wskaż zawodnika, któremu chcesz przyznać SMPL Coins.' });
+            const targetPl = (db.players || []).find((p) => p && String(p.id) === targetPid);
+            if (!targetPl) return sendJson(res, 404, { ok: false, error: 'Nie znaleziono wskazanego zawodnika w bazie ligi.' });
+            if (!db.competitions.playerShop || typeof db.competitions.playerShop !== 'object') {
+              db.competitions.playerShop = { unlocks: {}, bonusCoins: {}, giftHistory: [] };
+            }
+            if (!db.competitions.playerShop.bonusCoins || typeof db.competitions.playerShop.bonusCoins !== 'object' || Array.isArray(db.competitions.playerShop.bonusCoins)) {
+              db.competitions.playerShop.bonusCoins = {};
+            }
+            const mode = String(payload.mode || 'add').trim().toLowerCase();
+            const curBonus = Number(db.competitions.playerShop.bonusCoins[targetPid] || 0);
+            const cleanReason = String(payload.reason || '').replace(/<[^>]*>/g, '').trim().slice(0, 140);
+            const maxSafe = 1000000000;
+            let nextBonus = curBonus;
+            let appliedDelta = 0;
+            if (mode === 'reset_bonus') {
+              nextBonus = 0;
+              appliedDelta = -curBonus;
+            } else if (mode === 'set_bonus') {
+              const rawSet = Math.round(Number(payload.amount || 0) || 0);
+              nextBonus = Math.max(-maxSafe, Math.min(maxSafe, rawSet));
+              appliedDelta = nextBonus - curBonus;
+            } else {
+              const rawDelta = Math.round(Number(payload.delta !== undefined ? payload.delta : payload.amount || 0) || 0);
+              if (!rawDelta) return sendJson(res, 400, { ok: false, error: 'Podaj liczbę SMPL Coins różną od 0 (np. 1000 lub -500).' });
+              nextBonus = Math.max(-maxSafe, Math.min(maxSafe, curBonus + rawDelta));
+              appliedDelta = nextBonus - curBonus;
+            }
+            db.competitions.playerShop.bonusCoins[targetPid] = nextBonus;
+            const newBalance = computePlayerCoinsLocal(db, targetPid);
+            const targetName = String(targetPl.name || 'Gracz');
+            if (appliedDelta > 0) {
+              if (!Array.isArray(targetPl.notifications)) targetPl.notifications = [];
+              targetPl.notifications.unshift({
+                id: 'NOTIF_MCOINS_' + Date.now(),
+                type: 'MASTER_COINS',
+                icon: '👑',
+                title: `Otrzymałeś +${appliedDelta} SMPL Coins od Master Admina!`,
+                text: `Master Admin ${actorName} doładował Twoje konto w Sklepiku SMPL o +${appliedDelta} Coins (saldo: ${newBalance} Coins).${cleanReason ? ' Powód: ' + cleanReason : ''}`,
+                time: nowStr,
+                read: false
+              });
+              if (targetPl.notifications.length > 50) targetPl.notifications = targetPl.notifications.slice(0, 50);
+            }
+            logText = mode === 'reset_bonus'
+              ? `👑🧹 Master Admin ${actorName} wyzerował bonusowe SMPL Coins gracza ${targetName} (nowe saldo: ${newBalance} Coins).`
+              : `👑🪙 Master Admin ${actorName} zmienił SMPL Coins gracza ${targetName} o ${appliedDelta >= 0 ? '+' : ''}${appliedDelta} (saldo: ${newBalance} Coins)${cleanReason ? ' [' + cleanReason + ']' : ''}.`;
           } else if (op === 'tv_clip_add') {
             const title = String(payload.title || '').replace(/<[^>]*>/g, '').trim().slice(0, 100);
             const url = String(payload.url || '').trim();
