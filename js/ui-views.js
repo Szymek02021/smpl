@@ -3693,6 +3693,9 @@ window.SMPL_VIEWS = (function () {
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="SMPL_APP.openOnboardingTutorialModal({ isAutoFirstTime: false })" class="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-400/45 font-display font-bold text-xs uppercase transition">
+              🎬 Poradnik Świeżaka (Wideo A–Z)
+            </button>
             <button type="button" onclick="SMPL_APP.openLegalReportOrAppeal()" class="px-3.5 py-2 rounded-xl bg-blue-600/25 hover:bg-blue-600/40 text-blue-300 border border-blue-500/40 font-display font-bold text-xs uppercase transition">
               💬 Odwołanie / Zgłoszenie DSA
             </button>

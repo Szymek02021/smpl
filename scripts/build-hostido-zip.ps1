@@ -32,7 +32,7 @@ $includeFiles = @(
     'REGULAMIN-I-POLITYKA-SMPL.md'
 )
 
-$includeDirs = @('css', 'js', 'img')
+$includeDirs = @('css', 'js', 'img', 'media')
 
 $zip = [System.IO.Compression.ZipFile]::Open($outZip, [System.IO.Compression.ZipArchiveMode]::Create)
 $count = 0

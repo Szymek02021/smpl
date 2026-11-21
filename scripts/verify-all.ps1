@@ -83,7 +83,7 @@ foreach ($jf in @('manifest.json', 'package.json')) {
 # 4. Git secret leak check
 if ($gitExe -and (Test-Path -LiteralPath (Join-Path $repoRoot '.git'))) {
     $tracked = & $gitExe -C $repoRoot ls-files
-    $leaks = @($tracked | Where-Object { $_ -match '^data/(smpl-db|\.smpl-|snapshots/|audit\.log)' -or $_ -match '\.(zip|mp4|env)$' })
+    $leaks = @($tracked | Where-Object { $_ -ne 'media/smpl-tutorial-swiezaka.mp4' -and ($_ -match '^data/(smpl-db|\.smpl-|snapshots/|audit\.log)' -or $_ -match '\.(zip|mp4|env)$') })
     if ($leaks.Count -eq 0) {
         Write-Host "[PASS] Git secret audit: 0 wrazliwych plikow sledzonych w repo" -ForegroundColor Green
     } else {

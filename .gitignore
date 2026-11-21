@@ -32,6 +32,8 @@ data/*.tmp
 *.tar
 *.gz
 *.mp4
+# Zezwol na oficjalny poradnik wideo swiezaka w folderze media/
+!media/smpl-tutorial-swiezaka.mp4
 *.mov
 *.avi
 *.mkv

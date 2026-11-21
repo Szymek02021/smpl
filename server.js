@@ -36,6 +36,8 @@ const MIME_TYPES = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
   '.ico': 'image/x-icon',
   '.md': 'text/markdown; charset=utf-8'
 };
@@ -3432,7 +3434,29 @@ const server = http.createServer((req, res) => {
   if (fs.existsSync(safePath) && fs.statSync(safePath).isFile()) {
     const ext = path.extname(safePath).toLowerCase();
     const mime = MIME_TYPES[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': mime });
+    const stat = fs.statSync(safePath);
+    const rangeHeader = req.headers && req.headers.range ? String(req.headers.range) : '';
+    if (rangeHeader && rangeHeader.startsWith('bytes=')) {
+      const parts = rangeHeader.replace(/^bytes=/, '').split('-');
+      const start = Math.max(0, parseInt(parts[0], 10) || 0);
+      const end = parts[1] ? Math.min(stat.size - 1, parseInt(parts[1], 10)) : (stat.size - 1);
+      if (start >= stat.size || end < start) {
+        res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` });
+        return res.end();
+      }
+      res.writeHead(206, {
+        'Content-Type': mime,
+        'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': (end - start) + 1
+      });
+      return fs.createReadStream(safePath, { start, end }).pipe(res);
+    }
+    res.writeHead(200, {
+      'Content-Type': mime,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': stat.size
+    });
     fs.createReadStream(safePath).pipe(res);
   } else {
     // Fallback do index.html

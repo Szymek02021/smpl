@@ -3033,6 +3033,21 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_10',
+      version: 'V2.10',
+      date: '2026-11-21',
+      category: 'NOWOŚCI',
+      title: 'Oficjalny Poradnik Wideo dla Świeżaków (A–Z z Lektorem, 9 Rozdziałów)!',
+      summary: 'Nowi zawodnicy nie muszą już zgadywać, jak działa portal SMPL! Zaraz po ukończeniu rejestracji jednorazowo uruchamia się kinowy poradnik wideo HD (4:20) z lektorem, który krok po kroku omawia każdą funkcję portalu — od Tabeli i Terminarza po Kartę UT, Złotego Buta, Złotą Piłkę, Sklepik Coins i Vanessę AI.',
+      highlights: [
+        'Jednorazowe okno powitalne po rejestracji: poradnik wideo otwiera się automatycznie wyłącznie raz po założeniu konta i nigdy więcej nie wyskakuje przy kolejnych wizytach czy logowaniach.',
+        '9 interaktywnych rozdziałów z szybkim przeskokiem: Start & Ligi, Tabela & Żelazna Kurtyna, Terminarz & Messenger, Dodaj Wynik & VAR, Karta UT & Trajektoria L1–L9, Konkursy & Złoty But, Złota Piłka & Sklepik Coins, H2H & Archiwum S1–S55 oraz Vanessa AI & PWA.',
+        'Chcesz wrócić do filmu później? Opcjonalny przycisk „🎬 Poradnik Świeżaka (Wideo A–Z)” jest zawsze dostępny pod ręką w Menu (prawy górny róg) oraz w zakładce Regulamin.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_9',
       version: 'V2.9',
       date: '2026-11-20',

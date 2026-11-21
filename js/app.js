@@ -37,6 +37,71 @@ window.SMPL_APP = (function () {
     } catch (e) {}
   }
 
+  // =========================================================================
+  // JEDNORAZOWY PORADNIK WIDEO ŚWIEŻAKA (OTWIERA SIĘ TYLKO RAZ PO REJESTRACJI)
+  // =========================================================================
+  const TUTORIAL_SEEN_PREFIX = 'smpl_onboarding_tutorial_seen_v1::';
+  const TUTORIAL_SEEN_GLOBAL_KEY = 'smpl_onboarding_tutorial_seen_v1::__device_any__';
+  const TUTORIAL_MEDIA_VER = '62';
+  let onboardingTutorialAutoShownInSession = false;
+
+  const TUTORIAL_CHAPTERS = [
+    { num: 1, time: 0, stamp: '0:00', title: 'Start & Ligi', desc: 'Przełącznik lig L1–L3, pasek zakładek, dzwonek i motywy' },
+    { num: 2, time: 26.5, stamp: '0:26', title: 'Tabela & Kurtyna', desc: 'Strefy awansu/spadku, zasada PKT → H2H i Czyste Konta' },
+    { num: 3, time: 55, stamp: '0:55', title: 'Terminarz & Mecze', desc: '4 kolejki/tydz., DOM zaprasza, Messenger, Kiedy Gramy? i urlop' },
+    { num: 4, time: 80.5, stamp: '1:20', title: 'Dodaj Wynik & VAR', desc: 'Obowiązkowy screen po meczu i zgłoszenia do Trybunału VAR' },
+    { num: 5, time: 109.5, stamp: '1:49', title: 'Karta UT & Kariera', desc: 'OVR, eksport PNG, 18 Kamieni Milowych i Trajektoria L1–L9' },
+    { num: 6, time: 140.5, stamp: '2:20', title: 'Konkursy & Złoty But', desc: 'Król Strzelców, Puchar KO, Typer, Nagroda Puskása i TOTW' },
+    { num: 7, time: 167.5, stamp: '2:47', title: 'Złota Piłka & Sklepik', desc: 'Głosowanie MVP (1 gracz = 1 głos) i Sklepik Coins 0 zł' },
+    { num: 8, time: 198, stamp: '3:18', title: 'H2H & Archiwum', desc: 'Porównywarka rywali H2H i pełna historia Sezonów S1–S55' },
+    { num: 9, time: 224, stamp: '3:44', title: 'Vanessa AI & Start', desc: 'Asystentka AI 24/7, Regulamin, Czarna Lista i aplikacja PWA' }
+  ];
+
+  function buildOnboardingTutorialKeys(reg) {
+    const keys = [TUTORIAL_SEEN_GLOBAL_KEY];
+    if (reg && typeof reg === 'object') {
+      const idPart = reg.id ? String(reg.id).trim().toLowerCase() : '';
+      const userPart = reg.username ? String(reg.username).trim().toLowerCase() : '';
+      const namePart = reg.name ? String(reg.name).trim().toLowerCase() : '';
+      if (idPart) keys.push(TUTORIAL_SEEN_PREFIX + 'id:' + idPart);
+      if (userPart) keys.push(TUTORIAL_SEEN_PREFIX + 'u:' + userPart);
+      if (namePart) keys.push(TUTORIAL_SEEN_PREFIX + 'n:' + namePart);
+    }
+    return keys;
+  }
+
+  function hasSeenOnboardingTutorial(reg) {
+    if (onboardingTutorialAutoShownInSession) return true;
+    try {
+      const keys = buildOnboardingTutorialKeys(reg);
+      for (let i = 0; i < keys.length; i++) {
+        if (localStorage.getItem(keys[i]) === '1') return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function markOnboardingTutorialSeen(reg) {
+    onboardingTutorialAutoShownInSession = true;
+    try {
+      const keys = buildOnboardingTutorialKeys(reg);
+      for (let i = 0; i < keys.length; i++) {
+        localStorage.setItem(keys[i], '1');
+      }
+    } catch (e) {}
+  }
+
+  function triggerFirstTimeOnboardingTutorial(reg) {
+    if (hasSeenOnboardingTutorial(reg)) return false;
+    // Zapisz natychmiast synchronicznie przed otwarciem — gwarantuje absolutne 1-razowe otwarcie
+    markOnboardingTutorialSeen(reg);
+    const pName = reg && reg.name ? String(reg.name) : '';
+    setTimeout(function () {
+      openOnboardingTutorialModal({ playerName: pName, isAutoFirstTime: true });
+    }, 120);
+    return true;
+  }
+
   let settingsDrawerOpen = false;
   let notifCenterOpen = false;
   let lastBackPressAt = 0;
@@ -1109,6 +1174,10 @@ window.SMPL_APP = (function () {
               <button type="button" onclick="SMPL_APP.closeSettingsDrawer(); SMPL_APP.openAiAssistant();" class="smpl-drawer-action-row">
                 <span>🤖 Otwórz Asystentkę Vanessę AI</span>
                 <span class="text-pink-300 text-[10px] font-bold">OTWÓRZ ›</span>
+              </button>
+              <button type="button" onclick="SMPL_APP.closeSettingsDrawer(); SMPL_APP.openOnboardingTutorialModal({ isAutoFirstTime: false });" class="smpl-drawer-action-row">
+                <span>🎬 Poradnik Świeżaka (Wideo A–Z)</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-400/20 text-amber-300 border border-amber-400/40 font-bold">4:20 ▶</span>
               </button>
               <button type="button" onclick="SMPL_APP.toggleAiFabVisibility()" class="smpl-drawer-action-row">
                 <span>💬 Pływający przycisk Vanessy na ekranie</span>
@@ -2309,6 +2378,8 @@ window.SMPL_APP = (function () {
               renderAll();
               if (wasAdminSession && finalReg && finalReg.id) {
                 openPostRegistrationAdminChoiceModal(finalReg.id);
+              } else if (!wasAdminSession) {
+                triggerFirstTimeOnboardingTutorial(finalReg);
               }
             }
           : null
@@ -2339,6 +2410,8 @@ window.SMPL_APP = (function () {
     renderAll();
     if (wasAdminSession && reg && reg.id) {
       openPostRegistrationAdminChoiceModal(reg.id);
+    } else if (!wasAdminSession) {
+      triggerFirstTimeOnboardingTutorial(reg);
     }
   }
 
@@ -4041,6 +4114,8 @@ window.SMPL_APP = (function () {
               renderAll();
               if (isAdminCreator && finalReg && finalReg.id) {
                 openPostRegistrationAdminChoiceModal(finalReg.id);
+              } else if (!isAdminCreator) {
+                triggerFirstTimeOnboardingTutorial(finalReg);
               }
             }
           : null
@@ -4065,6 +4140,8 @@ window.SMPL_APP = (function () {
     renderAll();
     if (isAdminCreator && createdReg && createdReg.id) {
       openPostRegistrationAdminChoiceModal(createdReg.id);
+    } else if (!isAdminCreator) {
+      triggerFirstTimeOnboardingTutorial(createdReg);
     }
   }
 
@@ -6214,7 +6291,268 @@ window.SMPL_APP = (function () {
     `;
   }
 
+  function stopOnboardingTutorialVideo() {
+    const vid = document.getElementById('smpl-onboarding-tutorial-video');
+    if (vid) {
+      try {
+        vid.pause();
+      } catch (e) {}
+    }
+  }
+
   function closeModal() {
+    stopOnboardingTutorialVideo();
+    const dlg = document.getElementById('smpl-tutorial-dialog');
+    if (dlg && dlg.open && typeof dlg.close === 'function') {
+      try {
+        dlg.close();
+      } catch (e) {}
+    }
+    const modalRoot = document.getElementById('global-modal-root');
+    if (modalRoot) modalRoot.innerHTML = '';
+  }
+
+  function escapeTutorialHtml(str) {
+    if (window.SMPL_VIEWS && typeof window.SMPL_VIEWS.escapeHtml === 'function') {
+      return window.SMPL_VIEWS.escapeHtml(str);
+    }
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function updateOnboardingTutorialChapterHighlight(currentSec) {
+    const t = Number(currentSec) || 0;
+    let activeIdx = 0;
+    for (let i = 0; i < TUTORIAL_CHAPTERS.length; i++) {
+      if (t + 0.25 >= TUTORIAL_CHAPTERS[i].time) activeIdx = i;
+    }
+    const ch = TUTORIAL_CHAPTERS[activeIdx] || TUTORIAL_CHAPTERS[0];
+    for (let j = 0; j < TUTORIAL_CHAPTERS.length; j++) {
+      const btn = document.getElementById('smpl-tut-ch-btn-' + TUTORIAL_CHAPTERS[j].num);
+      if (btn) {
+        if (j === activeIdx) btn.classList.add('is-active');
+        else btn.classList.remove('is-active');
+      }
+    }
+    const nowEl = document.getElementById('smpl-tut-now-playing');
+    if (nowEl && ch) {
+      nowEl.innerHTML = '<span>Rozdział <strong>' + ch.num + '/9 • ' + escapeTutorialHtml(ch.title) + '</strong> — ' + escapeTutorialHtml(ch.desc) + '</span>'
+        + '<span style="color:#94a3b8;font-size:10.5px;white-space:nowrap;">Czas: ' + escapeTutorialHtml(ch.stamp) + ' / 4:20</span>';
+    }
+  }
+
+  function openOnboardingTutorialModal(opts) {
+    const options = opts && typeof opts === 'object' ? opts : {};
+    const playerName = options.playerName ? String(options.playerName).trim() : '';
+    const isAutoFirstTime = Boolean(options.isAutoFirstTime);
+    const isStandaloneReg = window.SMPL_FORCED_TAB === 'register';
+
+    closeRankTooltip();
+    stopOnboardingTutorialVideo();
+    const modalRoot = document.getElementById('global-modal-root');
+    if (!modalRoot) return;
+
+    const existingDlg = document.getElementById('smpl-tutorial-dialog');
+    if (existingDlg && existingDlg.open && typeof existingDlg.close === 'function') {
+      try { existingDlg.close(); } catch (e) {}
+    }
+
+    const firstName = playerName ? playerName.split(/\s+/)[0] : '';
+    const headingText = isAutoFirstTime && firstName
+      ? ('Witamy w SMPL, ' + firstName + '! Poradnik Świeżaka od A do Z')
+      : 'Oficjalny Poradnik Świeżaka SMPL — Wszystko od A do Z';
+    const subtitleText = isAutoFirstTime
+      ? 'Twoje konto jest już utworzone! Obejrzyj 4-minutowy przewodnik z lektorem po wszystkich zakładkach, meczach, Karcie UT, konkursach i zasadach ligi.'
+      : 'Kompletny przewodnik wideo HD (4:20) z lektorem po każdej funkcji portalu Score Match Polska Liga — kliknij dowolny rozdział, aby przeskoczyć.';
+
+    const chaptersHtml = TUTORIAL_CHAPTERS.map(function (ch, idx) {
+      return (
+        '<button type="button" id="smpl-tut-ch-btn-' + ch.num + '" class="smpl-tutorial-ch-btn' + (idx === 0 ? ' is-active' : '') + '"'
+        + ' onclick="SMPL_APP.seekOnboardingTutorial(' + ch.time + ')" title="' + escapeTutorialHtml(ch.desc) + '">'
+        + '<span class="smpl-tutorial-ch-stamp">' + escapeTutorialHtml(ch.stamp) + '</span>'
+        + '<span class="smpl-tutorial-ch-label">' + ch.num + '. ' + escapeTutorialHtml(ch.title) + '</span>'
+        + '</button>'
+      );
+    }).join('');
+
+    const firstCh = TUTORIAL_CHAPTERS[0];
+    const portalLinkHtml = isStandaloneReg
+      ? '<a href="./index.html" class="smpl-tutorial-cta-secondary">🏆 Portal Główny</a>'
+      : '';
+
+    modalRoot.innerHTML =
+      '<dialog id="smpl-tutorial-dialog" class="smpl-tutorial-dialog" aria-labelledby="smpl-tutorial-title" closedby="any">'
+      + '<div class="smpl-tutorial-header">'
+        + '<div style="min-width:0;">'
+          + '<span class="smpl-tutorial-badge">🎬 PORADNIK ŚWIEŻAKA • LEKTOR PL • 4:20 HD</span>'
+          + '<h2 id="smpl-tutorial-title" class="smpl-tutorial-title">' + escapeTutorialHtml(headingText) + '</h2>'
+          + '<p class="smpl-tutorial-subtitle">' + escapeTutorialHtml(subtitleText) + '</p>'
+        + '</div>'
+        + '<form method="dialog" style="margin:0;">'
+          + '<button type="submit" value="close" autofocus class="smpl-tutorial-close-btn" aria-label="Zamknij poradnik wideo" title="Zamknij (Esc)">✕</button>'
+        + '</form>'
+      + '</div>'
+      + '<div class="smpl-tutorial-body">'
+        + '<div class="smpl-tutorial-stage">'
+          + '<video id="smpl-onboarding-tutorial-video" class="smpl-tutorial-video" controls playsinline preload="metadata"'
+            + ' poster="./media/smpl-tutorial-poster.jpg?v=' + TUTORIAL_MEDIA_VER + '">'
+            + '<source src="./media/smpl-tutorial-swiezaka.mp4?v=' + TUTORIAL_MEDIA_VER + '" type="video/mp4">'
+            + 'Twoja przeglądarka nie obsługuje odtwarzacza wideo HTML5.'
+          + '</video>'
+          + '<button type="button" id="smpl-tut-play-overlay" class="smpl-tutorial-play-overlay" style="display:none;"'
+            + ' onclick="SMPL_APP.playOnboardingTutorialFromOverlay()" aria-label="Odtwórz poradnik z lektorem">'
+            + '<span class="smpl-tutorial-play-cta">▶ ODTWÓRZ Z LEKTOREM (4:20)</span>'
+            + '<span class="smpl-tutorial-play-hint">🔊 Kliknij, aby włączyć film z pełnym głosem lektora</span>'
+          + '</button>'
+        + '</div>'
+        + '<div id="smpl-tut-now-playing" class="smpl-tutorial-nowbar">'
+          + '<span>Rozdział <strong>1/9 • ' + escapeTutorialHtml(firstCh.title) + '</strong> — ' + escapeTutorialHtml(firstCh.desc) + '</span>'
+          + '<span style="color:#94a3b8;font-size:10.5px;white-space:nowrap;">Czas: 0:00 / 4:20</span>'
+        + '</div>'
+        + '<div class="smpl-tutorial-chapters-grid" aria-label="Rozdziały poradnika">'
+          + chaptersHtml
+        + '</div>'
+        + '<div class="smpl-tutorial-footer">'
+          + '<div class="smpl-tutorial-once-note">'
+            + '<strong>🔒 Otwiera się automatycznie tylko raz</strong> — nigdy więcej nie wyskoczy po odświeżeniu ani logowaniu. '
+            + 'Gdybyś chciał wrócić, znajdziesz go w <strong>Menu → Poradnik Świeżaka</strong> oraz w zakładce <strong>Regulamin</strong>.'
+          + '</div>'
+          + '<div class="smpl-tutorial-actions">'
+            + portalLinkHtml
+            + '<form method="dialog" style="margin:0;">'
+              + '<button type="submit" value="done" class="smpl-tutorial-cta-primary">✅ Wszystko jasne — Wchodzę do Ligi</button>'
+            + '</form>'
+          + '</div>'
+        + '</div>'
+      + '</div>'
+      + '</dialog>';
+
+    const dlg = document.getElementById('smpl-tutorial-dialog');
+    const vid = document.getElementById('smpl-onboarding-tutorial-video');
+    const overlay = document.getElementById('smpl-tut-play-overlay');
+
+    if (dlg) {
+      if (typeof dlg.showModal === 'function') {
+        try {
+          dlg.showModal();
+        } catch (e) {
+          dlg.setAttribute('open', 'open');
+        }
+      } else {
+        dlg.setAttribute('open', 'open');
+      }
+      dlg.scrollTop = 0;
+
+      // Fallback light-dismiss dla przeglądarek bez natywnego <dialog closedby="any"> (np. Safari)
+      if (typeof HTMLDialogElement !== 'undefined' && !('closedBy' in HTMLDialogElement.prototype)) {
+        const isOutsideDialog = function (ev) {
+          const r = dlg.getBoundingClientRect();
+          return ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom;
+        };
+        let pressedOutside = false;
+        dlg.addEventListener('pointerdown', function (ev) {
+          pressedOutside = isOutsideDialog(ev);
+        });
+        dlg.addEventListener('pointerup', function (ev) {
+          if (pressedOutside && isOutsideDialog(ev)) {
+            closeOnboardingTutorialModal();
+          }
+          pressedOutside = false;
+        });
+      }
+
+      dlg.addEventListener('close', function () {
+        dlg.returnValue = '';
+        stopOnboardingTutorialVideo();
+        const rootNow = document.getElementById('global-modal-root');
+        if (rootNow && rootNow.contains(dlg)) {
+          rootNow.innerHTML = '';
+        }
+      });
+    }
+
+    if (vid) {
+      vid.addEventListener('play', function () {
+        if (overlay) overlay.style.display = 'none';
+      });
+      vid.addEventListener('timeupdate', function () {
+        updateOnboardingTutorialChapterHighlight(vid.currentTime);
+      });
+      vid.addEventListener('error', function () {
+        const nowEl = document.getElementById('smpl-tut-now-playing');
+        if (nowEl) {
+          nowEl.innerHTML = '<span style="color:#fda4af;">⚠️ Nie udało się wczytać pliku wideo poradnika — sprawdź połączenie z internetem lub odśwież stronę (Ctrl+F5).</span>';
+        }
+      });
+      try {
+        const playPromise = vid.play();
+        if (playPromise && typeof playPromise.then === 'function') {
+          playPromise.then(function () {
+            if (overlay) overlay.style.display = 'none';
+          }).catch(function () {
+            if (overlay) overlay.style.display = 'flex';
+          });
+        }
+      } catch (e) {
+        if (overlay) overlay.style.display = 'flex';
+      }
+    }
+  }
+
+  function playOnboardingTutorialFromOverlay() {
+    const vid = document.getElementById('smpl-onboarding-tutorial-video');
+    const overlay = document.getElementById('smpl-tut-play-overlay');
+    if (overlay) overlay.style.display = 'none';
+    if (vid) {
+      try {
+        vid.muted = false;
+        const p = vid.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(function () {});
+        }
+      } catch (e) {}
+    }
+  }
+
+  function seekOnboardingTutorial(seconds) {
+    const targetSec = Math.max(0, Number(seconds) || 0);
+    const vid = document.getElementById('smpl-onboarding-tutorial-video');
+    const overlay = document.getElementById('smpl-tut-play-overlay');
+    updateOnboardingTutorialChapterHighlight(targetSec);
+    if (!vid) return;
+    if (overlay) overlay.style.display = 'none';
+    const applySeek = function () {
+      try {
+        vid.currentTime = targetSec;
+        vid.muted = false;
+        const p = vid.play();
+        if (p && typeof p.catch === 'function') p.catch(function () {});
+      } catch (e) {}
+    };
+    if (vid.readyState >= 1) {
+      applySeek();
+    } else {
+      vid.addEventListener('loadedmetadata', function onMeta() {
+        vid.removeEventListener('loadedmetadata', onMeta);
+        applySeek();
+      });
+      try { vid.load(); } catch (e) {}
+    }
+  }
+
+  function closeOnboardingTutorialModal() {
+    stopOnboardingTutorialVideo();
+    const dlg = document.getElementById('smpl-tutorial-dialog');
+    if (dlg && dlg.open && typeof dlg.close === 'function') {
+      try {
+        dlg.close('done');
+        return;
+      } catch (e) {}
+    }
     const modalRoot = document.getElementById('global-modal-root');
     if (modalRoot) modalRoot.innerHTML = '';
   }
@@ -10695,6 +11033,10 @@ window.SMPL_APP = (function () {
     masterSaveSupportConfig,
     masterAddSupporter,
     masterRemoveSupporter,
+    openOnboardingTutorialModal,
+    closeOnboardingTutorialModal,
+    seekOnboardingTutorial,
+    playOnboardingTutorialFromOverlay,
     closeModal
   };
 })();

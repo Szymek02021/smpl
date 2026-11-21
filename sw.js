@@ -3,7 +3,7 @@
  * Obsługuje: Instalację na telefonie (PWA), tryb offline oraz powiadomienia Push
  */
 
-const CACHE_NAME = 'smpl-pwa-v61';
+const CACHE_NAME = 'smpl-pwa-v62';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,11 +11,11 @@ const ASSETS_TO_CACHE = [
   './PANEL-ADMINA.html',
   './REJESTRACJA.html',
   './manifest.json',
-  './manifest.json?v=61',
+  './manifest.json?v=62',
   './favicon.ico',
   './css/styles.css',
-  './css/styles.css?v=61',
-  './css/smpl-wow-overhaul.css?v=61',
+  './css/styles.css?v=62',
+  './css/smpl-wow-overhaul.css?v=62',
   './css/favicon-16x16.png',
   './css/favicon-32x32.png',
   './css/apple-touch-icon.png',
@@ -50,21 +50,21 @@ const ASSETS_TO_CACHE = [
   './img/vip-preview-pc.jpg',
   './img/vip-preview-cert.jpg',
   './img/vip-preview-crest.jpg',
-  './js/seed-data.js?v=61',
-  './js/archive-data.js?v=61',
-  './js/crests-and-media.js?v=61',
-  './js/engine.js?v=61',
-  './js/expansion-studio.js?v=61',
+  './js/seed-data.js?v=62',
+  './js/archive-data.js?v=62',
+  './js/crests-and-media.js?v=62',
+  './js/engine.js?v=62',
+  './js/expansion-studio.js?v=62',
   './js/ranks.js',
-  './js/ranks.js?v=61',
-  './js/api-client.js?v=61',
-  './js/ui-views.js?v=61',
-  './js/ui-forms-admin.js?v=61',
+  './js/ranks.js?v=62',
+  './js/api-client.js?v=62',
+  './js/ui-views.js?v=62',
+  './js/ui-forms-admin.js?v=62',
   './js/notifications.js',
-  './js/notifications.js?v=61',
-  './js/ai-assistant.js?v=61',
-  './js/wow-overhaul.js?v=61',
-  './js/app.js?v=61'
+  './js/notifications.js?v=62',
+  './js/ai-assistant.js?v=62',
+  './js/wow-overhaul.js?v=62',
+  './js/app.js?v=62'
 ];
 
 self.addEventListener('install', (event) => {
@@ -94,6 +94,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (event.request.url.includes('api.php') || event.request.url.includes('/api/state')) return;
+  // Przepuść bezpośrednio żądania Range (206 Partial Content) oraz materiały wideo MP4/WebM
+  if (event.request.headers && event.request.headers.get('range')) return;
+  if (/\.(mp4|webm|m4v|mov)(\?|$)/i.test(event.request.url) || event.request.url.includes('/media/')) return;
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request.url, { cache: 'no-cache', credentials: 'same-origin' })
