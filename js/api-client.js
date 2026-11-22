@@ -1304,7 +1304,7 @@ window.SMPL_DB = (function () {
     const archData = window.SMPL_ARCHIVE_DATA;
     if (!archData) return { updatedPlayers: 0 };
 
-    const archVer = archData.ARCHIVE_RECALC_VERSION || '2026-11-20-S55-MIDSEASON-V3';
+    const archVer = archData.ARCHIVE_RECALC_VERSION || '2026-11-22-S55-GSHEETS-V4';
     const archSeasons = archData.HISTORICAL_SEASONS || [];
     const archGen = archData.GENERAL_RANKING || [];
     const arch5 = archData.FIVE_SEASON_RANKING || [];

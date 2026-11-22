@@ -3112,6 +3112,21 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_15',
+      version: 'V2.15',
+      date: '2026-11-22',
+      category: 'TURNIEJE',
+      title: 'Aktualizacja Tabel Sezonu 55 na Żywo — Ekstraklasa (54,2%) & 2. Liga (65,9%)!',
+      summary: 'Zaktualizowaliśmy tabele Sezonu 55 (w trakcie) w Archiwum o najnowsze rozegrane mecze Ekstraklasy (+6 meczów) oraz 2. Ligi (+10 meczów) — w tym przetasowania na podium obu dywizji i nowe statystyki Żelaznej Kurtyny!',
+      highlights: [
+        'Ekstraklasa S55 (130/240 meczów • 260 goli): Krzysztof Dziubak umocnił się na 1. miejscu (37 pkt / 16 M, 7 CS), a Kacper Kurczewski (30 pkt) awansował na podium wyprzedzając Michała Wu (28 pkt, nadal Król Strzelców — 23 gole).',
+        '2. Liga S55 (120/182 meczów realnych • 214 goli): Patryk Dzierża dominuje jako lider (53 pkt / 20 M, 31 goli, 11 CS), Adrian Baliński (46 pkt) wskoczył na 2. miejsce przed Tomasza Fałata (44 pkt), a Łukasz Jawor (41 pkt) awansował aż o 4 pozycje na #4!',
+        'Sezon 55 pozostaje oznaczony jako „W trakcie” — Ranking Wszech Czasów, Kariery, 5-Sezonowy oraz medale liczą się nadal z ukończonych sezonów S1–S54 aż do 30. kolejki.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_14',
       version: 'V2.14',
       date: '2026-11-22',
