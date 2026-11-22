@@ -3697,39 +3697,83 @@ textarea:focus-visible {
 }
 
 .smpl-profile-bg-stadium {
-  background: radial-gradient(circle at top, rgba(37, 99, 235, 0.28), rgba(15, 23, 42, 0.96)) !important;
+  background-color: #051230 !important;
+  background-image: linear-gradient(180deg, rgba(3, 10, 28, 0.14) 0%, rgba(2, 7, 20, 0.66) 100%), url('../img/ut-bg-stadium.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(3, 10, 28, 0.14) 0%, rgba(2, 7, 20, 0.66) 100%), image-set(url('../img/ut-bg-stadium-1x.webp') type('image/webp') 1x, url('../img/ut-bg-stadium.webp') type('image/webp') 2x, url('../img/ut-bg-stadium.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
 }
 
 .smpl-profile-bg-cyber {
-  background: linear-gradient(135deg, rgba(6, 78, 59, 0.38), rgba(15, 23, 42, 0.96), rgba(88, 28, 135, 0.35)) !important;
+  background-color: #05131f !important;
+  background-image: linear-gradient(180deg, rgba(4, 12, 24, 0.14) 0%, rgba(4, 9, 20, 0.60) 100%), url('../img/ut-bg-cyber.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(4, 12, 24, 0.14) 0%, rgba(4, 9, 20, 0.60) 100%), image-set(url('../img/ut-bg-cyber-1x.webp') type('image/webp') 1x, url('../img/ut-bg-cyber.webp') type('image/webp') 2x, url('../img/ut-bg-cyber.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
 }
 
 .smpl-profile-bg-royal {
-  background: radial-gradient(circle at top right, rgba(250, 204, 21, 0.24), rgba(10, 12, 20, 0.98)) !important;
+  background-color: #161003 !important;
+  background-image: linear-gradient(180deg, rgba(12, 9, 2, 0.12) 0%, rgba(8, 6, 2, 0.56) 100%), url('../img/ut-bg-royal.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(12, 9, 2, 0.12) 0%, rgba(8, 6, 2, 0.56) 100%), image-set(url('../img/ut-bg-royal-1x.webp') type('image/webp') 1x, url('../img/ut-bg-royal.webp') type('image/webp') 2x, url('../img/ut-bg-royal.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
 }
 
 .smpl-profile-bg-pitch {
-  background: radial-gradient(circle at top, rgba(5, 150, 105, 0.32), rgba(6, 24, 18, 0.97)) !important;
+  background-color: #031a12 !important;
+  background-image: linear-gradient(180deg, rgba(2, 16, 11, 0.14) 0%, rgba(2, 12, 8, 0.64) 100%), url('../img/ut-bg-pitch.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(2, 16, 11, 0.14) 0%, rgba(2, 12, 8, 0.64) 100%), image-set(url('../img/ut-bg-pitch-1x.webp') type('image/webp') 1x, url('../img/ut-bg-pitch.webp') type('image/webp') 2x, url('../img/ut-bg-pitch.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
 }
 
 .smpl-profile-bg-sunset {
-  background: linear-gradient(155deg, rgba(249, 115, 22, 0.32), rgba(30, 15, 24, 0.96), rgba(225, 29, 72, 0.22)) !important;
+  background-color: #1d0914 !important;
+  background-image: linear-gradient(180deg, rgba(24, 7, 10, 0.14) 0%, rgba(14, 4, 10, 0.62) 100%), url('../img/ut-bg-sunset.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(24, 7, 10, 0.14) 0%, rgba(14, 4, 10, 0.62) 100%), image-set(url('../img/ut-bg-sunset-1x.webp') type('image/webp') 1x, url('../img/ut-bg-sunset.webp') type('image/webp') 2x, url('../img/ut-bg-sunset.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
 }
 
 .smpl-profile-bg-aurora {
-  background: linear-gradient(145deg, rgba(45, 212, 191, 0.26), rgba(15, 23, 42, 0.96), rgba(139, 92, 246, 0.28)) !important;
+  background-color: #061826 !important;
+  background-image: linear-gradient(180deg, rgba(4, 14, 26, 0.14) 0%, rgba(4, 8, 20, 0.60) 100%), url('../img/ut-bg-aurora.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(4, 14, 26, 0.14) 0%, rgba(4, 8, 20, 0.60) 100%), image-set(url('../img/ut-bg-aurora-1x.webp') type('image/webp') 1x, url('../img/ut-bg-aurora.webp') type('image/webp') 2x, url('../img/ut-bg-aurora.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
 }
 
 .smpl-profile-bg-volcano {
-  background: radial-gradient(circle at bottom, rgba(239, 68, 68, 0.34), rgba(18, 8, 10, 0.98)) !important;
+  background-color: #1a0508 !important;
+  background-image: linear-gradient(180deg, rgba(16, 4, 6, 0.14) 0%, rgba(14, 3, 5, 0.56) 100%), url('../img/ut-bg-volcano.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(16, 4, 6, 0.14) 0%, rgba(14, 3, 5, 0.56) 100%), image-set(url('../img/ut-bg-volcano-1x.webp') type('image/webp') 1x, url('../img/ut-bg-volcano.webp') type('image/webp') 2x, url('../img/ut-bg-volcano.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
 }
 
 .smpl-profile-bg-carbon {
-  background: linear-gradient(135deg, rgba(51, 65, 85, 0.4), rgba(9, 13, 24, 0.98), rgba(30, 41, 59, 0.45)) !important;
+  background-color: #0b101b !important;
+  background-image: linear-gradient(180deg, rgba(6, 10, 18, 0.12) 0%, rgba(4, 7, 14, 0.56) 100%), url('../img/ut-bg-carbon.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(6, 10, 18, 0.12) 0%, rgba(4, 7, 14, 0.56) 100%), image-set(url('../img/ut-bg-carbon-1x.webp') type('image/webp') 1x, url('../img/ut-bg-carbon.webp') type('image/webp') 2x, url('../img/ut-bg-carbon.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
 }
 
 .smpl-profile-bg-cosmos {
-  background: radial-gradient(circle at top left, rgba(192, 132, 252, 0.32), rgba(7, 10, 22, 0.98) 60%, rgba(56, 189, 248, 0.2)) !important;
+  background-color: #0d0521 !important;
+  background-image: linear-gradient(180deg, rgba(10, 4, 24, 0.12) 0%, rgba(6, 4, 18, 0.58) 100%), url('../img/ut-bg-cosmos.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(10, 4, 24, 0.12) 0%, rgba(6, 4, 18, 0.58) 100%), image-set(url('../img/ut-bg-cosmos-1x.webp') type('image/webp') 1x, url('../img/ut-bg-cosmos.webp') type('image/webp') 2x, url('../img/ut-bg-cosmos.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
+}
+
+.smpl-profile-bg-starfall {
+  background-color: #070d24 !important;
+  background-image: linear-gradient(180deg, rgba(6, 10, 28, 0.12) 0%, rgba(5, 8, 22, 0.56) 100%), url('../img/ut-bg-starfall.jpg') !important;
+  background-image: linear-gradient(180deg, rgba(6, 10, 28, 0.12) 0%, rgba(5, 8, 22, 0.56) 100%), image-set(url('../img/ut-bg-starfall-1x.webp') type('image/webp') 1x, url('../img/ut-bg-starfall.webp') type('image/webp') 2x, url('../img/ut-bg-starfall.jpg') type('image/jpeg') 1x) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
 }
 
 .smpl-shop-badge-pill {

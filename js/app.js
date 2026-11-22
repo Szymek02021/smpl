@@ -9527,26 +9527,45 @@ window.SMPL_APP = (function () {
         const itemPrice = Number(item.price !== undefined ? item.price : item.cost || 0);
         const isSoundItem = item.category === 'sound' || item.category === 'joinSound';
 
-        const swatchHtml = item.swatch
+        const isBgItem = item.category === 'bg' || item.category === 'bgStyle';
+        const bgMap = (window.SMPL_STUDIO && window.SMPL_STUDIO.BG_CSS_MAP) ? window.SMPL_STUDIO.BG_CSS_MAP : {};
+        const itemBgCss = isBgItem ? (bgMap[item.value] || '') : '';
+        const rarityLow = String(item.rarity || '').toLowerCase();
+        const rarityCls = rarityLow.indexOf('vip') >= 0 ? 'smpl-rarity-vip'
+          : rarityLow.indexOf('legend') >= 0 ? 'smpl-rarity-legendarny'
+          : rarityLow.indexOf('epick') >= 0 ? 'smpl-rarity-epicki'
+          : rarityLow.indexOf('rzadk') >= 0 ? 'smpl-rarity-rzadki'
+          : rarityLow.indexOf('limit') >= 0 ? 'smpl-rarity-limit'
+          : 'smpl-rarity-klasyk';
+        const swatchHtml = (!isBgItem && item.swatch)
           ? '<span class="smpl-shop-swatch" style="background:' + studioEsc(item.swatch) + '"></span>'
           : '';
         const dropBadgeHtml = item.seasonOnly
           ? '<span class="smpl-drop-pill">⏳ LIMIT S' + studioEsc(String(item.seasonOnly)) + '</span>'
           : '';
         const rarityHtml = item.rarity
-          ? '<span class="smpl-shop-rarity">' + studioEsc(item.rarity) + '</span>'
+          ? '<span class="smpl-shop-rarity ' + rarityCls + '">' + studioEsc(item.rarity) + '</span>'
           : '';
         const customInpHtml = isCustomTitleItem
           ? '<input id="' + extraInputId + '" type="text" maxlength="28" value="' + studioEsc((coinShopPreviewOverrides._itemIds && coinShopPreviewOverrides._itemIds.customTitle === item.id && coinShopPreviewOverrides.customTitle) ? coinShopPreviewOverrides.customTitle : (cos.customTitle || '')) + '" placeholder="Wpisz własny tytuł UT (max 28 zn.)" class="mt-2 w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/15 text-white"/>'
           : '';
         const previewSlotKey = item.category === 'frame' ? 'frame'
-          : (item.category === 'bg' || item.category === 'bgStyle') ? 'bgStyle'
+          : isBgItem ? 'bgStyle'
           : item.category === 'badge' ? 'profileBadge'
           : item.category === 'nickfx' ? 'nickEffect'
           : item.category === 'poster' ? 'posterTheme'
           : item.category === 'title' ? 'customTitle'
           : '';
         const isTestingThis = Boolean(previewSlotKey && coinShopPreviewOverrides._itemIds && coinShopPreviewOverrides._itemIds[previewSlotKey] === item.id);
+        const bgThumbHtml = (isBgItem && itemBgCss)
+          ? (isEquipped
+              ? '<button type="button" onclick="SMPL_APP.resetCoinShopPreview(true)" class="smpl-shop-bg-thumb ' + studioEsc(itemBgCss) + ' is-equipped" title="Twoje aktualnie założone tło (kliknij, aby wrócić do podglądu tego tła)">' +
+                  '<span class="smpl-shop-bg-thumb-badge">✓ AKTYWNE</span>' +
+                '</button>'
+              : '<button type="button" aria-pressed="' + (isTestingThis ? 'true' : 'false') + '" onclick="SMPL_APP.toggleShopItemPreview(\'' + studioEsc(item.id) + '\', \'\')" class="smpl-shop-bg-thumb ' + studioEsc(itemBgCss) + (isTestingThis ? ' is-testing' : '') + '" title="Kliknij miniaturę, aby przetestować to tło na żywo na karcie powyżej">' +
+                  '<span class="smpl-shop-bg-thumb-badge">' + (isTestingThis ? '🧪 TEST' : '👁️ UT') + '</span>' +
+                '</button>')
+          : '';
         const testBtnHtml = isSoundItem
           ? '<button type="button" onclick="SMPL_APP.previewShopSound(\'' + studioEsc(item.value) + '\')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-white/10 font-bold" title="Odsłuchaj dźwięk przed zakupem (tylko podgląd)">🔊 Test</button>'
           : (!isEquipped || isCustomTitleItem)
@@ -9572,18 +9591,21 @@ window.SMPL_APP = (function () {
           ? '<span class="text-[10px] text-rose-300/90 font-semibold">• brakuje ' + (itemPrice - coins.balance) + '</span>'
           : '';
         return (
-          '<div class="p-3 rounded-xl bg-slate-950/85 border ' + borderCls + ' flex flex-wrap items-center justify-between gap-2">' +
-            '<div class="min-w-0 flex-1">' +
-              '<div class="font-display font-bold text-white flex items-center gap-1.5 flex-wrap">' +
-                swatchHtml +
-                '<span>' + (item.icon ? studioEsc(item.icon) + ' ' : '') + studioEsc(itemTitle) + '</span>' +
-                dropBadgeHtml +
-                rarityHtml +
-                '<span class="text-amber-300">(' + itemPrice + ' Coins)</span>' +
-                missingHtml +
+          '<div class="p-3 rounded-xl bg-slate-950/85 border ' + borderCls + ' flex flex-wrap items-center justify-between gap-2.5">' +
+            '<div class="flex items-center gap-3 min-w-0 flex-1">' +
+              bgThumbHtml +
+              '<div class="min-w-0 flex-1">' +
+                '<div class="font-display font-bold text-white flex items-center gap-1.5 flex-wrap">' +
+                  swatchHtml +
+                  '<span>' + (item.icon ? studioEsc(item.icon) + ' ' : '') + studioEsc(itemTitle) + '</span>' +
+                  dropBadgeHtml +
+                  rarityHtml +
+                  '<span class="text-amber-300">(' + itemPrice + ' Coins)</span>' +
+                  missingHtml +
+                '</div>' +
+                '<div class="text-[11px] text-slate-400 mt-0.5">' + studioEsc(item.desc) + '</div>' +
+                customInpHtml +
               '</div>' +
-              '<div class="text-[11px] text-slate-400 mt-0.5">' + studioEsc(item.desc) + '</div>' +
-              customInpHtml +
             '</div>' +
             '<div class="flex items-center gap-1.5 flex-shrink-0">' + testBtnHtml + actionBtnsHtml + '</div>' +
           '</div>'
@@ -9687,24 +9709,33 @@ window.SMPL_APP = (function () {
           '<button type="button" onclick="SMPL_APP.downloadUtCardPosterPng(\'' + studioEsc(pid) + '\')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-400/45 text-[11px] font-display font-black uppercase">📸 Karta PNG</button>' +
           '<button type="button" onclick="SMPL_APP.downloadStandingsPosterPng(\'' + studioEsc(shopPlLeague) + '\')" class="px-2.5 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/35 text-sky-200 border border-sky-400/45 text-[11px] font-display font-black uppercase">📊 Tabela PNG</button>' +
         '</div>';
+    const shopPlUt = (shopPlObj && window.SMPL_ENGINE && typeof window.SMPL_ENGINE.calculatePlayerUTCard === 'function')
+      ? window.SMPL_ENGINE.calculatePlayerUTCard(state, pid)
+      : null;
+    const shopPlOvr = (shopPlUt && shopPlUt.ovr) ? Number(shopPlUt.ovr) : 84;
+    const hasBgArtClass = viewCos.bgCss ? ' has-bg-art' : '';
     const livePreviewCardHtml =
-      '<div aria-live="polite" class="smpl-cosmetic-card smpl-shop-live-preview ' + studioEsc(viewCos.bgCss || '') + ' ' + studioEsc(viewCos.frameCss || '') + ' border ' + (hasActivePreview ? 'border-fuchsia-400/60' : 'border-white/15') + '">' +
+      '<div aria-live="polite" class="smpl-cosmetic-card smpl-shop-live-preview' + hasBgArtClass + ' ' + studioEsc(viewCos.bgCss || '') + ' ' + studioEsc(viewCos.frameCss || '') + ' border ' + (hasActivePreview ? 'border-fuchsia-400/60' : 'border-white/15') + '">' +
         (hasActivePreview
           ? '<div class="smpl-shop-test-banner w-full flex flex-wrap items-center justify-between gap-1.5 mb-1">' +
               '<span class="text-[10px] font-display font-black uppercase tracking-wider text-fuchsia-200">🧪 TRYB PODGLĄDU (TEST) — WIDOCZNY TYLKO W SKLEPIKU • POZA SKLEPIKIEM NIE DZIAŁA</span>' +
               '<div class="flex flex-wrap items-center gap-1">' + testedChipsHtml + '</div>' +
             '</div>'
           : '') +
-        '<div class="flex items-center justify-between gap-3 flex-wrap w-full">' +
+        '<div class="smpl-shop-preview-glass flex items-center justify-between gap-3 flex-wrap w-full">' +
           '<div class="flex items-center gap-3 min-w-0">' +
-            (shopPlAvatar ? '<img src="' + shopPlAvatar + '" alt="' + studioEsc(shopPlName) + '" class="w-12 h-12 rounded-full object-cover border-2 border-amber-400/70 shadow-lg flex-shrink-0"/>' : '') +
+            '<div class="smpl-shop-preview-ovr">' +
+              '<span class="font-display font-black text-base leading-none text-amber-300">' + shopPlOvr + '</span>' +
+              '<span class="text-[8px] font-display font-bold uppercase tracking-wider text-slate-300 mt-0.5">OVR</span>' +
+            '</div>' +
+            (shopPlAvatar ? '<img src="' + shopPlAvatar + '" alt="' + studioEsc(shopPlName) + '" class="w-12 h-12 rounded-full object-cover border-2 border-amber-400/80 shadow-lg flex-shrink-0"/>' : '') +
             '<div class="min-w-0">' +
-              '<div class="text-[9.5px] font-display font-bold uppercase tracking-wider text-slate-300">' + (hasActivePreview ? '👁️ PRZYMIERZALNIA NA ŻYWO (KLIKNIJ „KUP”, ABY ZAPISAĆ NA STAŁE)' : '✨ PODGLĄD TWOJEGO STYLU NA ŻYWO (KARTA UT + PROFIL + TABELA)') + '</div>' +
+              '<div class="text-[9.5px] font-display font-bold uppercase tracking-wider text-slate-200">' + (hasActivePreview ? '👁️ PRZYMIERZALNIA NA ŻYWO (KLIKNIJ „KUP”, ABY ZAPISAĆ NA STAŁE)' : '✨ PODGLĄD TWOJEGO STYLU NA ŻYWO (KARTA UT + PROFIL + TABELA)') + '</div>' +
               '<div class="flex items-center gap-2 flex-wrap mt-0.5">' +
                 '<span class="font-display font-black text-base text-white uppercase ' + studioEsc(shopPlRkNameCls) + ' ' + studioEsc(viewCos.nickFxCss || '') + '">' + studioEsc(shopPlName) + '</span>' +
                 shopPreviewBadgeHtml +
               '</div>' +
-              (shopPreviewTitleHtml ? '<div class="mt-1">' + shopPreviewTitleHtml + '</div>' : '<div class="text-[10.5px] text-slate-300 mt-0.5">@' + studioEsc(shopPlNick) + '</div>') +
+              (shopPreviewTitleHtml ? '<div class="mt-1">' + shopPreviewTitleHtml + '</div>' : '<div class="text-[10.5px] text-slate-200 mt-0.5">@' + studioEsc(shopPlNick) + '</div>') +
             '</div>' +
           '</div>' +
           livePreviewActionsHtml +

@@ -23,16 +23,16 @@ window.SMPL_STUDIO = (function () {
     { id: 'frame_obsidian_noir', category: 'frame', value: 'obsidian_noir', rarity: 'LEGENDARNY', swatch: '#e2e8f0', price: 2600, icon: '🖤', title: 'Obsydianowy Prestiż', desc: 'Czarna karbonowa tarcza ze srebrzystą krawędzią VIP.' },
     { id: 'frame_champion_eclipse', category: 'frame', value: 'champion_eclipse', rarity: 'VIP', swatch: '#fbbf24', price: 5000, icon: '🏆', title: 'Zaćmienie Czempiona VIP', desc: 'Najwyższy wielosezonowy tier wizualny: królewski ametyst i płynne złoto.' },
 
-    // 2. TŁA KARTY UT & PROFILU (9)
-    { id: 'bg_emerald_pitch', category: 'bg', value: 'emerald_pitch', rarity: 'KLASYK', swatch: '#059669', price: 280, icon: '⚽', title: 'Tło: Murawa Nocą UCL', desc: 'Szmaragdowe boisko oświetlone nocnymi jupiterami.' },
-    { id: 'bg_stadium_aura', category: 'bg', value: 'stadium_aura', rarity: 'KLASYK', swatch: '#2563eb', price: 380, icon: '🏟️', title: 'Tło: Nocna Arena Jupitery', desc: 'Głębokie granatowe podświetlenie reflektorów stadionu.' },
-    { id: 'bg_sunset_derby', category: 'bg', value: 'sunset_derby', rarity: 'RZADKI', swatch: '#f97316', price: 520, icon: '🌅', title: 'Tło: Zachód Nad Stadionem', desc: 'Gorące bursztynowo-pomarańczowe niebo przed meczem derbowym.' },
-    { id: 'bg_cyber_grid', category: 'bg', value: 'cyber_grid', rarity: 'RZADKI', swatch: '#14b8a6', price: 720, icon: '🌐', title: 'Tło: Cyber-Neon Matrix', desc: 'Futurystyczna siatka gradientowa w stylu e-sport.' },
-    { id: 'bg_aurora_borealis', category: 'bg', value: 'aurora_borealis', rarity: 'EPICKI', swatch: '#2dd4bf', price: 1100, icon: '🌌', title: 'Tło: Zorza Polarna Arena', desc: 'Arktyczny turkus łączący się z nocnym fioletem na Karcie UT.' },
-    { id: 'bg_royal_gold', category: 'bg', value: 'royal_gold', rarity: 'EPICKI', swatch: '#eab308', price: 1350, icon: '✨', title: 'Tło: Królewski Welur Złota', desc: 'Prestiżowy czarno-złoty aksamit na Twoim profilu i karcie.' },
-    { id: 'bg_volcano_magma', category: 'bg', value: 'volcano_magma', rarity: 'LEGENDARNY', swatch: '#ef4444', price: 1900, icon: '🌋', title: 'Tło: Krater Ognia', desc: 'Żarząca się magma pod stopami najgroźniejszych napastników.' },
-    { id: 'bg_holo_carbon', category: 'bg', value: 'holo_carbon', rarity: 'LEGENDARNY', swatch: '#64748b', price: 2200, icon: '🕶️', title: 'Tło: Włókno Węglowe PRO', desc: 'Tekstura dark-carbon znana z bolidów sportowych.' },
-    { id: 'bg_galaxies_end', category: 'bg', value: 'galaxies_end', rarity: 'VIP', swatch: '#c084fc', price: 3800, icon: '🌠', title: 'Tło: Gwiezdny Kosmos S56', desc: 'Głęboka mgławica gwiezdna widoczna w profilu i eksporcie PNG.' },
+    // 2. TŁA KARTY UT & PROFILU (9) — KOLEKCJONERSKIE ARTWORKI 3:4 + HOLO BŁYSK + EKSPORT PNG
+    { id: 'bg_emerald_pitch', category: 'bg', value: 'emerald_pitch', rarity: 'KLASYK', swatch: '#059669', price: 280, icon: '⚽', title: 'Tło: Murawa Nocą UCL', desc: 'Szmaragdowa murawa Champions League w blasku nocnych jupiterów i mgły stadionowej (Karta UT + PNG).' },
+    { id: 'bg_stadium_aura', category: 'bg', value: 'stadium_aura', rarity: 'KLASYK', swatch: '#2563eb', price: 380, icon: '🏟️', title: 'Tło: Nocna Arena Jupitery', desc: 'Monumentalny stadion nocą z krzyżującymi się szafirowymi wiązkami reflektorów (Karta UT + PNG).' },
+    { id: 'bg_sunset_derby', category: 'bg', value: 'sunset_derby', rarity: 'RZADKI', swatch: '#f97316', price: 520, icon: '🌅', title: 'Tło: Zachód Nad Stadionem', desc: 'Płonąca złoto-karmazynowa korona słońca nad panoramą stadionu z żarzącymi iskrami (Karta UT + PNG).' },
+    { id: 'bg_cyber_grid', category: 'bg', value: 'cyber_grid', rarity: 'RZADKI', swatch: '#14b8a6', price: 720, icon: '🌐', title: 'Tło: Cyber-Neon Matrix', desc: 'Esportowa komora holograficzna z neonowymi laserami cyjan-magenta i pryzmatami (Karta UT + PNG).' },
+    { id: 'bg_aurora_borealis', category: 'bg', value: 'aurora_borealis', rarity: 'EPICKI', swatch: '#2dd4bf', price: 1100, icon: '🌌', title: 'Tło: Zorza Polarna Arena', desc: 'Zjawiskowe arktyczne kurtyny zorzy turkusowo-fioletowej nad gwiezdnym niebem (Karta UT + PNG).' },
+    { id: 'bg_royal_gold', category: 'bg', value: 'royal_gold', rarity: 'EPICKI', swatch: '#eab308', price: 1350, icon: '✨', title: 'Tło: Królewski Welur Złota', desc: 'Królewski czarny aksamit ICON z ornamentami 24-karatowego złota i złotym pyłem (Karta UT + PNG).' },
+    { id: 'bg_volcano_magma', category: 'bg', value: 'volcano_magma', rarity: 'LEGENDARNY', swatch: '#ef4444', price: 1900, icon: '🌋', title: 'Tło: Krater Ognia', desc: 'Spękany bazalt wulkaniczny rozdarty strumieniami rozgrzanej lawy i lecącym żarem (Karta UT + PNG).' },
+    { id: 'bg_holo_carbon', category: 'bg', value: 'holo_carbon', rarity: 'LEGENDARNY', swatch: '#64748b', price: 2200, icon: '🕶️', title: 'Tło: Włókno Węglowe PRO', desc: 'Kuty karbon hiper-auta i tytanowe panele F1 z holograficznym połyskiem chromu (Karta UT + PNG).' },
+    { id: 'bg_galaxies_end', category: 'bg', value: 'galaxies_end', rarity: 'VIP', swatch: '#c084fc', price: 3800, icon: '🌠', title: 'Tło: Gwiezdny Kosmos S56', desc: 'VIP Edycja Supernowej — złota korona galaktyczna i ametystowo-szafirowa mgławica (Karta UT + PNG).' },
 
     // 3. ODZNAKI FLAIR OBOK NICKU & KARCIE UT (6)
     { id: 'badge_sniper', category: 'badge', value: 'sniper', rarity: 'KLASYK', swatch: '#38bdf8', price: 250, icon: '🎯', title: 'Odznaka: Snajper Pola Karnego', desc: 'Przypnij etykietę „🎯 SNAJPER” przy swoim nicku i na Karcie UT.' },
@@ -121,6 +121,19 @@ window.SMPL_STUDIO = (function () {
     'holo_carbon': 'smpl-profile-bg-carbon',
     'galaxies_end': 'smpl-profile-bg-cosmos',
     'drop_s56_starfall': 'smpl-profile-bg-starfall'
+  };
+
+  var BG_IMAGE_MAP = {
+    'emerald_pitch': './img/ut-bg-pitch.jpg',
+    'stadium_aura': './img/ut-bg-stadium.jpg',
+    'sunset_derby': './img/ut-bg-sunset.jpg',
+    'cyber_grid': './img/ut-bg-cyber.jpg',
+    'aurora_borealis': './img/ut-bg-aurora.jpg',
+    'royal_gold': './img/ut-bg-royal.jpg',
+    'volcano_magma': './img/ut-bg-volcano.jpg',
+    'holo_carbon': './img/ut-bg-carbon.jpg',
+    'galaxies_end': './img/ut-bg-cosmos.jpg',
+    'drop_s56_starfall': './img/ut-bg-starfall.jpg'
   };
 
   var BADGE_DISPLAY_MAP = {
@@ -2322,8 +2335,8 @@ window.SMPL_STUDIO = (function () {
       ctx, W, H,
       '', '', '',
       {
-        bgImg: null,
-        bgAlpha: 0,
+        bgImg: bgImg || null,
+        bgAlpha: bgImg ? 0.30 : 0,
         bg0: bgPal.bg0,
         bg1: bgPal.bg1,
         bg2: bgPal.bg2,
@@ -2399,9 +2412,26 @@ window.SMPL_STUDIO = (function () {
     ctx.fillStyle = shGrad;
     ctx.fill();
 
-    // Symmetrical top dome glow + clean micro-mesh clipped strictly inside shield
+    // Symmetrical collector artwork + dome glow clipped strictly inside FUT shield
     ctx.save();
     ctx.clip();
+    if (bgImg && bgImg.width && bgImg.height) {
+      var artScale = Math.max(sw / bgImg.width, sh / bgImg.height);
+      var artW = bgImg.width * artScale;
+      var artH = bgImg.height * artScale;
+      var artX = sx + (sw - artW) / 2;
+      var artY = sy + (sh - artH) / 2;
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      ctx.drawImage(bgImg, artX, artY, artW, artH);
+      ctx.restore();
+      var artScrim = ctx.createLinearGradient(sx, sy, sx, sy + sh);
+      artScrim.addColorStop(0, 'rgba(4, 8, 18, 0.14)');
+      artScrim.addColorStop(0.45, 'rgba(4, 8, 18, 0.34)');
+      artScrim.addColorStop(1, 'rgba(4, 8, 18, 0.68)');
+      ctx.fillStyle = artScrim;
+      ctx.fillRect(sx, sy, sw, sh);
+    }
     var spotTop = ctx.createRadialGradient(360, 140, 20, 360, 200, 360);
     spotTop.addColorStop(0, 'rgba(' + th.accentRgb + ', 0.28)');
     spotTop.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -2631,8 +2661,11 @@ window.SMPL_STUDIO = (function () {
     var cos = getPlayerCosmetics(s, pid);
     var outName = 'SMPL-KartaUT-' + foldName(player.name).replace(/\s+/g, '-') + '.png';
 
+    var customBgUrl = (cos && cos.bgStyle && BG_IMAGE_MAP[cos.bgStyle]) ? BG_IMAGE_MAP[cos.bgStyle] : '';
+
     return waitFontsBrief().then(function () {
-      return loadSafeImage('./img/ut-card-foil-bg.jpg').then(function (bgImg) {
+      var bgPromise = customBgUrl ? loadSafeImage(customBgUrl) : Promise.resolve(null);
+      return bgPromise.then(function (bgImg) {
         return loadSafeImage(player.avatar).then(function (img) {
           var res = buildPosterResult(renderUtCardCanvas(s, player, ut, cos, img, bgImg), outName);
           if (!res.ok && img) {
@@ -3111,6 +3144,21 @@ window.SMPL_STUDIO = (function () {
    * Uwaga: opisujemy wyłącznie funkcje i poprawki dla graczy (zero wewnętrznych detali serwera).
    */
   var BUILTIN_PLAYER_UPDATES = [
+    {
+      id: 'BUILTIN_V2_16',
+      version: 'V2.16',
+      date: '2026-11-22',
+      category: 'NOWOŚCI',
+      title: 'Zjawiskowe Kolekcjonerskie Tła Karty UT (Edycja TOTY / ICON) & Podgląd Miniatur w Sklepiku!',
+      summary: 'Przebudowaliśmy wszystkie 10 teł Karty Ultimate Team ze Sklepiku SMPL Coins na autorskie, pełnoklatkowe, w 100% symetryczne grafiki kolekcjonerskie (WebP/JPG) z holograficznym błyskiem folii oraz natychmiastowym podglądem miniatur w Sklepiku i eksporcie Karty UT PNG!',
+      highlights: [
+        '10 zupełnie nowych, zjawiskowych teł Karty UT i Profilu: Murawa Nocą UCL, Nocna Arena Jupitery, Zachód Nad Stadionem, Cyber-Neon Matrix, Zorza Polarna Arena, Królewski Welur Złota (24K ICON), Krater Ognia (Lawa), Włókno Węglowe PRO (F1 Tytan), DROP S56: Deszcz Gwiazd oraz VIP: Gwiezdny Kosmos S56 (Supernowa)!',
+        'Nowe miniatury 3:4 każdej grafiki prosto w katalogu Sklepiku SMPL Coins (kliknięcie miniatury od razu odpala przymierzalnię 👁️ Test na powiększonej karcie podglądu z OVR!) oraz kolorowe jubilerskie odznaki rzadkości (KLASYK → VIP / LIMIT S56).',
+        'Holograficzny błysk folii GPU przy otwarciu karty i najechaniu, szklane kafelki statystyk zapewniające 100% czytelności liczb na każdym tle oraz pełny eksport nowej grafiki bezpośrednio wewnątrz tarczy pobieranej Karty UT PNG!'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
     {
       id: 'BUILTIN_V2_15',
       version: 'V2.15',
@@ -3642,6 +3690,7 @@ window.SMPL_STUDIO = (function () {
     POSTER_THEMES_MAP: POSTER_THEMES_MAP,
     FRAME_CSS_MAP: FRAME_CSS_MAP,
     BG_CSS_MAP: BG_CSS_MAP,
+    BG_IMAGE_MAP: BG_IMAGE_MAP,
     WEEKLY_QUESTS_DEF: WEEKLY_QUESTS_DEF,
     BADGE_DISPLAY_MAP: BADGE_DISPLAY_MAP,
     NICKFX_CSS_MAP: NICKFX_CSS_MAP,
