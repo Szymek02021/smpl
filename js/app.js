@@ -3919,10 +3919,15 @@ window.SMPL_APP = (function () {
         ? '⏳ Oba wyniki dwumeczu (Dom + Wyjazd) i 2× SS wysłane! Admin zatwierdzi je po weryfikacji screenów.'
         : '⏳ Wynik ze screenem (SS) wysłany! Mecz oczekuje na weryfikację Administratora.'
     );
-    if (window.SMPL_STUDIO && session && session.activePlayerId && window.SMPL_NOTIF && typeof window.SMPL_NOTIF.playShopSound === 'function') {
-      const mCos = window.SMPL_STUDIO.getPlayerCosmetics(window.SMPL_DB.getState(), session.activePlayerId);
-      if (mCos && mCos.joinSound && mCos.joinSound !== 'default') {
-        window.SMPL_NOTIF.playShopSound(mCos.joinSound, false);
+    if (window.SMPL_STUDIO && window.SMPL_NOTIF && typeof window.SMPL_NOTIF.playShopSound === 'function') {
+      const stSound = window.SMPL_DB.getState();
+      const soundPl = resolveNotificationTargetPlayer(stSound, session);
+      const soundPid = (soundPl && soundPl.id) || (session && session.activePlayerId) || null;
+      if (soundPid) {
+        const mCos = window.SMPL_STUDIO.getPlayerCosmetics(stSound, soundPid);
+        if (mCos && mCos.joinSound && mCos.joinSound !== 'default') {
+          window.SMPL_NOTIF.playShopSound(mCos.joinSound, false);
+        }
       }
     }
     renderAll();
@@ -6281,13 +6286,14 @@ window.SMPL_APP = (function () {
   // =========================================================================
   // MODALE: LIGHTBOX SCREENÓW, PROFIL GRACZA, WYBÓR GRACZA
   // =========================================================================
-  function openModal(htmlContent) {
+  function openModal(htmlContent, maxWidthClass) {
     closeRankTooltip();
     const modalRoot = document.getElementById('global-modal-root');
     if (!modalRoot) return;
+    const widthCls = maxWidthClass || 'max-w-xl';
     modalRoot.innerHTML = `
       <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md" onclick="SMPL_APP.closeModal()">
-        <div class="glass-panel rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-white/20 shadow-2xl" onclick="event.stopPropagation()">
+        <div class="glass-panel rounded-3xl ${widthCls} w-full max-h-[90vh] overflow-y-auto border border-white/20 shadow-2xl" onclick="event.stopPropagation()">
           ${htmlContent}
         </div>
       </div>
@@ -7441,10 +7447,22 @@ window.SMPL_APP = (function () {
     );
     const quickBio = p.bio ? String(p.bio).trim() : '';
     const quickAvatar = (row && row.avatar) || p.avatar || (window.SMPL_MEDIA ? window.SMPL_MEDIA.generatePlayerAvatar(p.name, p.nick, Math.max(0, ((row && row.position) || 1) - 1)) : '');
+    const qCos = (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.getPlayerCosmetics === 'function')
+      ? window.SMPL_STUDIO.getPlayerCosmetics(state, p.id)
+      : { frameCss: '', bgCss: '', nickFxCss: '', badgeLabel: '', badgeColor: '#38bdf8', customTitle: '' };
+    const qHeaderCosCls = (qCos.bgCss || qCos.frameCss)
+      ? ('smpl-cosmetic-card ' + (qCos.bgCss || '') + ' ' + (qCos.frameCss || '') + ' p-4 mb-4')
+      : 'pb-4 mb-4 border-b border-white/10';
+    const qBadgeHtml = qCos.badgeLabel
+      ? `<span class="smpl-shop-badge-pill" style="border-color:${window.SMPL_VIEWS.escapeHtml(qCos.badgeColor || '#38bdf8')};color:${window.SMPL_VIEWS.escapeHtml(qCos.badgeColor || '#38bdf8')};box-shadow:0 0 10px ${window.SMPL_VIEWS.escapeHtml(qCos.badgeColor || '#38bdf8')}33;">${window.SMPL_VIEWS.escapeHtml(qCos.badgeLabel)}</span>`
+      : '';
+    const qTitleHtml = qCos.customTitle
+      ? `<div class="mt-1"><span class="smpl-coin-title-ribbon">🪙 ${window.SMPL_VIEWS.escapeHtml(qCos.customTitle)}</span></div>`
+      : '';
 
     openModal(`
       <div class="p-5 sm:p-6">
-        <div class="flex items-start justify-between gap-4 pb-4 mb-4 border-b border-white/10">
+        <div class="flex items-start justify-between gap-4 ${qHeaderCosCls}">
           <div class="flex items-center gap-4">
             <div class="relative">
               ${window.SMPL_RANKS ? window.SMPL_RANKS.avatarWithGlassBadgeHtml(quickAvatar, p.name, 'w-16 h-16 rounded-full object-cover border-2 border-league', window.SMPL_RANKS.getPlayerRank(p, state), p.id, 'sm') : `<img src="${quickAvatar}" class="w-16 h-16 rounded-full object-cover border-2 border-league" alt="${window.SMPL_VIEWS.escapeHtml(p.name)}"/>`}
@@ -7456,8 +7474,9 @@ window.SMPL_APP = (function () {
               <span class="px-2 py-0.5 rounded bg-white/10 text-[10px] font-display font-bold text-league-primary uppercase">
                 Pozycja #${row.position} • ${window.SMPL_VIEWS.escapeHtml((state.leagues && state.leagues[p.leagueId] && state.leagues[p.leagueId].shortName) || p.leagueId)} • ${utData.tierLabel}
               </span>
-              <h3 class="font-display font-black text-xl text-white mt-1 ${window.SMPL_RANKS ? window.SMPL_RANKS.nameClass(window.SMPL_RANKS.getPlayerRank(p, state)) : ''}">${window.SMPL_VIEWS.escapeHtml(p.name)}</h3>
-              ${window.SMPL_RANKS ? `<div class="my-1.5 flex items-center gap-1.5 flex-wrap">${window.SMPL_RANKS.fullBadgesHtml(window.SMPL_RANKS.getPlayerRank(p, state), 'sm', p.id)}</div>` : ''}
+              <h3 class="font-display font-black text-xl text-white mt-1 ${window.SMPL_RANKS ? window.SMPL_RANKS.nameClass(window.SMPL_RANKS.getPlayerRank(p, state)) : ''} ${qCos.nickFxCss || ''}">${window.SMPL_VIEWS.escapeHtml(p.name)}</h3>
+              ${window.SMPL_RANKS ? `<div class="my-1.5 flex items-center gap-1.5 flex-wrap">${window.SMPL_RANKS.fullBadgesHtml(window.SMPL_RANKS.getPlayerRank(p, state), 'sm', p.id)}${qBadgeHtml}</div>` : (qBadgeHtml ? `<div class="my-1.5">${qBadgeHtml}</div>` : '')}
+              ${qTitleHtml}
               <div class="text-xs text-slate-400">@${window.SMPL_VIEWS.escapeHtml(p.nick)} • ${utData.playstyle}</div>
             </div>
           </div>
@@ -9004,7 +9023,8 @@ window.SMPL_APP = (function () {
     }
     const state = window.SMPL_DB.getState();
     const sess = window.SMPL_DB.getSession();
-    const viewerPid = (sess && sess.activePlayerId) || null;
+    const viewerPl = resolveNotificationTargetPlayer(state, sess);
+    const viewerPid = (viewerPl && viewerPl.id) || (sess && sess.activePlayerId) || null;
     showToast('🎨 Generowanie grafiki tabeli ' + (leagueId || 'L1') + ' (PNG)...');
     return handlePosterPngDownload(
       window.SMPL_STUDIO.generateStandingsPosterPng(state, leagueId, viewerPid),
@@ -9022,7 +9042,8 @@ window.SMPL_APP = (function () {
     }
     const state = window.SMPL_DB.getState();
     const sess = window.SMPL_DB.getSession();
-    const viewerPid = (sess && sess.activePlayerId) || null;
+    const viewerPl = resolveNotificationTargetPlayer(state, sess);
+    const viewerPid = (viewerPl && viewerPl.id) || (sess && sess.activePlayerId) || null;
     showToast('🎨 Generowanie karty VS meczu (PNG)...');
     return handlePosterPngDownload(
       window.SMPL_STUDIO.generateMatchdayPosterPng(state, matchId, viewerPid),
@@ -9528,6 +9549,44 @@ window.SMPL_APP = (function () {
       ? (', <strong class="text-amber-300">Bonus Master (' + (coins.breakdown.adminBonusCoins >= 0 ? '+' : '') + coins.breakdown.adminBonusCoins + ')</strong>')
       : '';
 
+    const shopPlObj = (state.players || []).find((p) => p && String(p.id) === String(pid)) || null;
+    const shopPlName = shopPlObj ? String(shopPlObj.name || 'Gracz') : 'Gracz';
+    const shopPlNick = shopPlObj ? String(shopPlObj.nick || '') : '';
+    const shopPlLeague = (shopPlObj && shopPlObj.leagueId && /^L\d+$/i.test(String(shopPlObj.leagueId))) ? String(shopPlObj.leagueId) : (currentLeagueId || 'L1');
+    const shopPlRk = (shopPlObj && window.SMPL_RANKS) ? window.SMPL_RANKS.getPlayerRank(shopPlObj, state) : null;
+    const shopPlRkNameCls = (shopPlRk && window.SMPL_RANKS) ? window.SMPL_RANKS.nameClass(shopPlRk) : '';
+    const shopPlAvatar = (shopPlObj && shopPlObj.avatar) || (window.SMPL_MEDIA ? window.SMPL_MEDIA.generatePlayerAvatar(shopPlName, shopPlNick || 'SMPL', 1) : '');
+    const shopPreviewBadgeHtml = cos.badgeLabel
+      ? '<span class="smpl-shop-badge-pill" style="border-color:' + studioEsc(cos.badgeColor || '#38bdf8') + ';color:' + studioEsc(cos.badgeColor || '#38bdf8') + ';box-shadow:0 0 10px ' + studioEsc(cos.badgeColor || '#38bdf8') + '44;">' + studioEsc(cos.badgeLabel) + '</span>'
+      : '';
+    const shopPreviewTitleHtml = cos.customTitle
+      ? '<span class="smpl-coin-title-ribbon">🪙 ' + studioEsc(cos.customTitle) + '</span>'
+      : '';
+    const findCatalogTitle = (cat, val) => {
+      if (!val || val === 'default') return 'domyślny';
+      const hit = catalog.find((it) => it && it.category === cat && it.value === val);
+      return hit ? String(hit.title || val).replace(/^(Tło|Blask Nicku|Skórka PNG|Dźwięk|Odznaka|Tytuł|DROP S56):\s*/i, '') : String(val);
+    };
+    const livePreviewCardHtml =
+      '<div class="smpl-cosmetic-card smpl-shop-live-preview ' + studioEsc(cos.bgCss || '') + ' ' + studioEsc(cos.frameCss || '') + ' border border-white/15">' +
+        '<div class="flex items-center gap-3 min-w-0">' +
+          (shopPlAvatar ? '<img src="' + shopPlAvatar + '" alt="' + studioEsc(shopPlName) + '" class="w-12 h-12 rounded-full object-cover border-2 border-amber-400/70 shadow-lg flex-shrink-0"/>' : '') +
+          '<div class="min-w-0">' +
+            '<div class="text-[9.5px] font-display font-bold uppercase tracking-wider text-slate-300">✨ PODGLĄD TWOJEGO STYLU NA ŻYWO (KARTA UT + PROFIL + TABELA)</div>' +
+            '<div class="flex items-center gap-2 flex-wrap mt-0.5">' +
+              '<span class="font-display font-black text-base text-white uppercase ' + studioEsc(shopPlRkNameCls) + ' ' + studioEsc(cos.nickFxCss || '') + '">' + studioEsc(shopPlName) + '</span>' +
+              shopPreviewBadgeHtml +
+            '</div>' +
+            (shopPreviewTitleHtml ? '<div class="mt-1">' + shopPreviewTitleHtml + '</div>' : '<div class="text-[10.5px] text-slate-300 mt-0.5">@' + studioEsc(shopPlNick) + '</div>') +
+          '</div>' +
+        '</div>' +
+        '<div class="flex flex-wrap items-center gap-1.5 flex-shrink-0">' +
+          '<button type="button" onclick="SMPL_APP.closeModal(); SMPL_APP.openPlayerProfileTab(\'' + studioEsc(pid) + '\');" class="px-2.5 py-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/50 text-[11px] font-display font-black uppercase">🎴 Karta UT</button>' +
+          '<button type="button" onclick="SMPL_APP.downloadUtCardPosterPng(\'' + studioEsc(pid) + '\')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-400/45 text-[11px] font-display font-black uppercase">📸 Karta PNG</button>' +
+          '<button type="button" onclick="SMPL_APP.downloadStandingsPosterPng(\'' + studioEsc(shopPlLeague) + '\')" class="px-2.5 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/35 text-sky-200 border border-sky-400/45 text-[11px] font-display font-black uppercase">📊 Tabela PNG</button>' +
+        '</div>' +
+      '</div>';
+
     const html = `
       <div class="p-5 sm:p-6 space-y-4">
         <div class="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
@@ -9537,33 +9596,45 @@ window.SMPL_APP = (function () {
           </div>
           <button type="button" onclick="SMPL_APP.closeModal()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-bold">✕</button>
         </div>
+        ${livePreviewCardHtml}
         ${masterCoinsVaultHtml}
         <div class="p-3 rounded-xl bg-slate-950/80 border border-white/10 text-[11px] text-slate-300 space-y-1.5">
           <div><strong class="text-amber-300">Ekonomia Wielo-Sezonowa:</strong> +6/mecz • +5/CK • +35 za 10 meczów bez WO • Typer +12/+4 • ZP +10 • Puskás +15 • Wyzwania do +65/tydz. <em>Odblokowane nagrody i Coins przechodzą na kolejne sezony!</em></div>
           <div>Twoje źródła: Mecze (${coins.breakdown.matchesCoins}), Czyste Konta (${coins.breakdown.cleanSheetCoins}), Terminowość (${coins.breakdown.timelyBonusCoins}), Typer/ZP/Puskás (${coins.breakdown.typerCoins + coins.breakdown.puskasCoins + coins.breakdown.goldenBallCoins}), Wyzwania (${coins.breakdown.questCoins || 0}), Prezenty (${coins.breakdown.giftCoinsReceived || 0}), Poprz. sezony (${coins.breakdown.carryoverCoins || 0})${adminBonusPart}.</div>
-          <div class="text-slate-400">Aktywne teraz: Ramka <strong class="text-white">${studioEsc(cos.frame)}</strong> • Tło <strong class="text-white">${studioEsc(cos.bgStyle)}</strong> • Skórka PNG <strong class="text-white">${studioEsc(cos.posterTheme || 'default')}</strong> • Odznaka <strong class="text-white">${studioEsc(cos.badgeLabel || 'brak')}</strong> • Blask <strong class="text-white">${studioEsc(cos.nickEffect || 'brak')}</strong> • Dźwięk <strong class="text-white">${studioEsc(cos.joinSound)}</strong></div>
+          <div class="text-slate-400">Aktywne teraz: Ramka <strong class="text-white">${studioEsc(findCatalogTitle('frame', cos.frame))}</strong> • Tło <strong class="text-white">${studioEsc(findCatalogTitle('bg', cos.bgStyle))}</strong> • Skórka PNG <strong class="text-white">${studioEsc(findCatalogTitle('poster', cos.posterTheme))}</strong> • Odznaka <strong class="text-white">${studioEsc(cos.badgeLabel || 'brak')}</strong> • Blask <strong class="text-white">${studioEsc(findCatalogTitle('nickfx', cos.nickEffect))}</strong> • Dźwięk <strong class="text-white">${studioEsc(findCatalogTitle('sound', cos.joinSound))}</strong></div>
         </div>
         <div class="flex flex-wrap gap-1.5">${tabsHtml}</div>
         <div class="space-y-2.5 max-h-96 overflow-y-auto pr-1 text-xs">${bodyHtml}</div>
       </div>
     `;
-    openModal(html);
+    openModal(html, 'max-w-3xl');
   }
 
   function handleBuyShopItem(itemId, customTitleInputId) {
     const titleEl = customTitleInputId ? document.getElementById(customTitleInputId) : null;
+    const rawCustomTitle = titleEl ? String(titleEl.value || '').trim() : '';
+    const effectiveCustomTitle = (itemId === 'title_custom' && !rawCustomTitle) ? 'MISTRZ SMPL' : rawCustomTitle;
     try {
-      const res = window.SMPL_DB.buyShopItem({ itemId: itemId, customTitle: titleEl ? titleEl.value : '' });
+      const res = window.SMPL_DB.buyShopItem({ itemId: itemId, customTitle: effectiveCustomTitle });
       const catalog = (window.SMPL_STUDIO && window.SMPL_STUDIO.SHOP_CATALOG) || [];
       const boughtItem = catalog.find((x) => x.id === itemId);
       if (boughtItem && boughtItem.category === 'sound' && window.SMPL_NOTIF && typeof window.SMPL_NOTIF.playShopSound === 'function') {
         window.SMPL_NOTIF.playShopSound(boughtItem.value, false);
       }
-      showToast('🪙 Zakupiono i aktywowano element kosmetyczny!');
+      showToast(
+        itemId === 'title_custom' && !rawCustomTitle
+          ? '🪙 Odblokowano Własny Tytuł! Wpisz swój napis w polu i kliknij „✏️ Zapisz”.'
+          : '🪙 Zakupiono i aktywowano element kosmetyczny!'
+      );
       renderAll();
       openCoinShopModal();
       if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
-        res.remotePromise.then(() => {});
+        res.remotePromise.then((srv) => {
+          if (srv && srv.ok === false && srv.error) {
+            showToast('⚠️ Serwer nie zapisał zakupu: ' + srv.error, 'error');
+            renderAll();
+          }
+        });
       }
     } catch (err) {
       showToast((err && err.message) || 'Nie udało się kupić przedmiotu.', 'error');
@@ -9572,8 +9643,10 @@ window.SMPL_APP = (function () {
 
   function handleEquipShopItem(category, value, customTitleInputId) {
     const titleEl = customTitleInputId ? document.getElementById(customTitleInputId) : null;
+    const rawCustomTitle = titleEl ? String(titleEl.value || '').trim() : '';
+    const effectiveCustomTitle = (category === 'title' && value === 'custom' && !rawCustomTitle) ? 'MISTRZ SMPL' : rawCustomTitle;
     try {
-      const res = window.SMPL_DB.equipShopItem({ category: category, value: value, customTitle: titleEl ? titleEl.value : '' });
+      const res = window.SMPL_DB.equipShopItem({ category: category, value: value, customTitle: effectiveCustomTitle });
       if (category === 'sound' && value && value !== 'default' && window.SMPL_NOTIF && typeof window.SMPL_NOTIF.playShopSound === 'function') {
         window.SMPL_NOTIF.playShopSound(value, false);
       }
@@ -9581,7 +9654,12 @@ window.SMPL_APP = (function () {
       renderAll();
       openCoinShopModal();
       if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
-        res.remotePromise.then(() => {});
+        res.remotePromise.then((srv) => {
+          if (srv && srv.ok === false && srv.error) {
+            showToast('⚠️ Serwer nie zapisał zmiany stylu: ' + srv.error, 'error');
+            renderAll();
+          }
+        });
       }
     } catch (err) {
       showToast((err && err.message) || 'Nie udało się zmienić stylu.', 'error');

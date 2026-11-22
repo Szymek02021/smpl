@@ -2457,7 +2457,14 @@ const server = http.createServer((req, res) => {
             const admId = String(adm.adminId || 'ADM');
             actorId = 'ADM_' + admId;
             actorName = String(adm.name || 'Administrator');
-            const linked = db.players.find((p) => p && String(p.adminId || '') === admId);
+            const admNameLow = actorName.trim().toLowerCase();
+            const admUserLow = String(adm.username || '').trim().toLowerCase();
+            const linked =
+              db.players.find((p) => p && !p.isPlaceholder && !p.gdprDeleted && String(p.adminId || '') === admId) ||
+              db.players.find((p) => p && !p.isPlaceholder && !p.gdprDeleted && (
+                (admUserLow && String(p.username || '').trim().toLowerCase() === admUserLow) ||
+                (admNameLow && String(p.name || '').trim().toLowerCase() === admNameLow)
+              ));
             if (linked) {
               actorPlayerId = String(linked.id);
               actorNick = String(linked.nick || '');

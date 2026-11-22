@@ -1568,21 +1568,22 @@ window.SMPL_STUDIO = (function () {
       }
     }
 
+    var isCustomBg = Boolean(o.bg0 && o.bg0 !== '#040814');
     var darkWash = ctx.createLinearGradient(0, 0, 0, H);
-    darkWash.addColorStop(0, 'rgba(4, 8, 20, 0.72)');
-    darkWash.addColorStop(0.45, 'rgba(6, 12, 28, 0.52)');
-    darkWash.addColorStop(1, 'rgba(3, 6, 16, 0.88)');
+    darkWash.addColorStop(0, isCustomBg ? 'rgba(4, 8, 20, 0.24)' : 'rgba(4, 8, 20, 0.72)');
+    darkWash.addColorStop(0.45, isCustomBg ? 'rgba(6, 12, 28, 0.14)' : 'rgba(6, 12, 28, 0.52)');
+    darkWash.addColorStop(1, isCustomBg ? 'rgba(3, 6, 16, 0.48)' : 'rgba(3, 6, 16, 0.88)');
     ctx.fillStyle = darkWash;
     ctx.fillRect(0, 0, W, H);
 
-    var radTop = ctx.createRadialGradient(W * 0.25, H * 0.08, 20, W * 0.25, H * 0.08, W * 0.68);
-    radTop.addColorStop(0, 'rgba(' + accentRgb + ', 0.22)');
+    var radTop = ctx.createRadialGradient(W * 0.25, H * 0.08, 20, W * 0.25, H * 0.08, W * 0.72);
+    radTop.addColorStop(0, 'rgba(' + accentRgb + ', ' + (isCustomBg ? '0.38' : '0.22') + ')');
     radTop.addColorStop(1, 'rgba(' + accentRgb + ', 0)');
     ctx.fillStyle = radTop;
     ctx.fillRect(0, 0, W, H);
 
-    var radRight = ctx.createRadialGradient(W * 0.82, H * 0.18, 20, W * 0.82, H * 0.18, W * 0.62);
-    radRight.addColorStop(0, 'rgba(' + accentRightRgb + ', 0.16)');
+    var radRight = ctx.createRadialGradient(W * 0.82, H * 0.18, 20, W * 0.82, H * 0.18, W * 0.68);
+    radRight.addColorStop(0, 'rgba(' + accentRightRgb + ', ' + (isCustomBg ? '0.34' : '0.16') + ')');
     radRight.addColorStop(1, 'rgba(' + accentRightRgb + ', 0)');
     ctx.fillStyle = radRight;
     ctx.fillRect(0, 0, W, H);
@@ -2149,20 +2150,30 @@ window.SMPL_STUDIO = (function () {
     });
   }
 
-  function getUtBgRgb(bgStyle) {
+  function getUtBgPalette(bgStyle, posterThemeMeta) {
     var map = {
-      'emerald_pitch': '16, 185, 129',
-      'stadium_aura': '37, 99, 235',
-      'sunset_derby': '249, 115, 22',
-      'cyber_grid': '20, 184, 166',
-      'aurora_borealis': '45, 212, 191',
-      'royal_gold': '234, 179, 8',
-      'volcano_magma': '239, 68, 68',
-      'holo_carbon': '148, 163, 184',
-      'galaxies_end': '192, 132, 252',
-      'drop_s56_starfall': '167, 139, 250'
+      'emerald_pitch': { bg0: '#042419', bg1: '#07442f', bg2: '#02120c', rgb: '16, 185, 129' },
+      'stadium_aura': { bg0: '#051436', bg1: '#0d2b6b', bg2: '#03081a', rgb: '37, 99, 235' },
+      'sunset_derby': { bg0: '#2d0c10', bg1: '#4d1814', bg2: '#14050c', rgb: '249, 115, 22' },
+      'cyber_grid': { bg0: '#04242b', bg1: '#0c2340', bg2: '#1a0730', rgb: '20, 184, 166' },
+      'aurora_borealis': { bg0: '#05262e', bg1: '#0f1c42', bg2: '#1b0a38', rgb: '45, 212, 191' },
+      'royal_gold': { bg0: '#291a03', bg1: '#3d2806', bg2: '#0f0a02', rgb: '234, 179, 8' },
+      'volcano_magma': { bg0: '#26060a', bg1: '#4a0b10', bg2: '#140305', rgb: '239, 68, 68' },
+      'holo_carbon': { bg0: '#182233', bg1: '#0f172a', bg2: '#04070f', rgb: '148, 163, 184' },
+      'galaxies_end': { bg0: '#24094a', bg1: '#150836', bg2: '#05081a', rgb: '192, 132, 252' },
+      'drop_s56_starfall': { bg0: '#0a1d42', bg1: '#14123b', bg2: '#050718', rgb: '167, 139, 250' }
     };
-    return map[String(bgStyle || 'default')] || '56, 189, 248';
+    var key = String(bgStyle || 'default');
+    if (map[key]) return map[key];
+    if (posterThemeMeta && posterThemeMeta.label) {
+      return {
+        bg0: posterThemeMeta.bg0 || '#040814',
+        bg1: posterThemeMeta.bg1 || '#0a1428',
+        bg2: posterThemeMeta.bg2 || '#030610',
+        rgb: posterThemeMeta.accentRightRgb || '56, 189, 248'
+      };
+    }
+    return { bg0: '#040814', bg1: '#0a1428', bg2: '#030610', rgb: '56, 189, 248' };
   }
 
   function getUtVisualTheme(ut, cos) {
@@ -2277,15 +2288,19 @@ window.SMPL_STUDIO = (function () {
     if (!ctx) return null;
 
     var th = getUtVisualTheme(ut, cos);
+    var bgPal = getUtBgPalette(cos ? cos.bgStyle : 'default', cos ? cos.posterThemeMeta : null);
     paintStudioBackdrop(
       ctx, W, H,
       '', '', '',
       {
         bgImg: bgImg,
-        bgAlpha: 0.24,
+        bgAlpha: (cos && cos.bgStyle && cos.bgStyle !== 'default') ? 0.12 : 0.24,
+        bg0: bgPal.bg0,
+        bg1: bgPal.bg1,
+        bg2: bgPal.bg2,
         accent: th.accent,
         accentRgb: th.accentRgb,
-        accentRightRgb: getUtBgRgb(cos ? cos.bgStyle : 'default'),
+        accentRightRgb: bgPal.rgb,
         skipHeader: true,
         footerText: 'SCORE! MATCH LIGA POLSKA • OFICJALNA KARTA ULTIMATE TEAM'
       }
@@ -3032,6 +3047,22 @@ window.SMPL_STUDIO = (function () {
    * Uwaga: opisujemy wyłącznie funkcje i poprawki dla graczy (zero wewnętrznych detali serwera).
    */
   var BUILTIN_PLAYER_UPDATES = [
+    {
+      id: 'BUILTIN_V2_11',
+      version: 'V2.11',
+      date: '2026-11-22',
+      category: 'ULEPSZENIA',
+      title: 'Pełny Remaster Wizualny Sklepiku SMPL Coins — Wszystkie Ramki, Tła, Blaski Nicku i Skórki PNG!',
+      summary: 'Przeprowadziliśmy pełny audyt i ulepszenie wszystkich 51 przedmiotów ze Sklepiku SMPL Coins! Każda ramka, tło, odznaka, tytuł kolekcjonerski, efekt blasku nicku, dźwięk meczowy i skórka PNG działają teraz z pełną mocą wizualną w całym portalu.',
+      highlights: [
+        'Wszystkie 11 Ramek UT i 10 Teł Profilu działają teraz w pełnej krasie również w stylu Studio WOW 2026 — z animowanymi aurami dla edycji VIP/Legendarnych/Drop S56 (Zaćmienie Czempiona, Szkarłatne Inferno, Król Mrozu, Gwiezdny Kosmos S56).',
+        'Wszystkie 5 Efektów Blasku Nicku (w tym animowany Pryzmatyczny Hologram VIP) działają teraz także dla najwyższych rang (Właściciel, GOAT, Legenda, Mistrz) i są widoczne na Karcie UT, w Tabeli Głównej, na Podium TOP 3, w Żelaznej Kurtynie oraz w podglądzie gracza!',
+        'Dodaliśmy w samym oknie Sklepiku kartę „✨ Podgląd Twojego Stylu na Żywo”, dzięki której natychmiast po zakupie widzisz efekt ramki, tła, blasku nicku, kolorowej odznaki i szarfy tytułu.',
+        'Wzmocniliśmy kolorystykę wszystkich 5 Skórek Grafik PNG (Tabela, Karta VS, Karta UT, Wrapped) oraz pełną obsługę dźwięków meczowych także dla kont administracyjnych.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
     {
       id: 'BUILTIN_V2_10',
       version: 'V2.10',

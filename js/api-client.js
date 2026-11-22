@@ -7216,7 +7216,7 @@ state = enrichFromArchive(data.state);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
 
     const remotePromise = isHttpProtocol()
-      ? sendCompetitionActionToServer({ op: 'shop_buy', itemId: itemId, customTitle: customTitle }, actor.isAdmin)
+      ? sendCompetitionActionToServer({ op: 'shop_buy', itemId: itemId, customTitle: customTitle, playerId: targetPid }, actor.isAdmin)
       : Promise.resolve({ ok: true, localOnly: true });
     return { ok: true, unlock: u, remotePromise: remotePromise };
   }
@@ -7243,7 +7243,7 @@ state = enrichFromArchive(data.state);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
 
     const remotePromise = isHttpProtocol()
-      ? sendCompetitionActionToServer({ op: 'shop_equip', category: category, value: value, customTitle: customTitle }, actor.isAdmin)
+      ? sendCompetitionActionToServer({ op: 'shop_equip', category: category, value: value, customTitle: customTitle, playerId: targetPid }, actor.isAdmin)
       : Promise.resolve({ ok: true, localOnly: true });
     return { ok: true, unlock: u, remotePromise: remotePromise };
   }
@@ -7276,7 +7276,7 @@ state = enrichFromArchive(data.state);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
 
     const remotePromise = isHttpProtocol()
-      ? sendCompetitionActionToServer({ op: 'shop_quest_claim', questId: questId }, actor.isAdmin)
+      ? sendCompetitionActionToServer({ op: 'shop_quest_claim', questId: questId, playerId: targetPid }, actor.isAdmin)
       : Promise.resolve({ ok: true, localOnly: true });
     return { ok: true, quest: q, unlock: u, remotePromise: remotePromise };
   }
@@ -7361,7 +7361,7 @@ state = enrichFromArchive(data.state);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
 
     const remotePromise = isHttpProtocol()
-      ? sendCompetitionActionToServer({ op: 'shop_gift', toPlayerId: String(recipient.id), giftType: gType, amount: giftCost, itemId: itemId, note: cleanNote }, actor.isAdmin)
+      ? sendCompetitionActionToServer({ op: 'shop_gift', toPlayerId: String(recipient.id), giftType: gType, amount: giftCost, itemId: itemId, note: cleanNote, playerId: targetPid }, actor.isAdmin)
       : Promise.resolve({ ok: true, localOnly: true });
     return { ok: true, gift: entry, unlock: senderU, remotePromise: remotePromise };
   }

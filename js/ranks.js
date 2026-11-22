@@ -1069,13 +1069,18 @@ window.SMPL_RANKS = (function () {
       const rb = st.reliabilityBadgeHtml(state, player.id, Boolean(compact));
       if (rb) parts.push(rb);
     }
-    if (!compact && typeof st.getPlayerCosmetics === 'function') {
+    if (typeof st.getPlayerCosmetics === 'function') {
       const cos = st.getPlayerCosmetics(state, player.id);
       if (cos && cos.badgeLabel) {
-        parts.push('<span class="smpl-shop-badge-pill" title="Odznaka ze Sklepiku SMPL Coins">' + esc(cos.badgeLabel) + '</span>');
+        const bCol = cos.badgeColor || '#38bdf8';
+        parts.push(
+          '<span class="smpl-shop-badge-pill' + (compact ? ' is-compact' : '') + '"'
+          + ' style="border-color:' + esc(bCol) + ';color:' + esc(bCol) + ';box-shadow:0 0 10px ' + esc(bCol) + '33;"'
+          + ' title="Odznaka ze Sklepiku SMPL Coins">' + esc(cos.badgeLabel) + '</span>'
+        );
       }
-      if (cos && cos.customTitle) {
-        parts.push('<span class="smpl-coin-title-badge" title="Wlasny tytul ze Sklepiku SMPL Coins">🪙 ' + esc(cos.customTitle) + '</span>');
+      if (!compact && cos && cos.customTitle) {
+        parts.push('<span class="smpl-coin-title-ribbon" title="Tytuł kolekcjonerski ze Sklepiku SMPL Coins">🪙 ' + esc(cos.customTitle) + '</span>');
       }
     }
     return parts.join(' ');
@@ -1311,8 +1316,21 @@ window.SMPL_RANKS = (function () {
         </div>`;
     }).join('');
 
+    const shopCos = (typeof window !== 'undefined' && window.SMPL_STUDIO && typeof window.SMPL_STUDIO.getPlayerCosmetics === 'function')
+      ? window.SMPL_STUDIO.getPlayerCosmetics(state, player.id)
+      : null;
+    const shopHeroCls = shopCos && (shopCos.bgCss || shopCos.frameCss)
+      ? (' smpl-cosmetic-card ' + (shopCos.bgCss || '') + ' ' + (shopCos.frameCss || ''))
+      : '';
+    const shopBadgeHeroHtml = shopCos && shopCos.badgeLabel
+      ? `<span class="smpl-shop-badge-pill" style="border-color:${esc(shopCos.badgeColor || '#38bdf8')};color:${esc(shopCos.badgeColor || '#38bdf8')};box-shadow:0 0 12px ${esc(shopCos.badgeColor || '#38bdf8')}44;">${esc(shopCos.badgeLabel)}</span>`
+      : '';
+    const shopTitleHeroHtml = shopCos && shopCos.customTitle
+      ? `<span class="smpl-coin-title-ribbon">🪙 ${esc(shopCos.customTitle)}</span>`
+      : '';
+
     return `
-      <div class="glass-panel rounded-3xl p-5 sm:p-6 mb-6 rk-hero ${glassObj.css}-hero relative overflow-hidden">
+      <div class="glass-panel rounded-3xl p-5 sm:p-6 mb-6 rk-hero ${glassObj.css}-hero${shopHeroCls} relative overflow-hidden">
         <div class="flex flex-col md:flex-row md:items-center gap-5">
           <div class="rk-emblem ${glassObj.css}">
             <div class="rk-emblem-ico">${glassObj.displayIcon || glassObj.icon}</div>
@@ -1327,6 +1345,8 @@ window.SMPL_RANKS = (function () {
               ${badgeHtml(glassObj, 'lg', player.id, r.reason)}
               ${titleHtml(r.title, 'lg')}
               ${Array.isArray(r.extraTitles) && r.extraTitles.length > 0 ? r.extraTitles.map((t) => titleHtml(t, 'lg')).join('') : ''}
+              ${shopBadgeHeroHtml}
+              ${shopTitleHeroHtml}
               ${player.isSuspended ? '<span class="smpl-rank rk-suspended rk-lg"><span class="rk-ico">⛔</span><span class="rk-txt">Zawieszony</span></span>' : ''}
             </div>
             <div class="mt-2.5 p-3 rounded-xl bg-black/40 border border-white/15 backdrop-blur-md text-xs text-white leading-relaxed">

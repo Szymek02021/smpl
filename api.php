@@ -4192,12 +4192,27 @@ if ($method === 'POST') {
             $admId = isset($adminTokenInfo['adminId']) ? (string)$adminTokenInfo['adminId'] : 'ADM';
             $actorId = 'ADM_' . $admId;
             $actorName = isset($adminTokenInfo['name']) ? (string)$adminTokenInfo['name'] : 'Administrator';
+            $admNameLow = mb_strtolower(trim($actorName), 'UTF-8');
+            $admUserLow = isset($adminTokenInfo['username']) ? mb_strtolower(trim((string)$adminTokenInfo['username']), 'UTF-8') : '';
+            $fallbackMatchedP = null;
             foreach ($prevDb['players'] as $pl) {
-                if (is_array($pl) && isset($pl['adminId']) && (string)$pl['adminId'] === $admId) {
+                if (!is_array($pl) || !empty($pl['isPlaceholder']) || !empty($pl['gdprDeleted'])) continue;
+                if (isset($pl['adminId']) && (string)$pl['adminId'] === $admId) {
                     $actorPlayerId = (string)$pl['id'];
                     $actorNick = isset($pl['nick']) ? (string)$pl['nick'] : '';
                     break;
                 }
+                if ($fallbackMatchedP === null) {
+                    $pNameLow = isset($pl['name']) ? mb_strtolower(trim((string)$pl['name']), 'UTF-8') : '';
+                    $pUserLow = isset($pl['username']) ? mb_strtolower(trim((string)$pl['username']), 'UTF-8') : '';
+                    if (($admUserLow !== '' && $pUserLow !== '' && $pUserLow === $admUserLow) || ($admNameLow !== '' && $pNameLow !== '' && $pNameLow === $admNameLow)) {
+                        $fallbackMatchedP = $pl;
+                    }
+                }
+            }
+            if ($actorPlayerId === '' && $fallbackMatchedP !== null) {
+                $actorPlayerId = (string)$fallbackMatchedP['id'];
+                $actorNick = isset($fallbackMatchedP['nick']) ? (string)$fallbackMatchedP['nick'] : '';
             }
         } else {
             $subKind = isset($pTokInfo['subjectKind']) ? (string)$pTokInfo['subjectKind'] : 'PLAYER';

@@ -294,6 +294,13 @@ window.SMPL_VIEWS = (function () {
                       )
                     : `<img src="${row.avatar}" alt="${escapeHtml(row.name)}" class="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 ${cfg.avatarBorder} shadow-xl flex-shrink-0"/>`;
                 const nameCls = window.SMPL_RANKS && pRank ? window.SMPL_RANKS.nameClass(pRank) : '';
+                const pCos = (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.getPlayerCosmetics === 'function')
+                  ? window.SMPL_STUDIO.getPlayerCosmetics(state, row.playerId)
+                  : null;
+                const pNickFx = (pCos && pCos.nickFxCss) ? (' ' + pCos.nickFxCss) : '';
+                const pBadgePill = (pCos && pCos.badgeLabel)
+                  ? `<span class="smpl-shop-badge-pill is-compact" style="border-color:${escapeHtml(pCos.badgeColor || '#38bdf8')};color:${escapeHtml(pCos.badgeColor || '#38bdf8')};">${escapeHtml(pCos.badgeLabel)}</span>`
+                  : '';
                 const diffStr = row.diff > 0 ? '+' + row.diff : String(row.diff);
 
                 return `
@@ -308,9 +315,10 @@ window.SMPL_VIEWS = (function () {
                       <div class="flex items-center gap-3">
                         ${pAvatar}
                         <div class="min-w-0 flex-1">
-                          <div class="font-display font-black text-base text-white truncate ${nameCls}">${escapeHtml(row.name)}</div>
+                          <div class="font-display font-black text-base text-white truncate ${nameCls}${pNickFx}">${escapeHtml(row.name)}</div>
                           <div class="text-xs text-slate-300 flex items-center gap-1.5 flex-wrap mt-0.5">
                             <span>@${escapeHtml(row.nick)}</span>
+                            ${pBadgePill}
                             ${renderClanBadgeHtml(pObj || row, state, true)}
                           </div>
                         </div>
@@ -616,6 +624,10 @@ window.SMPL_VIEWS = (function () {
                         (Array.isArray(pRank.extraTitles) ? pRank.extraTitles.slice(0, 2).map((et) => window.SMPL_RANKS.titleHtml(et, 'sm')).join('') : '')
                       : '';
                   const rankNameCls = window.SMPL_RANKS && pRank ? window.SMPL_RANKS.nameClass(pRank) : '';
+                  const rowCos = (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.getPlayerCosmetics === 'function')
+                    ? window.SMPL_STUDIO.getPlayerCosmetics(state, row.playerId)
+                    : null;
+                  const rowNickFx = (rowCos && rowCos.nickFxCss) ? (' ' + rowCos.nickFxCss) : '';
 
                   return `
                     <tr class="zone-row ${row.zone.colorClass} group cursor-pointer" onclick="SMPL_APP.openPlayerModal('${row.playerId}')">
@@ -632,7 +644,7 @@ window.SMPL_VIEWS = (function () {
                           ${avatarHtml}
                           <div class="min-w-0">
                             <div class="font-bold text-white group-hover:text-league-primary transition flex items-center gap-1.5 flex-wrap">
-                              <span class="${rankNameCls}">${escapeHtml(row.name)}</span>
+                              <span class="${rankNameCls}${rowNickFx}">${escapeHtml(row.name)}</span>
                               ${rankBadgesHtml}
                               ${window.SMPL_RANKS && typeof window.SMPL_RANKS.expansionBadgesHtml === 'function' ? window.SMPL_RANKS.expansionBadgesHtml(state, pObj || row, true) : ''}
                               ${
@@ -774,8 +786,19 @@ window.SMPL_VIEWS = (function () {
                        <div class="flex items-center gap-4">
                          ${csAv}
                          <div class="min-w-0">
-                           <div class="font-display font-black text-base text-white truncate ${window.SMPL_RANKS && csRk ? window.SMPL_RANKS.nameClass(csRk) : ''}">${escapeHtml(item.name)}</div>
-                           ${window.SMPL_RANKS && csRk && !csRk.isPlaceholder ? `<div class="mt-1 mb-0.5 flex items-center gap-1 flex-wrap">${typeof window.SMPL_RANKS.roleBadgesHtml === 'function' ? window.SMPL_RANKS.roleBadgesHtml(csRk, 'sm') : ''}${window.SMPL_RANKS.glassBadgeHtml(csRk, item.playerId, 'sm')}</div>` : ''}
+                           ${(() => {
+                             const csCos = (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.getPlayerCosmetics === 'function')
+                               ? window.SMPL_STUDIO.getPlayerCosmetics(state, item.playerId)
+                               : null;
+                             const csFx = (csCos && csCos.nickFxCss) ? (' ' + csCos.nickFxCss) : '';
+                             const csBadge = (csCos && csCos.badgeLabel)
+                               ? `<span class="smpl-shop-badge-pill is-compact" style="border-color:${escapeHtml(csCos.badgeColor || '#38bdf8')};color:${escapeHtml(csCos.badgeColor || '#38bdf8')};">${escapeHtml(csCos.badgeLabel)}</span>`
+                               : '';
+                             return `
+                               <div class="font-display font-black text-base text-white truncate ${window.SMPL_RANKS && csRk ? window.SMPL_RANKS.nameClass(csRk) : ''}${csFx}">${escapeHtml(item.name)}</div>
+                               ${window.SMPL_RANKS && csRk && !csRk.isPlaceholder ? `<div class="mt-1 mb-0.5 flex items-center gap-1 flex-wrap">${typeof window.SMPL_RANKS.roleBadgesHtml === 'function' ? window.SMPL_RANKS.roleBadgesHtml(csRk, 'sm') : ''}${window.SMPL_RANKS.glassBadgeHtml(csRk, item.playerId, 'sm')}${csBadge}</div>` : (csBadge ? `<div class="mt-1 mb-0.5">${csBadge}</div>` : '')}
+                             `;
+                           })()}
                            <div class="text-xs text-slate-400">@${escapeHtml(item.nick)} • Poz. #${item.leaguePosition} w lidze</div>
                            <div class="mt-2 flex items-baseline gap-2">
                              <span class="font-display font-black text-2xl text-emerald-400">${item.cleanSheets}</span>
@@ -866,13 +889,21 @@ window.SMPL_VIEWS = (function () {
                             ? (typeof window.SMPL_RANKS.roleBadgesHtml === 'function' ? window.SMPL_RANKS.roleBadgesHtml(rowRk, 'sm') : '') +
                               window.SMPL_RANKS.glassBadgeHtml(rowRk, r.playerId, 'sm')
                             : '';
+                          const rowCosCs = (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.getPlayerCosmetics === 'function')
+                            ? window.SMPL_STUDIO.getPlayerCosmetics(state, r.playerId)
+                            : null;
+                          const csRowFx = (rowCosCs && rowCosCs.nickFxCss) ? (' ' + rowCosCs.nickFxCss) : '';
+                          const csRowBadge = (rowCosCs && rowCosCs.badgeLabel)
+                            ? `<span class="smpl-shop-badge-pill is-compact" style="border-color:${escapeHtml(rowCosCs.badgeColor || '#38bdf8')};color:${escapeHtml(rowCosCs.badgeColor || '#38bdf8')};">${escapeHtml(rowCosCs.badgeLabel)}</span>`
+                            : '';
                           return `
                             <div class="flex items-center gap-3">
                               ${av}
                               <div>
                                 <div class="font-bold text-white flex items-center gap-1.5 flex-wrap">
-                                  <span class="${window.SMPL_RANKS && rowRk ? window.SMPL_RANKS.nameClass(rowRk) : ''}">${escapeHtml(r.name)}</span>
+                                  <span class="${window.SMPL_RANKS && rowRk ? window.SMPL_RANKS.nameClass(rowRk) : ''}${csRowFx}">${escapeHtml(r.name)}</span>
                                   ${bd}
+                                  ${csRowBadge}
                                 </div>
                                 <div class="text-xs text-slate-400">@${escapeHtml(r.nick)}</div>
                               </div>
