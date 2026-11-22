@@ -5062,6 +5062,9 @@ if ($method === 'POST') {
             if (!isset($prevDb['competitions']['playerShop']['bonusCoins']) || !is_array($prevDb['competitions']['playerShop']['bonusCoins'])) {
                 $prevDb['competitions']['playerShop']['bonusCoins'] = array();
             }
+            if (!isset($prevDb['competitions']['playerShop']['unlocks']) || !is_array($prevDb['competitions']['playerShop']['unlocks'])) {
+                $prevDb['competitions']['playerShop']['unlocks'] = array();
+            }
             $mode = isset($body['mode']) ? strtolower(trim((string)$body['mode'])) : 'add';
             $curBonus = isset($prevDb['competitions']['playerShop']['bonusCoins'][$targetPid])
                 ? (int)$prevDb['competitions']['playerShop']['bonusCoins'][$targetPid]
@@ -5069,7 +5072,25 @@ if ($method === 'POST') {
             $cleanReason = mb_substr(trim(strip_tags((string)(isset($body['reason']) ? $body['reason'] : ''))), 0, 140, 'UTF-8');
             $maxSafe = 1000000000;
             $appliedDelta = 0;
-            if ($mode === 'reset_bonus') {
+            if ($mode === 'reset_shop') {
+                $appliedDelta = -$curBonus;
+                $nextBonus = 0;
+                $prevDb['competitions']['playerShop']['unlocks'][$targetPid] = array(
+                    'unlockedItems' => array(),
+                    'spentCoins' => 0,
+                    'questCoins' => 0,
+                    'giftCoinsReceived' => 0,
+                    'carryoverCoins' => 0,
+                    'claimedQuests' => array(),
+                    'frame' => 'default',
+                    'bgStyle' => 'default',
+                    'customTitle' => '',
+                    'joinSound' => 'default',
+                    'profileBadge' => 'default',
+                    'nickEffect' => 'default',
+                    'posterTheme' => 'default'
+                );
+            } elseif ($mode === 'reset_bonus') {
                 $appliedDelta = -$curBonus;
                 $nextBonus = 0;
             } elseif ($mode === 'set_bonus') {
@@ -5105,7 +5126,9 @@ if ($method === 'POST') {
                 ));
                 $prevDb['players'][$targetPlIdx]['notifications'] = array_slice($prevDb['players'][$targetPlIdx]['notifications'], 0, 50);
             }
-            if ($mode === 'reset_bonus') {
+            if ($mode === 'reset_shop') {
+                $logText = '👑🗑️ Master Admin ' . $actorName . ' wyzerował cały Sklepik SMPL gracza ' . $targetPlName . ' (usunięto przedmioty i bonusowe Coins; nowe saldo: ' . $newBalance . ' Coins).';
+            } elseif ($mode === 'reset_bonus') {
                 $logText = '👑🧹 Master Admin ' . $actorName . ' wyzerował bonusowe SMPL Coins gracza ' . $targetPlName . ' (nowe saldo: ' . $newBalance . ' Coins).';
             } else {
                 $signTxt = ($appliedDelta >= 0 ? '+' : '') . $appliedDelta;

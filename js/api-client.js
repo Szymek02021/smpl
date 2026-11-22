@@ -7417,7 +7417,28 @@ state = enrichFromArchive(data.state);
     let nextBonus = curBonus;
     let appliedDelta = 0;
 
-    if (cleanMode === 'reset_bonus') {
+    if (!comp.playerShop.unlocks || typeof comp.playerShop.unlocks !== 'object' || Array.isArray(comp.playerShop.unlocks)) {
+      comp.playerShop.unlocks = {};
+    }
+    if (cleanMode === 'reset_shop') {
+      nextBonus = 0;
+      appliedDelta = -curBonus;
+      comp.playerShop.unlocks[targetPid] = {
+        unlockedItems: [],
+        spentCoins: 0,
+        questCoins: 0,
+        giftCoinsReceived: 0,
+        carryoverCoins: 0,
+        claimedQuests: [],
+        frame: 'default',
+        bgStyle: 'default',
+        customTitle: '',
+        joinSound: 'default',
+        profileBadge: 'default',
+        nickEffect: 'default',
+        posterTheme: 'default'
+      };
+    } else if (cleanMode === 'reset_bonus') {
       nextBonus = 0;
       appliedDelta = -curBonus;
     } else if (cleanMode === 'set_bonus') {
@@ -7448,9 +7469,11 @@ state = enrichFromArchive(data.state);
     }
     addLog(
       'MASTER_COINS',
-      cleanMode === 'reset_bonus'
-        ? `👑🧹 Master Admin ${adminName} wyzerował bonusowe SMPL Coins gracza ${targetPlayer.name} (saldo: ${balInfo.balance} Coins).`
-        : `👑🪙 Master Admin ${adminName} zmienił SMPL Coins gracza ${targetPlayer.name} o ${appliedDelta >= 0 ? '+' : ''}${appliedDelta} (saldo: ${balInfo.balance} Coins)${cleanReason ? ' [' + cleanReason + ']' : ''}.`
+      cleanMode === 'reset_shop'
+        ? `👑🗑️ Master Admin ${adminName} wyzerował cały Sklepik SMPL gracza ${targetPlayer.name} (usunięto przedmioty i bonusowe Coins; saldo: ${balInfo.balance} Coins).`
+        : cleanMode === 'reset_bonus'
+          ? `👑🧹 Master Admin ${adminName} wyzerował bonusowe SMPL Coins gracza ${targetPlayer.name} (saldo: ${balInfo.balance} Coins).`
+          : `👑🪙 Master Admin ${adminName} zmienił SMPL Coins gracza ${targetPlayer.name} o ${appliedDelta >= 0 ? '+' : ''}${appliedDelta} (saldo: ${balInfo.balance} Coins)${cleanReason ? ' [' + cleanReason + ']' : ''}.`
     );
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
 

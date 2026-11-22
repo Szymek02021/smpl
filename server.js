@@ -2908,13 +2908,34 @@ const server = http.createServer((req, res) => {
             if (!db.competitions.playerShop.bonusCoins || typeof db.competitions.playerShop.bonusCoins !== 'object' || Array.isArray(db.competitions.playerShop.bonusCoins)) {
               db.competitions.playerShop.bonusCoins = {};
             }
+            if (!db.competitions.playerShop.unlocks || typeof db.competitions.playerShop.unlocks !== 'object' || Array.isArray(db.competitions.playerShop.unlocks)) {
+              db.competitions.playerShop.unlocks = {};
+            }
             const mode = String(payload.mode || 'add').trim().toLowerCase();
             const curBonus = Number(db.competitions.playerShop.bonusCoins[targetPid] || 0);
             const cleanReason = String(payload.reason || '').replace(/<[^>]*>/g, '').trim().slice(0, 140);
             const maxSafe = 1000000000;
             let nextBonus = curBonus;
             let appliedDelta = 0;
-            if (mode === 'reset_bonus') {
+            if (mode === 'reset_shop') {
+              nextBonus = 0;
+              appliedDelta = -curBonus;
+              db.competitions.playerShop.unlocks[targetPid] = {
+                unlockedItems: [],
+                spentCoins: 0,
+                questCoins: 0,
+                giftCoinsReceived: 0,
+                carryoverCoins: 0,
+                claimedQuests: [],
+                frame: 'default',
+                bgStyle: 'default',
+                customTitle: '',
+                joinSound: 'default',
+                profileBadge: 'default',
+                nickEffect: 'default',
+                posterTheme: 'default'
+              };
+            } else if (mode === 'reset_bonus') {
               nextBonus = 0;
               appliedDelta = -curBonus;
             } else if (mode === 'set_bonus') {
@@ -2943,9 +2964,11 @@ const server = http.createServer((req, res) => {
               });
               if (targetPl.notifications.length > 50) targetPl.notifications = targetPl.notifications.slice(0, 50);
             }
-            logText = mode === 'reset_bonus'
-              ? `👑🧹 Master Admin ${actorName} wyzerował bonusowe SMPL Coins gracza ${targetName} (nowe saldo: ${newBalance} Coins).`
-              : `👑🪙 Master Admin ${actorName} zmienił SMPL Coins gracza ${targetName} o ${appliedDelta >= 0 ? '+' : ''}${appliedDelta} (saldo: ${newBalance} Coins)${cleanReason ? ' [' + cleanReason + ']' : ''}.`;
+            logText = mode === 'reset_shop'
+              ? `👑🗑️ Master Admin ${actorName} wyzerował cały Sklepik SMPL gracza ${targetName} (usunięto przedmioty i bonusowe Coins; nowe saldo: ${newBalance} Coins).`
+              : mode === 'reset_bonus'
+                ? `👑🧹 Master Admin ${actorName} wyzerował bonusowe SMPL Coins gracza ${targetName} (nowe saldo: ${newBalance} Coins).`
+                : `👑🪙 Master Admin ${actorName} zmienił SMPL Coins gracza ${targetName} o ${appliedDelta >= 0 ? '+' : ''}${appliedDelta} (saldo: ${newBalance} Coins)${cleanReason ? ' [' + cleanReason + ']' : ''}.`;
           } else if (op === 'tv_clip_add') {
             const title = String(payload.title || '').replace(/<[^>]*>/g, '').trim().slice(0, 100);
             const url = String(payload.url || '').trim();

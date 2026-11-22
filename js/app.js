@@ -9636,16 +9636,21 @@ window.SMPL_APP = (function () {
               '<button type="button" onclick="SMPL_APP.masterQuickGrantCoins(\'' + studioEsc(pid) + '\', 10000, true)" class="px-2 py-1 rounded-lg bg-amber-400/25 hover:bg-amber-400/40 text-amber-100 border border-amber-400/55 font-black">+10 000</button>' +
               '<button type="button" onclick="SMPL_APP.masterQuickGrantCoins(\'' + studioEsc(pid) + '\', 100000, true)" class="px-2 py-1 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/40 text-emerald-200 border border-emerald-400/50 font-black">+100 000</button>' +
               (coins.breakdown.adminBonusCoins
-                ? '<button type="button" onclick="SMPL_APP.masterResetPlayerBonusCoins(\'' + studioEsc(pid) + '\', true)" class="px-2 py-1 rounded-lg bg-rose-600/25 hover:bg-rose-600/40 text-rose-200 border border-rose-400/40 font-bold" title="Zeruje Twoje bonusowe Coins od Mastera">🧹 Zeruj (' + coins.breakdown.adminBonusCoins + ')</button>'
+                ? '<button type="button" onclick="SMPL_APP.masterResetPlayerBonusCoins(\'' + studioEsc(pid) + '\', true)" class="px-2 py-1 rounded-lg bg-rose-600/25 hover:bg-rose-600/40 text-rose-200 border border-rose-400/40 font-bold" title="Zeruje Twoje bonusowe Coins od Mastera">🧹 Zeruj Coins (' + coins.breakdown.adminBonusCoins + ')</button>'
                 : '') +
+              '<button type="button" onclick="SMPL_APP.masterResetPlayerShop(\'' + studioEsc(pid) + '\', true)" class="px-2 py-1 rounded-lg bg-rose-700/35 hover:bg-rose-600/55 text-rose-100 border border-rose-400/60 font-black" title="Usuwa wszystkie zakupione i założone przedmioty ze Sklepiku oraz bonusowe Coins na Twoim koncie">🗑️ Wyzeruj Mój Sklepik</button>' +
             '</div>' +
           '</div>' +
           '<form onsubmit="SMPL_APP.masterSubmitGrantCoinsForm(event, true)" class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 items-center">' +
-            '<select name="playerId" class="sm:col-span-5 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-white/15 text-white font-semibold">' + masterCoinsOptsHtml + '</select>' +
+            '<select id="master-shop-vault-player-select" name="playerId" class="sm:col-span-5 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-white/15 text-white font-semibold">' + masterCoinsOptsHtml + '</select>' +
             '<input type="number" name="delta" step="1" value="5000" required placeholder="Kwota bez limitu (lub -500)" class="sm:col-span-3 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-amber-400/40 text-amber-200 font-mono-num font-bold"/>' +
             '<input type="text" name="reason" maxlength="100" placeholder="Powód (opcj., np. Test)" class="sm:col-span-2 px-2 py-1.5 rounded-lg bg-slate-950 border border-white/15 text-slate-200"/>' +
             '<button type="submit" class="sm:col-span-2 btn-league px-2.5 py-1.5 rounded-lg font-display font-black uppercase">🪙 Dodaj</button>' +
           '</form>' +
+          '<div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-amber-400/20">' +
+            '<span class="text-[10px] text-slate-300">Wybierz dowolnego gracza z listy wyżej, aby wyczyścić jego zakupy i kosmetyki ze Sklepiku:</span>' +
+            '<button type="button" onclick="SMPL_APP.masterResetSelectedPlayerShop(\'master-shop-vault-player-select\', true)" class="px-2.5 py-1 rounded-lg bg-rose-700/35 hover:bg-rose-600/55 text-rose-100 border border-rose-400/55 font-display font-black text-[10.5px] uppercase transition">🗑️ Wyzeruj Sklepik Wybranego Gracza</button>' +
+          '</div>' +
         '</div>'
       : '';
     const adminBonusPart = coins.breakdown.adminBonusCoins
@@ -9957,6 +9962,46 @@ window.SMPL_APP = (function () {
     }
   }
 
+  function masterResetPlayerShop(playerId, reopenShop) {
+    if (!requireMasterAdmin('zerowanie Sklepiku gracza')) return;
+    try {
+      const state = window.SMPL_DB.getState();
+      const targetPl = (state.players || []).find((p) => p && String(p.id) === String(playerId));
+      const targetLabel = targetPl ? String(targetPl.name || playerId) : String(playerId || 'gracza');
+      if (typeof confirm === 'function' && !confirm('Czy na pewno WYZEROWAĆ cały Sklepik gracza ' + targetLabel + '?\n\nUsunie to wszystkie jego zakupione i założone przedmioty (ramki, tła UT, odznaki, blaski nicku, tytuły, dźwięki, skórki PNG) oraz bonusowe Coins od Mastera!')) {
+        return;
+      }
+      const res = window.SMPL_DB.masterGrantPlayerCoins({
+        playerId: playerId,
+        mode: 'reset_shop'
+      });
+      coinShopPreviewOverrides = {};
+      showToast('👑🗑️ Wyzerowano cały Sklepik gracza ' + res.playerName + ' (usunięto wszystkie przedmioty i bonusowe Coins; saldo: ' + res.balance + ' Coins).');
+      renderAll();
+      if (reopenShop) openCoinShopModal();
+      if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
+        res.remotePromise.then((srv) => {
+          if (srv && srv.ok === false && srv.error) {
+            showToast('⚠️ Serwer odrzucił zerowanie Sklepiku: ' + srv.error, 'error');
+            renderAll();
+          }
+        });
+      }
+    } catch (err) {
+      showToast((err && err.message) || 'Nie udało się wyzerować Sklepiku gracza.', 'error');
+    }
+  }
+
+  function masterResetSelectedPlayerShop(selectElId, reopenShop) {
+    const sel = document.getElementById(selectElId);
+    const chosenPid = sel ? String(sel.value || '').trim() : '';
+    if (!chosenPid) {
+      showToast('Wybierz zawodnika z listy.', 'error');
+      return;
+    }
+    masterResetPlayerShop(chosenPid, Boolean(reopenShop));
+  }
+
   function openMasterGrantCoinsModal(defaultPlayerId) {
     const state = window.SMPL_DB.getState();
     const session = window.SMPL_DB.getSession();
@@ -10002,7 +10047,7 @@ window.SMPL_APP = (function () {
         <form onsubmit="SMPL_APP.masterSubmitGrantCoinsForm(event, false); SMPL_APP.closeModal();" class="space-y-3 text-xs">
           <div>
             <label class="block text-[11px] font-bold uppercase text-slate-300 mb-1">Zawodnik</label>
-            <select name="playerId" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white font-semibold">${optsHtml || '<option value="">Brak zawodników w bazie</option>'}</select>
+            <select id="master-grant-modal-player-select" name="playerId" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white font-semibold">${optsHtml || '<option value="">Brak zawodników w bazie</option>'}</select>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -10015,7 +10060,10 @@ window.SMPL_APP = (function () {
             </div>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
-            ${chosenPl && chosenBal.breakdown.adminBonusCoins ? `<button type="button" onclick="SMPL_APP.masterResetPlayerBonusCoins('${studioEsc(chosenPl.id)}', false); SMPL_APP.openMasterGrantCoinsModal('${studioEsc(chosenPl.id)}');" class="px-3 py-2 rounded-xl bg-rose-600/25 hover:bg-rose-600/40 text-rose-200 border border-rose-500/40 font-bold">🧹 Wyzeruj Bonus (${chosenBal.breakdown.adminBonusCoins})</button>` : '<span></span>'}
+            <div class="flex flex-wrap items-center gap-1.5">
+              ${chosenPl && chosenBal.breakdown.adminBonusCoins ? `<button type="button" onclick="SMPL_APP.masterResetPlayerBonusCoins('${studioEsc(chosenPl.id)}', false); SMPL_APP.openMasterGrantCoinsModal('${studioEsc(chosenPl.id)}');" class="px-3 py-2 rounded-xl bg-rose-600/25 hover:bg-rose-600/40 text-rose-200 border border-rose-500/40 font-bold">🧹 Wyzeruj Bonus (${chosenBal.breakdown.adminBonusCoins})</button>` : ''}
+              <button type="button" onclick="SMPL_APP.masterResetSelectedPlayerShop('master-grant-modal-player-select', false)" class="px-3 py-2 rounded-xl bg-rose-700/35 hover:bg-rose-600/55 text-rose-100 border border-rose-400/55 font-bold">🗑️ Wyzeruj Sklepik Gracza</button>
+            </div>
             <button type="submit" class="btn-league px-4 py-2 rounded-xl font-display font-black uppercase">🪙 Przyznaj SMPL Coins</button>
           </div>
         </form>
@@ -11406,6 +11454,8 @@ window.SMPL_APP = (function () {
     masterQuickGrantCoins,
     masterSubmitGrantCoinsForm,
     masterResetPlayerBonusCoins,
+    masterResetPlayerShop,
+    masterResetSelectedPlayerShop,
     openMasterGrantCoinsModal,
     openSmplWrappedModal,
     openVacationModeModal,
