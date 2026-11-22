@@ -1313,7 +1313,7 @@ html[data-smpl-theme="dawn"] #top-auth-bar::before {
   40%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 0 18px 2px #ef4444, 0 0 5px #fde047 inset; }
   70%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.52), 0 0 13px 1px #f59e0b, 0 0 3px #fff inset; }
 }
-@keyframes rkFloat { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-6px) rotate(3deg); } }
+@keyframes rkFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes rkSpin  { to { transform: rotate(360deg); } }
 
 /* --- Poszczególne rangi XP & Funkcyjne --- */
@@ -1418,14 +1418,63 @@ html[data-smpl-theme="dawn"] #top-auth-bar::before {
 .rk-goat-hero     { box-shadow: 0 0 70px -8px #ec4899; }
 .rk-emblem {
   width: 104px; height: 104px; flex-shrink: 0;
-  border-radius: 28px;
+  border-radius: 26px;
+  padding: 10px;
   display: flex; align-items: center; justify-content: center;
-  border: 2px solid rgba(255,255,255,0.35);
+  text-align: center;
+  border: 1.5px solid rgba(255,255,255,0.32);
   overflow: hidden; position: relative;
   margin: 0 auto;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), 0 14px 32px rgba(0,0,0,0.52);
 }
-.rk-emblem::after { animation: rkShine 2.8s ease-in-out infinite; content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.5) 48%, transparent 66%); transform: translateX(-120%); }
-.rk-emblem-ico { font-size: 54px; animation: rkFloat 3.4s ease-in-out infinite; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.6)); position: relative; z-index: 1; }
+.rk-emblem.rk-glass-legend {
+  background: radial-gradient(circle at 50% 25%, rgba(253, 224, 71, 0.36) 0%, rgba(180, 83, 9, 0.44) 55%, rgba(15, 11, 5, 0.94) 100%);
+  border-color: rgba(253, 224, 71, 0.78);
+  animation: none;
+}
+.rk-emblem.rk-glass-elite {
+  background: radial-gradient(circle at 50% 25%, rgba(251, 191, 36, 0.34) 0%, rgba(51, 65, 85, 0.56) 56%, rgba(9, 13, 26, 0.95) 100%);
+  border-color: rgba(253, 230, 138, 0.72);
+  animation: none;
+}
+.rk-emblem.rk-glass-defense {
+  background: radial-gradient(circle at 50% 25%, rgba(148, 163, 184, 0.36) 0%, rgba(30, 41, 59, 0.68) 58%, rgba(8, 12, 24, 0.96) 100%);
+  border-color: rgba(203, 213, 225, 0.68);
+}
+.rk-emblem.rk-glass-veteran {
+  background: radial-gradient(circle at 50% 25%, rgba(251, 146, 60, 0.36) 0%, rgba(124, 45, 18, 0.56) 58%, rgba(18, 9, 5, 0.95) 100%);
+  border-color: rgba(251, 146, 60, 0.70);
+}
+.rk-emblem.rk-glass-rookie {
+  background: radial-gradient(circle at 50% 25%, rgba(56, 189, 248, 0.36) 0%, rgba(12, 74, 110, 0.58) 58%, rgba(6, 17, 34, 0.95) 100%);
+  border-color: rgba(56, 189, 248, 0.72);
+}
+.rk-emblem::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(125deg, rgba(255,255,255,0.16) 0%, transparent 48%, rgba(255,255,255,0.04) 100%);
+  pointer-events: none;
+}
+.rk-emblem-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  line-height: 1;
+  white-space: nowrap;
+  font-size: 46px;
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,0.58));
+  position: relative;
+  z-index: 1;
+}
+.rk-emblem-ico.is-duo {
+  font-size: 31px;
+  gap: 3px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rk-emblem-ico {
+    animation: rkFloat 3.6s ease-in-out infinite;
+  }
+}
 .rk-progress { height: 10px; border-radius: 999px; background: rgba(15,23,42,0.9); border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
 .rk-progress-fill { height: 100%; border-radius: 999px; border: 0 !important; transition: width 1s ease; }
 .rk-progress-fill::after { display: none; }
@@ -1438,8 +1487,9 @@ html[data-smpl-theme="dawn"] #top-auth-bar::before {
 .rk-step-xp { font-size: 8px; opacity: 0.75; margin-top: 2px; }
 @media (max-width: 640px) {
   .rk-ladder { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .rk-emblem { width: 84px; height: 84px; border-radius: 22px; }
-  .rk-emblem-ico { font-size: 42px; }
+  .rk-emblem { width: 84px; height: 84px; border-radius: 22px; padding: 8px; }
+  .rk-emblem-ico { font-size: 36px; }
+  .rk-emblem-ico.is-duo { font-size: 25px; gap: 2px; }
 }
 @media (orientation: landscape) and (max-height: 550px) {
   .rk-ladder { grid-template-columns: repeat(9, minmax(0, 1fr)); }

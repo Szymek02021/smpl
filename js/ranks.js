@@ -1329,11 +1329,14 @@ window.SMPL_RANKS = (function () {
       ? `<span class="smpl-coin-title-ribbon">🪙 ${esc(shopCos.customTitle)}</span>`
       : '';
 
+    const emblemIcon = glassObj.displayIcon || glassObj.icon || '⚽';
+    const isDuoEmblem = Boolean(glassObj.displayIcon && glassObj.icon && glassObj.displayIcon !== glassObj.icon);
+
     return `
       <div class="glass-panel rounded-3xl p-5 sm:p-6 mb-6 rk-hero ${glassObj.css}-hero${shopHeroCls} relative overflow-hidden">
         <div class="flex flex-col md:flex-row md:items-center gap-5">
-          <div class="rk-emblem ${glassObj.css}">
-            <div class="rk-emblem-ico">${glassObj.displayIcon || glassObj.icon}</div>
+          <div class="rk-emblem ${glassObj.css} md:mx-0">
+            <div class="rk-emblem-ico${isDuoEmblem ? ' is-duo' : ''}">${emblemIcon}</div>
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-[10px] font-display font-bold uppercase tracking-widest text-slate-300">

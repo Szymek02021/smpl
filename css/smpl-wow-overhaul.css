@@ -1294,7 +1294,7 @@ html[data-smpl-theme="dawn"] .smpl-toast-error {
   }
 }
 
-/* Fix Platynowy Taktyk & active XP career ladder readable contrast */
+/* Fix Platynowy Taktyk & active XP career ladder tier-matched readable contrast */
 .rk-ladder .rk-step-cur,
 .rk-platinum.bg-slate-950\/80,
 .rk-platinum[class*="bg-slate-9"],
@@ -1306,6 +1306,34 @@ html[data-smpl-theme="dawn"] .smpl-toast-error {
   box-shadow: 0 0 22px rgba(45, 212, 191, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
 }
 
+.rk-ladder .rk-step-cur.rk-gold {
+  background: linear-gradient(160deg, rgba(42, 28, 6, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+  border-color: rgba(250, 204, 21, 0.82) !important;
+  box-shadow: 0 0 22px rgba(250, 204, 21, 0.30), inset 0 1px 0 rgba(254, 240, 138, 0.28) !important;
+}
+.rk-ladder .rk-step-cur.rk-diamond {
+  background: linear-gradient(160deg, rgba(10, 32, 60, 0.95) 0%, rgba(12, 20, 40, 0.95) 100%) !important;
+  border-color: rgba(56, 189, 248, 0.82) !important;
+  box-shadow: 0 0 22px rgba(56, 189, 248, 0.30), inset 0 1px 0 rgba(186, 230, 253, 0.28) !important;
+}
+.rk-ladder .rk-step-cur.rk-master {
+  background: linear-gradient(160deg, rgba(52, 20, 8, 0.95) 0%, rgba(18, 12, 26, 0.95) 100%) !important;
+  border-color: rgba(249, 115, 22, 0.84) !important;
+  box-shadow: 0 0 22px rgba(249, 115, 22, 0.32), inset 0 1px 0 rgba(253, 186, 116, 0.28) !important;
+}
+.rk-ladder .rk-step-cur.rk-legend {
+  background: linear-gradient(160deg, rgba(46, 16, 86, 0.95) 0%, rgba(15, 13, 36, 0.95) 100%) !important;
+  border-color: rgba(192, 132, 252, 0.88) !important;
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.38), inset 0 1px 0 rgba(253, 224, 71, 0.30) !important;
+  animation: none !important;
+}
+.rk-ladder .rk-step-cur.rk-goat {
+  background: linear-gradient(160deg, rgba(58, 12, 54, 0.95) 0%, rgba(18, 12, 34, 0.95) 100%) !important;
+  border-color: rgba(244, 114, 182, 0.88) !important;
+  box-shadow: 0 0 24px rgba(236, 72, 153, 0.38), inset 0 1px 0 rgba(253, 224, 71, 0.34) !important;
+  animation: none !important;
+}
+
 .rk-ladder .rk-step-cur .rk-step-name {
   color: #FFFFFF !important;
 }
@@ -1313,6 +1341,17 @@ html[data-smpl-theme="dawn"] .smpl-toast-error {
 .rk-ladder .rk-step-cur .rk-step-xp {
   color: #99F6E4 !important;
   opacity: 1 !important;
+}
+.rk-ladder .rk-step-cur.rk-gold .rk-step-xp,
+.rk-ladder .rk-step-cur.rk-legend .rk-step-xp,
+.rk-ladder .rk-step-cur.rk-goat .rk-step-xp {
+  color: #FDE047 !important;
+}
+.rk-ladder .rk-step-cur.rk-diamond .rk-step-xp {
+  color: #BAE6FD !important;
+}
+.rk-ladder .rk-step-cur.rk-master .rk-step-xp {
+  color: #FDBA74 !important;
 }
 
 html[data-smpl-theme="light"] .rk-ladder .rk-step,
@@ -1324,7 +1363,6 @@ html[data-smpl-theme="dawn"] .rk-ladder .rk-step {
 
 html[data-smpl-theme="light"] .rk-ladder .rk-step-cur,
 html[data-smpl-theme="dawn"] .rk-ladder .rk-step-cur {
-  background: linear-gradient(155deg var(--in-oklab), #0F172A 0%, #134E4A 100%) !important;
   color: #FFFFFF !important;
 }
 
