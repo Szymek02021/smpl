@@ -820,7 +820,7 @@ window.SMPL_DB = (function () {
 
   function ensureSingleLeagueExists(targetState, leagueId, forceEnable) {
     if (!targetState) return null;
-    if (!targetState.leagues || typeof targetState.leagues !== 'object') {
+    if (!targetState.leagues || typeof targetState.leagues !== 'object' || Array.isArray(targetState.leagues)) {
       targetState.leagues = {};
     }
     const lid = String(leagueId || '').toUpperCase().trim();
@@ -837,7 +837,7 @@ window.SMPL_DB = (function () {
     if (forceEnable === true) {
       targetState.leagues[lid].enabled = true;
     }
-    if (!targetState.customCrests) targetState.customCrests = {};
+    if (!targetState.customCrests || typeof targetState.customCrests !== 'object' || Array.isArray(targetState.customCrests)) targetState.customCrests = {};
     if (typeof targetState.customCrests[lid] === 'undefined') {
       targetState.customCrests[lid] = null;
     }
@@ -846,7 +846,7 @@ window.SMPL_DB = (function () {
 
   function ensureLeaguesStructure(targetState) {
     if (!targetState) return targetState;
-    if (!targetState.leagues || typeof targetState.leagues !== 'object') {
+    if (!targetState.leagues || typeof targetState.leagues !== 'object' || Array.isArray(targetState.leagues)) {
       targetState.leagues = {};
     }
     ensureSingleLeagueExists(targetState, 'L1');
@@ -1446,7 +1446,7 @@ window.SMPL_DB = (function () {
     if (!targetState.disciplinaryLog) targetState.disciplinaryLog = [];
     if (!Array.isArray(targetState.aiKnowledge)) targetState.aiKnowledge = [];
     if (!Array.isArray(targetState.customRanks)) targetState.customRanks = [];
-    if (!targetState.portalSettings || typeof targetState.portalSettings !== 'object') {
+    if (!targetState.portalSettings || typeof targetState.portalSettings !== 'object' || Array.isArray(targetState.portalSettings)) {
       targetState.portalSettings = {};
     }
     if (!Array.isArray(targetState.aiUnansweredQueue)) targetState.aiUnansweredQueue = [];
@@ -1694,13 +1694,13 @@ window.SMPL_DB = (function () {
   function revokeServerAdminToken(tokenToRevoke) {
     if (!tokenToRevoke || !isHttpProtocol() || typeof fetch !== 'function') return;
     try {
-      fetch('./api.php?action=admin_logout', {
+      fetch(getAiActionUrl('admin_logout'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-SMPL-Admin-Token': tokenToRevoke
         },
-        body: JSON.stringify({ token: tokenToRevoke })
+        body: JSON.stringify({ token: tokenToRevoke, _adminToken: tokenToRevoke })
       }).catch(() => {});
     } catch (e) {}
   }
@@ -2515,6 +2515,23 @@ state = enrichFromArchive(data.state);
     adm.rejectionReason = reason;
     adm.reviewedBy = masterName;
     adm.reviewedAt = nowFormatted();
+
+    // Zdejmij powiązanie rangi Admina z profilu zawodnika, aby cofnięty admin nie zachował odznaki 🛡️ ADMIN
+    const revNameLow = adm.name ? String(adm.name).trim().toLowerCase() : '';
+    const revUserLow = adm.username ? String(adm.username).trim().toLowerCase() : '';
+    (state.players || []).forEach((pl) => {
+      if (!pl) return;
+      const pNameLow = pl.name ? String(pl.name).trim().toLowerCase() : '';
+      const pUserLow = pl.username ? String(pl.username).trim().toLowerCase() : '';
+      const matchesRevoked =
+        (pl.adminId && String(pl.adminId) === String(adm.id)) ||
+        (pl.isAdminPlayer && ((revUserLow && pUserLow === revUserLow) || (revNameLow && pNameLow === revNameLow)));
+      if (matchesRevoked) {
+        pl.isAdminPlayer = false;
+        delete pl.adminId;
+        delete pl.adminRole;
+      }
+    });
 
     addLog(
       'ADMIN_REVOKE',
@@ -4162,7 +4179,7 @@ state = enrichFromArchive(data.state);
 
   function setSeasonJoinWindow(isOpen, options = {}, adminName = 'Szymon Komenda', onServerResult) {
     assertAdminAuthenticated();
-    if (!state.portalSettings || typeof state.portalSettings !== 'object') {
+    if (!state.portalSettings || typeof state.portalSettings !== 'object' || Array.isArray(state.portalSettings)) {
       state.portalSettings = {};
     }
     const prevPsSnapshot = JSON.parse(JSON.stringify(state.portalSettings));
@@ -4353,8 +4370,8 @@ state = enrichFromArchive(data.state);
         };
 
     const desiredNick = String((options && options.nick) || (player && player.nick) || adm.username || adm.name).trim();
-    const fallbackAvatar = (window.SMPL_MEDIA && typeof window.SMPL_MEDIA.createDefaultAvatarSVG === 'function')
-      ? window.SMPL_MEDIA.createDefaultAvatarSVG(adm.name || 'Admin', '#F59E0B', '#451A03')
+    const fallbackAvatar = (window.SMPL_MEDIA && typeof window.SMPL_MEDIA.generatePlayerAvatar === 'function')
+      ? window.SMPL_MEDIA.generatePlayerAvatar(adm.name || 'Admin', desiredNick || 'ADM', 1)
       : '';
 
     if (player) {
@@ -5298,6 +5315,14 @@ state = enrichFromArchive(data.state);
       'ADMIN_CREDS_UPDATE',
       `🔐 Administrator ${adm.name} zaktualizował swój indywidualny login / hasło dostępowe.`
     );
+    try {
+      const curSess = getSession();
+      if (curSess && curSess.isAdminAuthenticated && String(curSess.adminId) === String(adm.id)) {
+        curSess.adminUsername = adm.username;
+        if (adm.email) curSess.adminEmail = adm.email;
+        saveSession(curSess);
+      }
+    } catch (e) {}
     syncToBackend();
     return {
       ok: true,
@@ -5443,7 +5468,9 @@ state = enrichFromArchive(data.state);
     if (!isHttpProtocol() || typeof fetch !== 'function') {
       return Promise.resolve({ ok: true, localOnly: true });
     }
-    const waitTok = !useAdminToken && serverPlayerTokenPromise ? serverPlayerTokenPromise : Promise.resolve(null);
+    const waitTok = useAdminToken
+      ? (serverAdminTokenPromise || Promise.resolve(null))
+      : (serverPlayerTokenPromise || Promise.resolve(null));
     return waitTok
       .then(() => {
         const headers = { 'Content-Type': 'application/json' };
@@ -5467,7 +5494,7 @@ state = enrichFromArchive(data.state);
             }
           }
         }
-        return fetch('./api.php?action=' + encodeURIComponent(actionName), {
+        return fetch(getAiActionUrl(actionName), {
           method: 'POST',
           headers: headers,
           body: JSON.stringify(wirePayload)
@@ -5495,6 +5522,8 @@ state = enrichFromArchive(data.state);
               state = data.state;
               ensureLeaguesStructure(state);
               ensureClansStructure(state);
+              ensureMasterExtensions(state);
+              ensureCompetitionsStructure(state);
               applyLocalNotifPrefsToState(state);
               try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
             }
@@ -5674,7 +5703,9 @@ state = enrichFromArchive(data.state);
     const seasonNum = Number(state.season || 56);
     const activeIds = getActiveLeagueIds(state).slice();
     (state.players || []).forEach((p) => {
-      if (p && p.leagueId && activeIds.indexOf(p.leagueId) === -1) activeIds.push(p.leagueId);
+      if (p && p.active !== false && p.leagueId && /^L\d{1,2}$/i.test(String(p.leagueId)) && activeIds.indexOf(p.leagueId) === -1) {
+        activeIds.push(p.leagueId);
+      }
     });
     activeIds.sort((a, b) => getLeagueNumber(a) - getLeagueNumber(b));
 
@@ -6019,7 +6050,7 @@ state = enrichFromArchive(data.state);
       throw new Error('⛔ Tylko zalogowany zawodnik lub Administrator może oddać głos w Złotej Piłce.');
     }
 
-    if (!state.goldenBall || typeof state.goldenBall !== 'object') {
+    if (!state.goldenBall || typeof state.goldenBall !== 'object' || Array.isArray(state.goldenBall)) {
       state.goldenBall = { season: state.season || 56, isOpen: true, winnerPlayerId: null, votes: [] };
     }
     if (!Array.isArray(state.goldenBall.votes)) {
@@ -6202,35 +6233,35 @@ state = enrichFromArchive(data.state);
   function ensureCompetitionsStructure(targetState) {
     const st = targetState || state;
     const s = Number((st && st.season) || 56);
-    if (!st.competitions || typeof st.competitions !== 'object') {
+    if (!st.competitions || typeof st.competitions !== 'object' || Array.isArray(st.competitions)) {
       st.competitions = buildDefaultCompetitionsState(s);
     }
     const c = st.competitions;
     const def = buildDefaultCompetitionsState(s);
-    if (!c.cup || typeof c.cup !== 'object') c.cup = def.cup;
+    if (!c.cup || typeof c.cup !== 'object' || Array.isArray(c.cup)) c.cup = def.cup;
     if (!Array.isArray(c.cup.rounds)) c.cup.rounds = [];
     if (c.typerOpen === undefined) c.typerOpen = true;
     if (!Array.isArray(c.typerPredictions)) c.typerPredictions = [];
     if (c.puskasOpen === undefined) c.puskasOpen = true;
     if (!Array.isArray(c.puskasNominations)) c.puskasNominations = [];
-    if (!c.awardedHonors || typeof c.awardedHonors !== 'object') c.awardedHonors = {};
-    if (!c.blitzCup || typeof c.blitzCup !== 'object') c.blitzCup = def.blitzCup;
+    if (!c.awardedHonors || typeof c.awardedHonors !== 'object' || Array.isArray(c.awardedHonors)) c.awardedHonors = {};
+    if (!c.blitzCup || typeof c.blitzCup !== 'object' || Array.isArray(c.blitzCup)) c.blitzCup = def.blitzCup;
     if (!Array.isArray(c.blitzCup.rounds)) c.blitzCup.rounds = [];
-    if (!c.supercup || typeof c.supercup !== 'object') c.supercup = def.supercup;
-    if (!c.playoffs || typeof c.playoffs !== 'object') c.playoffs = def.playoffs;
+    if (!c.supercup || typeof c.supercup !== 'object' || Array.isArray(c.supercup)) c.supercup = def.supercup;
+    if (!c.playoffs || typeof c.playoffs !== 'object' || Array.isArray(c.playoffs)) c.playoffs = def.playoffs;
     if (!Array.isArray(c.playoffs.ties)) c.playoffs.ties = [];
     if (!Array.isArray(c.matchProposals)) c.matchProposals = [];
     if (!Array.isArray(c.matchDisputes)) c.matchDisputes = [];
-    if (!c.fanPolls || typeof c.fanPolls !== 'object') c.fanPolls = {};
+    if (!c.fanPolls || typeof c.fanPolls !== 'object' || Array.isArray(c.fanPolls)) c.fanPolls = {};
     if (!Array.isArray(c.totwHistory)) c.totwHistory = [];
-    if (!c.playerShop || typeof c.playerShop !== 'object') c.playerShop = def.playerShop;
+    if (!c.playerShop || typeof c.playerShop !== 'object' || Array.isArray(c.playerShop)) c.playerShop = def.playerShop;
     if (!c.playerShop.unlocks || typeof c.playerShop.unlocks !== 'object' || Array.isArray(c.playerShop.unlocks)) c.playerShop.unlocks = {};
     if (!c.playerShop.bonusCoins || typeof c.playerShop.bonusCoins !== 'object' || Array.isArray(c.playerShop.bonusCoins)) c.playerShop.bonusCoins = {};
     if (!Array.isArray(c.playerShop.giftHistory)) c.playerShop.giftHistory = [];
-    if (!c.smplTV || typeof c.smplTV !== 'object') c.smplTV = def.smplTV;
-    if (!c.smplTV.liveStream || typeof c.smplTV.liveStream !== 'object') c.smplTV.liveStream = def.smplTV.liveStream;
+    if (!c.smplTV || typeof c.smplTV !== 'object' || Array.isArray(c.smplTV)) c.smplTV = def.smplTV;
+    if (!c.smplTV.liveStream || typeof c.smplTV.liveStream !== 'object' || Array.isArray(c.smplTV.liveStream)) c.smplTV.liveStream = def.smplTV.liveStream;
     if (!Array.isArray(c.smplTV.clips)) c.smplTV.clips = [];
-    if (!c.newsletter || typeof c.newsletter !== 'object') c.newsletter = def.newsletter;
+    if (!c.newsletter || typeof c.newsletter !== 'object' || Array.isArray(c.newsletter)) c.newsletter = def.newsletter;
     if (!Array.isArray(c.newsletter.archive)) c.newsletter.archive = [];
     return c;
   }
@@ -6791,16 +6822,16 @@ state = enrichFromArchive(data.state);
   // WEBHOOKI, SNAPSHOTY 14 DNI, PRZERWA TECHNICZNA, AI OCR SS
   // =========================================================================
   function getMaintenanceMode() {
-    const ps = state && state.portalSettings ? state.portalSettings : {};
+    const ps = state && state.portalSettings && typeof state.portalSettings === 'object' && !Array.isArray(state.portalSettings) ? state.portalSettings : {};
     const m = ps.maintenanceMode;
-    if (!m || typeof m !== 'object') return { enabled: false, message: '' };
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return { enabled: false, message: '' };
     return { enabled: Boolean(m.enabled), message: String(m.message || '') };
   }
 
   function setMaintenanceMode(enabled, message, adminName = 'Szymon Komenda') {
     assertAdminAuthenticated();
-    if (!state.portalSettings || typeof state.portalSettings !== 'object') state.portalSettings = {};
-    const prevMaint = state.portalSettings.maintenanceMode
+    if (!state.portalSettings || typeof state.portalSettings !== 'object' || Array.isArray(state.portalSettings)) state.portalSettings = {};
+    const prevMaint = state.portalSettings.maintenanceMode && typeof state.portalSettings.maintenanceMode === 'object' && !Array.isArray(state.portalSettings.maintenanceMode)
       ? Object.assign({}, state.portalSettings.maintenanceMode)
       : { enabled: false, message: '' };
     const cleanMsg = String(message || '').replace(/<[^>]*>/g, '').trim().slice(0, 220) || 'Trwa przerwa techniczna (losowanie/aktualizacja tabel) — zgłaszanie wyników chwilowo wstrzymane.';
@@ -6828,7 +6859,6 @@ state = enrichFromArchive(data.state);
         }
       }
     );
-    syncToBackend();
     return state.portalSettings.maintenanceMode;
   }
 
@@ -6887,7 +6917,7 @@ state = enrichFromArchive(data.state);
       : (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.todayYmd === 'function' ? window.SMPL_STUDIO.todayYmd() : new Date().toISOString().slice(0, 10));
     const cleanAuthor = String(adminName || 'Administracja SMPL').replace(/<[^>]*>/g, '').trim().slice(0, 60) || 'Administracja SMPL';
 
-    if (!state.portalSettings || typeof state.portalSettings !== 'object') {
+    if (!state.portalSettings || typeof state.portalSettings !== 'object' || Array.isArray(state.portalSettings)) {
       state.portalSettings = {};
     }
     if (!Array.isArray(state.portalSettings.playerUpdates)) {
@@ -7369,7 +7399,7 @@ state = enrichFromArchive(data.state);
   function masterGrantPlayerCoins({ playerId, delta, amount, mode, reason }) {
     const sess = assertMasterAdminAuthenticated();
     const comp = ensureCompetitionsStructure(state);
-    if (!comp.playerShop || typeof comp.playerShop !== 'object') {
+    if (!comp.playerShop || typeof comp.playerShop !== 'object' || Array.isArray(comp.playerShop)) {
       comp.playerShop = { unlocks: {}, bonusCoins: {}, giftHistory: [] };
     }
     if (!comp.playerShop.bonusCoins || typeof comp.playerShop.bonusCoins !== 'object' || Array.isArray(comp.playerShop.bonusCoins)) {
@@ -7910,10 +7940,13 @@ state = enrichFromArchive(data.state);
     if (!isHttpProtocol() || typeof fetch !== 'function') {
       return makeResolvedPromise({ ok: false, offline: true, error: 'Funkcja wymaga serwera HTTP/HTTPS (PHP, Node.js lub server.ps1).' });
     }
-    const tok = resolveAdminRequestToken();
-    const headers = { Accept: 'application/json' };
-    if (tok) headers['X-SMPL-Admin-Token'] = tok;
-    return fetch(getAiActionUrl(actionName), { method: 'GET', cache: 'no-store', headers: headers })
+    const waitTok = serverAdminTokenPromise || Promise.resolve(null);
+    return waitTok.then(() => {
+      const tok = resolveAdminRequestToken();
+      const headers = { Accept: 'application/json' };
+      if (tok) headers['X-SMPL-Admin-Token'] = tok;
+      return fetch(getAiActionUrl(actionName), { method: 'GET', cache: 'no-store', headers: headers });
+    })
       .then((res) => res.json().catch(() => ({ ok: false, error: 'Błąd odpowiedzi serwera (' + res.status + ').' })))
       .catch((err) => ({ ok: false, error: (err && err.message) || 'Błąd sieci.' }));
   }
@@ -7923,10 +7956,19 @@ state = enrichFromArchive(data.state);
     if (!isHttpProtocol() || typeof fetch !== 'function') {
       return makeResolvedPromise({ ok: false, offline: true, error: 'Funkcja wymaga serwera HTTP/HTTPS.' });
     }
-    const tok = resolveAdminRequestToken();
-    const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
-    if (tok) headers['X-SMPL-Admin-Token'] = tok;
-    return fetch(getAiActionUrl(actionName), { method: 'POST', headers: headers, body: JSON.stringify(payloadObj || {}) })
+    const waitTok = serverAdminTokenPromise || Promise.resolve(null);
+    return waitTok.then(() => {
+      const tok = resolveAdminRequestToken();
+      const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+      const bodyObj = (payloadObj && typeof payloadObj === 'object' && !Array.isArray(payloadObj))
+        ? Object.assign({}, payloadObj)
+        : {};
+      if (tok) {
+        headers['X-SMPL-Admin-Token'] = tok;
+        bodyObj._adminToken = tok;
+      }
+      return fetch(getAiActionUrl(actionName), { method: 'POST', headers: headers, body: JSON.stringify(bodyObj) });
+    })
       .then((res) => res.json().catch(() => ({ ok: false, error: 'Błąd odpowiedzi serwera (' + res.status + ').' })))
       .catch((err) => ({ ok: false, error: (err && err.message) || 'Błąd sieci.' }));
   }
@@ -7940,10 +7982,12 @@ state = enrichFromArchive(data.state);
   function fetchSnapshotsList() { return callAdminServerGet('snapshots_list'); }
 
   function restoreServerSnapshot(snapshotName) {
+    assertMasterAdminAuthenticated();
     return callAdminServerPost('snapshot_restore', { name: snapshotName }).then((data) => {
       if (data && data.ok && data.state && Array.isArray(data.state.players)) {
         captureServerArchiveSnapshot(data.state);
-state = enrichFromArchive(data.state);
+        state = ensureMasterExtensions(enrichFromArchive(data.state));
+        ensureCompetitionsStructure(state);
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
       }
       return data;
@@ -8559,7 +8603,7 @@ state = enrichFromArchive(data.state);
   }
 
   function clearAllTablesForFreshSeason56(adminName = 'Szymon Komenda', options = null) {
-    assertAdminAuthenticated();
+    assertMasterAdminAuthenticated();
     const opts = options && typeof options === 'object' ? options : {};
     const targetSeason = Math.max(1, Number(opts.seasonNumber) || 56);
     state.season = targetSeason;
@@ -8807,7 +8851,7 @@ state = enrichFromArchive(data.state);
   }
 
   function startFreshSeason56(adminName = 'Szymon Komenda') {
-    assertAdminAuthenticated();
+    assertMasterAdminAuthenticated();
     const targetSeason = Math.max(56, Number(state.season || 56));
     state.season = targetSeason;
     state.seasonName = `Sezon ${targetSeason} — Oficjalny Start Rozgrywek (Czysta Tabela 0:0)`;
@@ -9189,7 +9233,7 @@ state = enrichFromArchive(data.state);
       totalRounds: Number((prev && prev.totalRounds) || 15)
     };
 
-    if (!state.customCrests) state.customCrests = {};
+    if (!state.customCrests || typeof state.customCrests !== 'object' || Array.isArray(state.customCrests)) state.customCrests = {};
     if (typeof state.customCrests[targetId] === 'undefined') {
       state.customCrests[targetId] = null;
     }
@@ -9261,11 +9305,11 @@ state = enrichFromArchive(data.state);
   }
 
   function resetDatabaseToSeed() {
-    assertAdminAuthenticated();
-    state = enrichFromArchive(window.SMPL_SEED.buildInitialDatabase());
+    assertMasterAdminAuthenticated();
+    state = ensureMasterExtensions(enrichFromArchive(window.SMPL_SEED.buildInitialDatabase()));
     state.version = TARGET_VERSION;
     seedSeenMessageIds(state);
-    syncToBackend();
+    syncToBackend({ allowBulkPlayerWipe: true });
     return state;
   }
 
@@ -10671,13 +10715,16 @@ state = enrichFromArchive(data.state);
         error: 'Konfiguracja klucza Gemini API wymaga uruchomienia portalu przez serwer (http/https: Hostido PHP lub node server.js).'
       });
     }
-    const tok = resolveAdminRequestToken();
-    const headers = { Accept: 'application/json' };
-    if (tok) headers['X-SMPL-Admin-Token'] = tok;
-    return fetch(getAiActionUrl('ai_config_get'), {
-      method: 'GET',
-      cache: 'no-store',
-      headers: headers
+    const waitTok = serverAdminTokenPromise || Promise.resolve(null);
+    return waitTok.then(() => {
+      const tok = resolveAdminRequestToken();
+      const headers = { Accept: 'application/json' };
+      if (tok) headers['X-SMPL-Admin-Token'] = tok;
+      return fetch(getAiActionUrl('ai_config_get'), {
+        method: 'GET',
+        cache: 'no-store',
+        headers: headers
+      });
     })
       .then((res) => res.json().catch(() => ({ ok: false, error: 'Błąd odpowiedzi serwera (' + res.status + ').' })))
       .then((data) => {
@@ -10695,7 +10742,7 @@ state = enrichFromArchive(data.state);
   }
 
   function saveAiGeminiConfig(cfg) {
-    assertAdminAuthenticated();
+    assertMasterAdminAuthenticated();
     if (!isHttpProtocol() || typeof fetch !== 'function') {
       return makeResolvedPromise({
         ok: false,
@@ -10703,13 +10750,20 @@ state = enrichFromArchive(data.state);
         error: 'Zapis klucza Gemini API działa w trybie serwerowym (Hostido PHP lub lokalnie node server.js).'
       });
     }
-    const tok = resolveAdminRequestToken();
-    const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
-    if (tok) headers['X-SMPL-Admin-Token'] = tok;
-    return fetch(getAiActionUrl('ai_config_save'), {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(cfg || {})
+    const waitTok = serverAdminTokenPromise || Promise.resolve(null);
+    return waitTok.then(() => {
+      const tok = resolveAdminRequestToken();
+      const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+      const bodyObj = (cfg && typeof cfg === 'object' && !Array.isArray(cfg)) ? Object.assign({}, cfg) : {};
+      if (tok) {
+        headers['X-SMPL-Admin-Token'] = tok;
+        bodyObj._adminToken = tok;
+      }
+      return fetch(getAiActionUrl('ai_config_save'), {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(bodyObj)
+      });
     })
       .then((res) => res.json().catch(() => ({ ok: false, error: 'Błąd zapisu konfiguracji (' + res.status + ').' })))
       .then((data) => {
@@ -10735,13 +10789,20 @@ state = enrichFromArchive(data.state);
         error: 'Test na żywo z Google Gemini wymaga uruchomienia przez http:// lub https:// (node server.js lub Hostido).'
       });
     }
-    const tok = resolveAdminRequestToken();
-    const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
-    if (tok) headers['X-SMPL-Admin-Token'] = tok;
-    return fetch(getAiActionUrl('ai_test'), {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(overrideCfg || {})
+    const waitTok = serverAdminTokenPromise || Promise.resolve(null);
+    return waitTok.then(() => {
+      const tok = resolveAdminRequestToken();
+      const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+      const bodyObj = (overrideCfg && typeof overrideCfg === 'object' && !Array.isArray(overrideCfg)) ? Object.assign({}, overrideCfg) : {};
+      if (tok) {
+        headers['X-SMPL-Admin-Token'] = tok;
+        bodyObj._adminToken = tok;
+      }
+      return fetch(getAiActionUrl('ai_test'), {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(bodyObj)
+      });
     })
       .then((res) => res.json().catch(() => ({ ok: false, error: 'Nieprawidłowa odpowiedź serwera podczas testu (' + res.status + ').' })))
       .catch((err) => ({ ok: false, error: (err && err.message) || 'Błąd połączenia z serwerem testowym.' }));
@@ -10806,7 +10867,8 @@ state = enrichFromArchive(data.state);
     const st = targetState || state;
     if (!st) return st;
     if (!Array.isArray(st.customRanks)) st.customRanks = [];
-    if (!st.portalSettings || typeof st.portalSettings !== 'object') st.portalSettings = {};
+    if (!st.portalSettings || typeof st.portalSettings !== 'object' || Array.isArray(st.portalSettings)) st.portalSettings = {};
+    if (!st.customCrests || typeof st.customCrests !== 'object' || Array.isArray(st.customCrests)) st.customCrests = {};
     return st;
   }
 
@@ -11000,18 +11062,6 @@ state = enrichFromArchive(data.state);
     ps.updatedBy = adminName;
 
     addLog('MASTER_SETTINGS', `⚙️ Master ${adminName} zaktualizował globalne ustawienia portalu (Sezon ${state.season}, Tydzień ${state.weeklyConfig.currentWeek}).`);
-    if (maintChanged && ps.maintenanceMode) {
-      sendAtomicAdminAction(
-        'admin_set_maintenance',
-        { enabled: Boolean(ps.maintenanceMode.enabled), message: ps.maintenanceMode.message || '' },
-        () => {
-          if (state && state.portalSettings && prevMaintSnap) {
-            state.portalSettings.maintenanceMode = prevMaintSnap;
-          }
-        },
-        { maintenanceMode: ps.maintenanceMode }
-      );
-    }
     syncToBackend();
     return state.portalSettings;
   }
@@ -11052,7 +11102,7 @@ state = enrichFromArchive(data.state);
   function getSupportConfig(targetState) {
     const st = targetState || state;
     const def = getDefaultSupportConfig();
-    const raw = (st && st.portalSettings && st.portalSettings.supportConfig && typeof st.portalSettings.supportConfig === 'object')
+    const raw = (st && st.portalSettings && st.portalSettings.supportConfig && typeof st.portalSettings.supportConfig === 'object' && !Array.isArray(st.portalSettings.supportConfig))
       ? st.portalSettings.supportConfig
       : {};
     const merged = Object.assign({}, def, raw);
@@ -11294,8 +11344,9 @@ state = enrichFromArchive(data.state);
       if (currentMaster) parsed.admins.unshift(JSON.parse(JSON.stringify(currentMaster)));
     }
     state = ensureMasterExtensions(enrichFromArchive(parsed));
+    ensureCompetitionsStructure(state);
     addLog('MASTER_DB_IMPORT', `📥 Master ${adminName} wczytał pełną kopię zapasową bazy danych JSON (${state.players.length} graczy, ${state.matches.length} meczów).`);
-    syncToBackend();
+    syncToBackend({ allowBulkPlayerWipe: true });
     return state;
   }
 

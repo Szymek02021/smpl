@@ -1036,7 +1036,13 @@ window.SMPL_VIEWS = (function () {
     }
 
     const isAdmin = Boolean(window.SMPL_DB ? window.SMPL_DB.isStrictAdminSession(session) : (session && session.isAdminAuthenticated && session.linkMode !== 'PUBLIC'));
-    const isLoggedInPlayer = Boolean(session && !session.isGuest && session.isPlayerAuthenticated && session.activePlayerId);
+    const adminLinkedPlayer = (isAdmin && window.SMPL_DB && typeof window.SMPL_DB.findPlayerForAdmin === 'function')
+      ? window.SMPL_DB.findPlayerForAdmin(session.adminId, state)
+      : null;
+    const myEffectivePlayerId = (session && !session.isGuest && session.isPlayerAuthenticated && session.activePlayerId)
+      ? session.activePlayerId
+      : (adminLinkedPlayer && adminLinkedPlayer.id ? adminLinkedPlayer.id : '');
+    const isLoggedInPlayer = Boolean(myEffectivePlayerId);
     const compSched = (state && state.competitions) ? state.competitions : {};
     const allProposals = Array.isArray(compSched.matchProposals) ? compSched.matchProposals : [];
     const allDisputes = Array.isArray(compSched.matchDisputes) ? compSched.matchDisputes : [];
@@ -1049,7 +1055,7 @@ window.SMPL_VIEWS = (function () {
           m.status === 'SCHEDULED' &&
           Number(m.round) >= myWeekStart &&
           Number(m.round) <= myWeekEnd &&
-          (m.homeId === session.activePlayerId || m.awayId === session.activePlayerId)
+          (m.homeId === myEffectivePlayerId || m.awayId === myEffectivePlayerId)
         )
       : [];
 
@@ -1138,7 +1144,7 @@ window.SMPL_VIEWS = (function () {
                         </button>`
                      : ''
                  }
-                 <button type="button" onclick="SMPL_APP.openSmplWrappedModal('${escapeHtml(session.activePlayerId)}')" class="px-3 py-1.5 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-400/40 text-xs font-display font-bold uppercase transition">
+                 <button type="button" onclick="SMPL_APP.openSmplWrappedModal('${escapeHtml(myEffectivePlayerId)}')" class="px-3 py-1.5 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-400/40 text-xs font-display font-bold uppercase transition">
                    🎁 Moje SMPL Wrapped
                  </button>
                </div>
@@ -1240,8 +1246,8 @@ window.SMPL_VIEWS = (function () {
                               : ''
                           }
                           ${
-                            m.status === 'SCHEDULED' && !home.isBye && !away.isBye && (isAdmin || (isLoggedInPlayer && (m.homeId === session.activePlayerId || m.awayId === session.activePlayerId)))
-                              ? `<button type="button" onclick="SMPL_APP.openMessengerForPlayer('${!isAdmin && session.activePlayerId === m.homeId ? away.id : home.id}')" class="px-2.5 py-1 rounded-lg bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-400/40 text-xs font-bold transition flex items-center gap-1">💬 Napisz na Messengerze</button>
+                            m.status === 'SCHEDULED' && !home.isBye && !away.isBye && (isAdmin || (isLoggedInPlayer && (m.homeId === myEffectivePlayerId || m.awayId === myEffectivePlayerId)))
+                              ? `<button type="button" onclick="SMPL_APP.openMessengerForPlayer('${myEffectivePlayerId && myEffectivePlayerId === m.homeId ? away.id : home.id}')" class="px-2.5 py-1 rounded-lg bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-400/40 text-xs font-bold transition flex items-center gap-1">💬 Napisz na Messengerze</button>
                                  <button type="button" onclick="SMPL_APP.openMatchProposalModal('${m.id}')" class="px-2.5 py-1 rounded-lg bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-400/40 text-xs font-bold transition flex items-center gap-1">📅 Kiedy Gramy?</button>`
                               : ''
                           }

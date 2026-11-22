@@ -124,6 +124,10 @@
     if (!matches.length) return null;
 
     var myPlayerId = session && session.activePlayerId ? session.activePlayerId : '';
+    if (!myPlayerId && session && window.SMPL_DB && typeof window.SMPL_DB.isStrictAdminSession === 'function' && window.SMPL_DB.isStrictAdminSession(session) && typeof window.SMPL_DB.findPlayerForAdmin === 'function') {
+      var admLinkedPl = window.SMPL_DB.findPlayerForAdmin(session.adminId, state);
+      if (admLinkedPl && admLinkedPl.id) myPlayerId = admLinkedPl.id;
+    }
     if (myPlayerId) {
       for (var i = 0; i < matches.length; i++) {
         if (matches[i].homeId === myPlayerId || matches[i].awayId === myPlayerId) {

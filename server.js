@@ -136,11 +136,22 @@ function validateAdminTokenHeader(req, db, bodyObj) {
   const tokens = loadTokens();
   const info = tokens[tokHash];
   if (!info || (info.tokenType && info.tokenType !== 'ADMIN')) return null;
+  const resolved = Object.assign({}, info);
   if (db && Array.isArray(db.admins)) {
     const adm = db.admins.find((a) => a && String(a.id) === String(info.adminId));
     if (!adm || (adm.status && adm.status !== 'APPROVED')) return null;
+    if (adm.role) resolved.role = String(adm.role);
+    if (adm.name) {
+      resolved.adminName = String(adm.name);
+      resolved.name = String(adm.name);
+    } else if (resolved.adminName && !resolved.name) {
+      resolved.name = String(resolved.adminName);
+    }
+    if (adm.username) resolved.username = String(adm.username);
+  } else if (resolved.adminName && !resolved.name) {
+    resolved.name = String(resolved.adminName);
   }
-  return info;
+  return resolved;
 }
 
 function validatePlayerTokenHeader(req, bodyObj) {
@@ -352,6 +363,31 @@ function validateCoAdminAdminsGuardLocal(prevDb, newDb, callerAdminId) {
     : {};
   if (!deepJsonEqLocal(prevBonusCoins, newBonusCoins)) {
     return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może przyznawać lub zmieniać bonusowe SMPL Coins.';
+  }
+  const prevCustomRanks = (prevDb && Array.isArray(prevDb.customRanks)) ? prevDb.customRanks : [];
+  const newCustomRanks = (newDb && Array.isArray(newDb.customRanks)) ? newDb.customRanks : [];
+  if (!deepJsonEqLocal(prevCustomRanks, newCustomRanks)) {
+    return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może tworzyć, edytować lub usuwać własne rangi specjalne.';
+  }
+  const prevPs = (prevDb && prevDb.portalSettings && typeof prevDb.portalSettings === 'object' && !Array.isArray(prevDb.portalSettings)) ? prevDb.portalSettings : {};
+  const newPs = (newDb && newDb.portalSettings && typeof newDb.portalSettings === 'object' && !Array.isArray(newDb.portalSettings)) ? newDb.portalSettings : {};
+  for (const brandKey of ['heroBadge', 'heroTitle', 'heroSubtitle', 'announcementText', 'announcementActive']) {
+    const pb = Object.prototype.hasOwnProperty.call(prevPs, brandKey) ? prevPs[brandKey] : null;
+    const nb = Object.prototype.hasOwnProperty.call(newPs, brandKey) ? newPs[brandKey] : null;
+    if (!deepJsonEqLocal(pb, nb)) {
+      return `Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może zmieniać główny banner i pasek ogłoszeń portalu (${brandKey}).`;
+    }
+  }
+  const prevClans = (prevDb && Array.isArray(prevDb.clans)) ? prevDb.clans : [];
+  const newClans = (newDb && Array.isArray(newDb.clans)) ? newDb.clans : [];
+  const prevClansMap = {};
+  const newClansMap = {};
+  prevClans.forEach((c) => { if (c && c.id != null) prevClansMap[String(c.id)] = c; });
+  newClans.forEach((c) => { if (c && c.id != null) newClansMap[String(c.id)] = c; });
+  for (const cid of Object.keys(prevClansMap)) {
+    if (!Object.prototype.hasOwnProperty.call(newClansMap, cid) || !deepJsonEqLocal(prevClansMap[cid], newClansMap[cid])) {
+      return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może edytować lub usuwać istniejące klany.';
+    }
   }
   return null;
 }
@@ -1313,9 +1349,13 @@ const server = http.createServer((req, res) => {
           const rawToken = crypto.randomBytes(24).toString('hex');
           const tokHash = crypto.createHash('sha256').update(rawToken).digest('hex');
           const tokens = loadTokens();
+          const admDisplayName = matched.name || 'Admin';
+          const admUsernameVal = String(matched.username || '');
           tokens[tokHash] = {
             adminId: String(matched.id),
-            adminName: matched.name || 'Admin',
+            adminName: admDisplayName,
+            name: admDisplayName,
+            username: admUsernameVal,
             role: matched.role || 'CO_ADMIN',
             issuedAt: Math.floor(Date.now() / 1000),
             expiresAt: Math.floor(Date.now() / 1000) + 604800
@@ -1325,13 +1365,16 @@ const server = http.createServer((req, res) => {
             ok: true,
             token: rawToken,
             adminId: String(matched.id),
-            adminName: matched.name || 'Admin',
+            adminName: admDisplayName,
+            username: admUsernameVal,
             role: matched.role || 'CO_ADMIN'
           });
         }
 
         if (action === 'admin_logout') {
-          const tok = String(req.headers['x-smpl-admin-token'] || '').trim();
+          let logoutBody = {};
+          try { logoutBody = JSON.parse(body || '{}') || {}; } catch (e) {}
+          const tok = String(req.headers['x-smpl-admin-token'] || logoutBody._adminToken || logoutBody.token || '').trim();
           if (tok) {
             const tokHash = crypto.createHash('sha256').update(tok).digest('hex');
             const tokens = loadTokens();
@@ -2193,7 +2236,7 @@ const server = http.createServer((req, res) => {
           if (approveAll) {
             prevDb.registrations.forEach((rg) => {
               if (!rg || rg.status !== 'PENDING') return;
-              if (typeof isBlacklistedMatchLocal === 'function' && isBlacklistedMatchLocal(prevDb, rg.name, rg.nick, rg.fbLink)) return;
+              if (isOnBlacklistLocal(prevDb, foldPlCharsLocal(rg.name || ''), foldPlCharsLocal(rg.nick || ''), String(rg.fbLink || '').trim().toLowerCase())) return;
               rg.status = 'APPROVED_POOL';
               rg.reviewedBy = admName;
               rg.reviewedAt = nowFmt;
@@ -2203,6 +2246,9 @@ const server = http.createServer((req, res) => {
             const targetReg = prevDb.registrations.find((rg) => rg && String(rg.id) === regId);
             if (!targetReg) {
               return sendJson(res, 404, { ok: false, error: 'Nie znaleziono zgłoszenia rekrutacyjnego na serwerze.' });
+            }
+            if (isOnBlacklistLocal(prevDb, foldPlCharsLocal(targetReg.name || ''), foldPlCharsLocal(targetReg.nick || ''), String(targetReg.fbLink || '').trim().toLowerCase())) {
+              return sendJson(res, 403, { ok: false, error: '⛔ Gracz widnieje na Czarnej Liście SMPL i nie może zostać zatwierdzony do Puli Graczy.' });
             }
             if (targetReg.status !== 'APPROVED_POOL') {
               targetReg.status = 'APPROVED_POOL';
@@ -2250,14 +2296,14 @@ const server = http.createServer((req, res) => {
           if (!db || !Array.isArray(db.players)) {
             return sendJson(res, 400, { ok: false, error: 'Brak prawidłowej bazy danych SMPL na serwerze.' });
           }
-          const admInfo = validateAdminTokenHeader(req, db);
-          const pAuth = !admInfo ? validatePlayerTokenHeader(req) : null;
-          if (!admInfo && !pAuth) {
-            return sendJson(res, 401, { ok: false, error: 'Wymagane uwierzytelnienie konta (X-SMPL-Player-Token lub X-SMPL-Admin-Token).' });
-          }
           let payload = {};
           try { payload = JSON.parse(body || '{}') || {}; } catch (e) {
             return sendJson(res, 400, { ok: false, error: 'Nieprawidłowy format JSON danych profilu.' });
+          }
+          const admInfo = validateAdminTokenHeader(req, db, payload);
+          const pAuth = !admInfo ? validatePlayerTokenHeader(req, payload) : null;
+          if (!admInfo && !pAuth) {
+            return sendJson(res, 401, { ok: false, error: 'Wymagane uwierzytelnienie konta (X-SMPL-Player-Token lub X-SMPL-Admin-Token).' });
           }
           const hasAvatar = Object.prototype.hasOwnProperty.call(payload, 'avatar');
           const hasBio = Object.prototype.hasOwnProperty.call(payload, 'bio');
@@ -2456,7 +2502,7 @@ const server = http.createServer((req, res) => {
           if (isAdmActor) {
             const admId = String(adm.adminId || 'ADM');
             actorId = 'ADM_' + admId;
-            actorName = String(adm.name || 'Administrator');
+            actorName = String(adm.adminName || adm.name || 'Administrator');
             const admNameLow = actorName.trim().toLowerCase();
             const admUserLow = String(adm.username || '').trim().toLowerCase();
             const linked =
@@ -2967,9 +3013,9 @@ const server = http.createServer((req, res) => {
 
         if (action === 'push_subscribe' || action === 'push_unsubscribe' || action === 'push_set_muted' || action === 'push_test') {
           const db = readDbJson();
-          const adm = db ? validateAdminTokenHeader(req, db) : null;
-          const pAuth = !adm ? validatePlayerTokenHeader(req) : null;
           let b = {}; try { b = JSON.parse(body || '{}') || {}; } catch (e) {}
+          const adm = db ? validateAdminTokenHeader(req, db, b) : null;
+          const pAuth = !adm ? validatePlayerTokenHeader(req, b) : null;
           const subs = readPushSubsLocal();
           if (action === 'push_unsubscribe') {
             const ep = String(b.endpoint || '').trim();
@@ -3003,7 +3049,15 @@ const server = http.createServer((req, res) => {
             if (adm) {
               verifiedIsAdmin = true;
               verifiedAdminId = String(adm.adminId || '');
-              const linked = db && Array.isArray(db.players) ? db.players.find((p) => p && String(p.adminId || '') === verifiedAdminId) : null;
+              const admNameLowPush = String(adm.adminName || adm.name || '').trim().toLowerCase();
+              const admUserLowPush = String(adm.username || '').trim().toLowerCase();
+              const linked = db && Array.isArray(db.players)
+                ? (db.players.find((p) => p && !p.isPlaceholder && !p.gdprDeleted && String(p.adminId || '') === verifiedAdminId) ||
+                   db.players.find((p) => p && !p.isPlaceholder && !p.gdprDeleted && (
+                     (admUserLowPush && String(p.username || '').trim().toLowerCase() === admUserLowPush) ||
+                     (admNameLowPush && String(p.name || '').trim().toLowerCase() === admNameLowPush)
+                   )))
+                : null;
               if (linked) { verifiedPid = String(linked.id); verifiedLeagueId = String(linked.leagueId || ''); }
             } else if (pAuth && pAuth.info && String(pAuth.info.subjectKind || 'PLAYER') === 'PLAYER') {
               verifiedPid = String(pAuth.info.subjectId || '');
@@ -3054,9 +3108,9 @@ const server = http.createServer((req, res) => {
 
         if (action === 'webhooks_save' || action === 'webhooks_test' || action === 'webhooks_broadcast') {
           const db = readDbJson();
-          const adm = validateAdminTokenHeader(req, db);
-          if (!adm) return sendJson(res, 403, { ok: false, error: 'Zarządzanie webhookami wymaga sesji Administratora.' });
           let b = {}; try { b = JSON.parse(body || '{}') || {}; } catch (e) {}
+          const adm = validateAdminTokenHeader(req, db, b);
+          if (!adm) return sendJson(res, 403, { ok: false, error: 'Zarządzanie webhookami wymaga sesji Administratora.' });
           const cfg = readWebhooksConfigLocal();
           if (action === 'webhooks_save') {
             if (b.enabled !== undefined) cfg.enabled = Boolean(b.enabled);
@@ -3078,15 +3132,54 @@ const server = http.createServer((req, res) => {
             const r2 = await dispatchWebhooksLocal('TEST', '🛡️ Test kanału Administracji SMPL', 'Kanał moderacji działa poprawnie!', true);
             return sendJson(res, 200, { ok: Boolean(r1.ok || r2.ok), public: r1, admin: r2 });
           }
-          const rB = await dispatchWebhooksLocal('BROADCAST', String(b.title || '📢 Ogłoszenie SMPL').slice(0, 180), String(b.message || '').slice(0, 1400), Boolean(b.adminOnly));
-          return sendJson(res, 200, rB);
+          const bTitle = String(b.title || '📢 Ogłoszenie SMPL').slice(0, 180);
+          const bMsg = String(b.message || '').slice(0, 1400);
+          const admOnlyB = Boolean(b.adminOnly);
+          const rB = await dispatchWebhooksLocal('BROADCAST', bTitle, bMsg, admOnlyB);
+          let pushSent = 0;
+          try {
+            const subs = readPushSubsLocal();
+            const bItems = [];
+            Object.keys(subs || {}).forEach((hK) => {
+              const sObj = subs[hK];
+              if (!sObj || sObj.muted || !sObj.endpoint) return;
+              if (admOnlyB && !sObj.isAdmin) return;
+              bItems.push({
+                hash: hK,
+                sub: sObj,
+                payload: {
+                  title: bTitle.slice(0, 110),
+                  body: bMsg.slice(0, 180),
+                  tag: 'smpl-broadcast-' + Date.now(),
+                  tab: admOnlyB ? 'admin' : 'standings',
+                  url: admOnlyB ? './PANEL-ADMINA.html' : './index.html'
+                }
+              });
+            });
+            if (bItems.length > 0) {
+              const pRes = await sendWebPushBatchLocal(bItems.slice(0, 80));
+              if (pRes && typeof pRes.sent === 'number') pushSent = pRes.sent;
+            }
+          } catch (ePush) {}
+          const webhooksOk = Boolean(rB && rB.ok);
+          const outB = Object.assign({}, rB || {}, {
+            webhooksOk,
+            pushSent,
+            ok: Boolean(webhooksOk || pushSent > 0)
+          });
+          if (!outB.ok && !outB.error) {
+            outB.error = 'Brak skonfigurowanych webhooków Discord/Telegram oraz aktywnych subskrypcji Web Push.';
+          }
+          return sendJson(res, 200, outB);
         }
 
         if (action === 'snapshot_restore') {
           const db = readDbJson();
-          const adm = validateAdminTokenHeader(req, db);
-          if (!adm) return sendJson(res, 403, { ok: false, error: 'Przywracanie kopii wymaga sesji Administratora.' });
           let b = {}; try { b = JSON.parse(body || '{}') || {}; } catch (e) {}
+          const adm = validateAdminTokenHeader(req, db, b);
+          if (!adm || String(adm.role || '') !== 'MASTER_ADMIN') {
+            return sendJson(res, 403, { ok: false, error: '⛔ Przywracanie kopii zapasowej (Snapshot) jest zastrzeżone wyłącznie dla Master Admina (Szymon Komenda).' });
+          }
           const snapName = path.basename(String(b.name || '').trim());
           if (!/^smpl-db-[A-Za-z0-9_-]+\.json$/.test(snapName)) return sendJson(res, 400, { ok: false, error: 'Nieprawidłowa nazwa kopii zapasowej.' });
           const snapPath = path.join(SNAPSHOTS_DIR, snapName);
@@ -3103,10 +3196,10 @@ const server = http.createServer((req, res) => {
 
         if (action === 'ai_verify_match_ss') {
           const db = readDbJson();
-          const adm = validateAdminTokenHeader(req, db);
-          const pAuth = !adm ? validatePlayerTokenHeader(req) : null;
-          if (!adm && !pAuth) return sendJson(res, 401, { ok: false, error: 'Zaloguj się, aby sprawdzić SS przez AI.' });
           let b = {}; try { b = JSON.parse(body || '{}') || {}; } catch (e) {}
+          const adm = validateAdminTokenHeader(req, db, b);
+          const pAuth = !adm ? validatePlayerTokenHeader(req, b) : null;
+          if (!adm && !pAuth) return sendJson(res, 401, { ok: false, error: 'Zaloguj się, aby sprawdzić SS przez AI.' });
           const rawUrl = String(b.screenshot || '').trim();
           const mImg = rawUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=]+)$/i);
           if (!mImg) return sendJson(res, 400, { ok: false, error: 'Brak poprawnego screena base64.' });
@@ -3127,13 +3220,13 @@ const server = http.createServer((req, res) => {
 
         if (action === 'ai_config_save') {
           const db = readDbJson();
-          const adm = validateAdminTokenHeader(req, db);
-          if (!adm) {
-            return sendJson(res, 403, { ok: false, error: 'Odmowa zapisu konfiguracji AI: wymagana sesja Administratora z ważnym tokenem.' });
-          }
           let cfgIn = {};
           try { cfgIn = JSON.parse(body || '{}'); } catch (e) {
             return sendJson(res, 400, { ok: false, error: 'Nieprawidłowy JSON konfiguracji AI.' });
+          }
+          const adm = validateAdminTokenHeader(req, db, cfgIn);
+          if (!adm || String(adm.role || '') !== 'MASTER_ADMIN') {
+            return sendJson(res, 403, { ok: false, error: '⛔ Wyłącznie Master Admin (Szymon Komenda) może zmieniać lub usuwać konfigurację klucza Google Gemini API.' });
           }
           const cfg = readAiSecrets();
           if (cfgIn.clearKey) {
@@ -3173,12 +3266,12 @@ const server = http.createServer((req, res) => {
 
         if (action === 'ai_test') {
           const db = readDbJson();
-          const adm = validateAdminTokenHeader(req, db);
+          let testIn = {};
+          try { testIn = JSON.parse(body || '{}'); } catch (e) {}
+          const adm = validateAdminTokenHeader(req, db, testIn);
           if (!adm) {
             return sendJson(res, 403, { ok: false, error: 'Test Gemini API wymaga sesji Administratora z ważnym tokenem.' });
           }
-          let testIn = {};
-          try { testIn = JSON.parse(body || '{}'); } catch (e) {}
           const cfg = readAiSecrets();
           const resolved = resolveGeminiKey(cfg);
           const testKey = (testIn.apiKey && String(testIn.apiKey).trim()) || resolved.key;
@@ -3403,9 +3496,10 @@ const server = http.createServer((req, res) => {
               fs.copyFileSync(DB_FILE, BACKUP_FILE);
             } catch (e) {}
           }
-          // OCHRONA SERWEROWA (v53): Zapobieganie utracie kont graczy i trofeów/historii S1-S55 przy pełnej synchronizacji POST
+          // OCHRONA SERWEROWA (v53/v68): Zapobieganie utracie kont graczy i trofeów/historii S1-S55 przy pełnej synchronizacji POST
+          const isMasterAdminCaller = Boolean(admInfo && String(admInfo.role || '') === 'MASTER_ADMIN');
           const allowHardDeleteId = admInfo ? String(parsed.allowHardDeletePlayerId || '').trim() : '';
-          const allowBulkWipe = Boolean(admInfo && parsed.allowBulkPlayerWipe);
+          const allowBulkWipe = Boolean(isMasterAdminCaller && parsed.allowBulkPlayerWipe);
           if (Object.prototype.hasOwnProperty.call(parsed, 'allowHardDeletePlayerId')) delete parsed.allowHardDeletePlayerId;
           if (Object.prototype.hasOwnProperty.call(parsed, 'allowBulkPlayerWipe')) delete parsed.allowBulkPlayerWipe;
           if (prevDb && Array.isArray(prevDb.players) && Array.isArray(parsed.players)) {
@@ -3421,11 +3515,15 @@ const server = http.createServer((req, res) => {
               if (!oldP || typeof oldP !== 'object' || oldP.isPlaceholder || oldP.gdprDeleted) return;
               const oldId = String(oldP.id || '');
               const oldUser = String(oldP.username || '').trim().toLowerCase();
+              const isUatBot = Boolean(oldP.isUatTester || oldId.indexOf('UAT_') === 0);
               let matchedIdx = null;
               if (oldId && newById.has(oldId)) matchedIdx = newById.get(oldId);
               else if (oldUser && newByUser.has(oldUser)) matchedIdx = newByUser.get(oldUser);
               if (matchedIdx === null) {
-                if (!allowBulkWipe && (!allowHardDeleteId || allowHardDeleteId !== oldId)) {
+                const canDeleteThisPlayer = allowBulkWipe
+                  || (allowHardDeleteId && allowHardDeleteId === oldId)
+                  || (Boolean(admInfo) && isUatBot);
+                if (!canDeleteThisPlayer) {
                   const restoredP = Object.assign({}, oldP, {
                     leagueId: 'POOL',
                     active: false,
@@ -3437,7 +3535,7 @@ const server = http.createServer((req, res) => {
                   if (oldId) newById.set(oldId, addedIdx);
                   if (oldUser) newByUser.set(oldUser, addedIdx);
                 }
-              } else {
+              } else if (!allowBulkWipe) {
                 const oldHasTrophies = Array.isArray(oldP.trophies) && oldP.trophies.length > 0;
                 const oldHasHist = oldP.historicalStats && typeof oldP.historicalStats === 'object' && Object.keys(oldP.historicalStats).length > 0;
                 const curPl = parsed.players[matchedIdx];

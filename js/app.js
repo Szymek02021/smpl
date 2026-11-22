@@ -1749,9 +1749,10 @@ window.SMPL_APP = (function () {
   }
 
   function masterApproveAdmin(adminId) {
-    if (!requireStrictAdmin('zatwierdzanie administratorów')) return;
+    if (!requireMasterAdmin('zatwierdzanie administratorów')) return;
+    const session = window.SMPL_DB.getSession();
     try {
-      const adm = window.SMPL_DB.approveAdminApplication(adminId, 'Szymon Komenda');
+      const adm = window.SMPL_DB.approveAdminApplication(adminId, (session && session.adminName) || 'Szymon Komenda');
       showToast(`✅ Zatwierdziłeś użytkownika ${adm.name} (@${adm.username}) jako Administratora! Może się już zalogować.`);
       renderAll();
     } catch (err) {
@@ -1760,9 +1761,10 @@ window.SMPL_APP = (function () {
   }
 
   function masterRejectAdmin(adminId) {
-    if (!requireStrictAdmin('odbieranie uprawnień administratora')) return;
+    if (!requireMasterAdmin('odbieranie uprawnień administratora')) return;
+    const session = window.SMPL_DB.getSession();
     try {
-      const adm = window.SMPL_DB.rejectOrRevokeAdmin(adminId, 'Odrzucono przez Głównego Administratora', 'Szymon Komenda');
+      const adm = window.SMPL_DB.rejectOrRevokeAdmin(adminId, 'Odrzucono przez Głównego Administratora', (session && session.adminName) || 'Szymon Komenda');
       showToast(`🚫 Odrzucono / cofnięto uprawnienia administratora dla: ${adm.name}.`, 'warning');
       renderAll();
     } catch (err) {
@@ -5808,7 +5810,7 @@ window.SMPL_APP = (function () {
   }
 
   function handleClearAllTablesSeason56() {
-    if (!requireStrictAdmin('czyszczenie tabel')) return;
+    if (!requireMasterAdmin('czysty start i reset bazy')) return;
     const st = window.SMPL_DB.getState();
     const curSeason = Number((st && st.season) || 56);
     openModal(`
@@ -5846,7 +5848,7 @@ window.SMPL_APP = (function () {
   }
 
   function confirmCleanNewSeason() {
-    if (!requireStrictAdmin('czysty start sezonu')) return;
+    if (!requireMasterAdmin('czysty start sezonu')) return;
     const seasonInput = document.getElementById('clean-season-number');
     const wipeSocialEl = document.getElementById('clean-wipe-social');
     const wipeBlacklistEl = document.getElementById('clean-wipe-blacklist');
@@ -6005,7 +6007,7 @@ window.SMPL_APP = (function () {
   }
 
   function resetSeedConfirm() {
-    if (!requireStrictAdmin('przywrócenie bazy startowej')) return;
+    if (!requireMasterAdmin('przywrócenie bazy startowej')) return;
     if (!confirm('Czy na pewno chcesz przywrócić początkową bazę z arkusza Excel pod Sezon 56 (wraz z 4 kandydatami w poczekalni)?')) return;
     window.SMPL_DB.resetDatabaseToSeed();
     showToast('🔄 Przywrócono pełną bazę startową z arkusza Excel pod Sezon 56!');
@@ -6013,7 +6015,7 @@ window.SMPL_APP = (function () {
   }
 
   function handleStartFreshSeason56() {
-    if (!requireStrictAdmin('zerowanie sezonu')) return;
+    if (!requireMasterAdmin('zerowanie sezonu')) return;
     const st = window.SMPL_DB.getState();
     const curS = Number((st && st.season) || 56);
     if (!confirm(`Czy chcesz wyzerować wszystkie tabele (0:0) i kartki w bieżącym Sezonie ${curS} pod 1. kolejkę?`)) return;
@@ -7180,7 +7182,7 @@ window.SMPL_APP = (function () {
   }
 
   function handleSaveAiGeminiConfig() {
-    if (!requireStrictAdmin('konfiguracja Gemini AI')) return;
+    if (!requireMasterAdmin('zmiana klucza Google Gemini API')) return;
     if (!window.SMPL_DB || typeof window.SMPL_DB.saveAiGeminiConfig !== 'function') return;
 
     const keyEl = document.getElementById('ai-gemini-key');
@@ -9179,7 +9181,7 @@ window.SMPL_APP = (function () {
       showToast('📅 Wysłano propozycję terminu „Kiedy Gramy?” do rywala!');
       renderAll();
       if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
-        res.remotePromise.then(() => { if (window.SMPL_DB.pullFromServer) window.SMPL_DB.pullFromServer(true); });
+        res.remotePromise.then(() => { if (window.SMPL_DB.pullFromServer) window.SMPL_DB.pullFromServer(null, true); });
       }
     } catch (err) {
       showToast((err && err.message) || 'Błąd wysyłania propozycji.', 'error');
@@ -9192,7 +9194,7 @@ window.SMPL_APP = (function () {
       showToast(decision === 'DECLINE' ? '❌ Odrzucono propozycję terminu.' : '✅ Zaakceptowano termin meczu: ' + (chosenSlot || ''));
       renderAll();
       if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
-        res.remotePromise.then(() => { if (window.SMPL_DB.pullFromServer) window.SMPL_DB.pullFromServer(true); });
+        res.remotePromise.then(() => { if (window.SMPL_DB.pullFromServer) window.SMPL_DB.pullFromServer(null, true); });
       }
     } catch (err) {
       showToast((err && err.message) || 'Nie udało się odpowiedzieć na propozycję.', 'error');
@@ -9279,7 +9281,7 @@ window.SMPL_APP = (function () {
       showToast('🚩 Zgłoszenie VAR (+SS) zostało wysłane do Administracji!');
       renderAll();
       if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
-        res.remotePromise.then(() => { if (window.SMPL_DB.pullFromServer) window.SMPL_DB.pullFromServer(true); });
+        res.remotePromise.then(() => { if (window.SMPL_DB.pullFromServer) window.SMPL_DB.pullFromServer(null, true); });
       }
     } catch (err) {
       showToast((err && err.message) || 'Błąd wysyłania sporu VAR.', 'error');
@@ -9287,6 +9289,7 @@ window.SMPL_APP = (function () {
   }
 
   function adminResolveDispute(disputeId, decision) {
+    if (!requireStrictAdmin('rozstrzyganie sporu VAR')) return;
     try {
       window.SMPL_DB.resolveMatchDispute(disputeId, decision, 'Decyzja VAR: ' + decision, getCurrentAdminDisplayName());
       showToast('⚖️ Spór VAR rozstrzygnięty (' + decision + ')!');
@@ -10606,6 +10609,7 @@ window.SMPL_APP = (function () {
   }
 
   function adminRestoreSnapshot(snapshotName) {
+    if (!requireMasterAdmin('przywracanie bazy danych z kopii zapasowej (snapshot)')) return;
     if (typeof confirm === 'function' && !confirm('Czy na pewno przywrócić bazę danych z kopii: ' + snapshotName + '?')) {
       return;
     }

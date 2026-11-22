@@ -289,7 +289,11 @@ window.SMPL_FORMS_ADMIN = (function () {
       playersMap[p.id] = p;
     });
 
-    const activePlayer = session.activePlayerId ? playersMap[session.activePlayerId] : null;
+    const adminLinkedPlayer = (isAdmin && window.SMPL_DB && typeof window.SMPL_DB.findPlayerForAdmin === 'function')
+      ? window.SMPL_DB.findPlayerForAdmin(session.adminId, state)
+      : null;
+    const mySubmitPlayerId = session.activePlayerId || (adminLinkedPlayer && adminLinkedPlayer.id ? adminLinkedPlayer.id : '');
+    const activePlayer = mySubmitPlayerId ? playersMap[mySubmitPlayerId] : null;
     const winInfoSubmit = (window.SMPL_DB && typeof window.SMPL_DB.getSeasonJoinWindowInfo === 'function')
       ? window.SMPL_DB.getSeasonJoinWindowInfo(state)
       : { isOpen: false, allowedLeagues: [] };
@@ -435,8 +439,8 @@ window.SMPL_FORMS_ADMIN = (function () {
                         .map((m) => {
                           const hp = playersMap[m.homeId];
                           const ap = playersMap[m.awayId];
-                          const isHost = m.homeId === session.activePlayerId;
-                          const isAway = m.awayId === session.activePlayerId;
+                          const isHost = Boolean(mySubmitPlayerId && m.homeId === mySubmitPlayerId);
+                          const isAway = Boolean(mySubmitPlayerId && m.awayId === mySubmitPlayerId);
                           const roleBadge = isHost ? '[TY vs GOŚĆ]' : isAway ? '[GOSPODARZ vs TY]' : '';
                           return `<option value="${m.id}" ${selectedMatch && selectedMatch.id === m.id ? 'selected' : ''}>
                             [Kolejka ${m.round}] ${escapeHtml(hp.name)} vs ${escapeHtml(ap.name)} ${roleBadge}
@@ -489,8 +493,8 @@ window.SMPL_FORMS_ADMIN = (function () {
                   const apObj = playersMap[mObj.awayId] || { name: 'Gość', nick: 'Away', avatar: '' };
                   const hsVal = (hsRaw !== undefined && hsRaw !== null) ? Number(hsRaw) : (legKey === 'leg2' ? 1 : 2);
                   const asVal = (asRaw !== undefined && asRaw !== null) ? Number(asRaw) : (legKey === 'leg2' ? 2 : 1);
-                  const isPlayerHome = Boolean(session.activePlayerId && mObj.homeId === session.activePlayerId);
-                  const isPlayerAway = Boolean(session.activePlayerId && mObj.awayId === session.activePlayerId);
+                  const isPlayerHome = Boolean(mySubmitPlayerId && mObj.homeId === mySubmitPlayerId);
+                  const isPlayerAway = Boolean(mySubmitPlayerId && mObj.awayId === mySubmitPlayerId);
                   const legTag = isPlayerHome
                     ? '🏠 MECZ U SIEBIE (Gospodarz)'
                     : isPlayerAway
@@ -514,7 +518,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                         <div class="sm:col-span-3 flex flex-col items-center text-center">
                           <div class="relative">
                             <img src="${hpObj.avatar}" class="w-12 h-12 rounded-full object-cover border-2 border-blue-400 mb-1.5" alt=""/>
-                            ${hpObj.id === session.activePlayerId ? `<span class="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-display font-black text-[9px] uppercase shadow">To Ty</span>` : ''}
+                            ${mySubmitPlayerId && hpObj.id === mySubmitPlayerId ? `<span class="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-display font-black text-[9px] uppercase shadow">To Ty</span>` : ''}
                           </div>
                           <div class="font-bold text-white text-sm truncate max-w-full">${escapeHtml(hpObj.name)}</div>
                           <div class="text-[11px] text-slate-400 mb-2">@${escapeHtml(hpObj.nick)} (Gospodarz)</div>
@@ -530,7 +534,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                         <div class="sm:col-span-3 flex flex-col items-center text-center">
                           <div class="relative">
                             <img src="${apObj.avatar}" class="w-12 h-12 rounded-full object-cover border-2 border-rose-400 mb-1.5" alt=""/>
-                            ${apObj.id === session.activePlayerId ? `<span class="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-display font-black text-[9px] uppercase shadow">To Ty</span>` : ''}
+                            ${mySubmitPlayerId && apObj.id === mySubmitPlayerId ? `<span class="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-display font-black text-[9px] uppercase shadow">To Ty</span>` : ''}
                           </div>
                           <div class="font-bold text-white text-sm truncate max-w-full">${escapeHtml(apObj.name)}</div>
                           <div class="text-[11px] text-slate-400 mb-2">@${escapeHtml(apObj.nick)} (Gość)</div>
@@ -3232,6 +3236,7 @@ window.SMPL_FORMS_ADMIN = (function () {
 
 
   function renderAiVanessaSubTab(state, session) {
+    const isMasterAiOwner = Boolean(session && window.SMPL_DB && window.SMPL_DB.isStrictAdminSession(session) && session.adminRole === 'MASTER_ADMIN');
     const queue = (state.aiUnansweredQueue || []).slice();
     const pendingQ = queue.filter((q) => q && q.status === 'PENDING');
     const resolvedQ = queue.filter((q) => q && q.status !== 'PENDING').slice(0, 12);
@@ -3242,6 +3247,111 @@ window.SMPL_FORMS_ADMIN = (function () {
     const customOrLearned = (state.aiKnowledge || []).slice();
     const totalUp = combinedKb.reduce((acc, k) => acc + Number((k && k.helpfulCount) || 0), 0);
     const totalDown = combinedKb.reduce((acc, k) => acc + Number((k && k.unhelpfulCount) || 0), 0);
+
+    const geminiConfigBodyHtml = isMasterAiOwner
+      ? `
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div class="lg:col-span-7 space-y-3.5">
+              <div class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/90 border border-white/10">
+                <input id="ai-gemini-enabled" type="checkbox" checked class="w-4 h-4 cursor-pointer"/>
+                <label for="ai-gemini-enabled" class="text-xs font-semibold text-white cursor-pointer">
+                  Włącz silnik Google Gemini AI dla wszystkich pytań graczy w dymku Vanessy
+                </label>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-display uppercase text-slate-300 font-bold mb-1">Klucz Google Gemini API (AI Studio)</label>
+                  <input id="ai-gemini-key" type="password" autocomplete="off" placeholder="AIzaSy... (wklej klucz API)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-pink-400"/>
+                  <div id="ai-gemini-key-hint" class="text-[11px] text-slate-400 mt-1">
+                    Pozostaw puste, jeśli klucz jest już zapisany i zmieniasz tylko model.
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-display uppercase text-slate-300 font-bold mb-1">Model Gemini</label>
+                  <select id="ai-gemini-model" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-white font-semibold focus:outline-none focus:border-pink-400">
+                    ${(
+                      window.SMPL_AI && typeof window.SMPL_AI.getAvailableGeminiModels === 'function'
+                        ? window.SMPL_AI.getAvailableGeminiModels()
+                        : [
+                            { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (Zalecany)' },
+                            { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+                            { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite' },
+                            { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }
+                          ]
+                    )
+                      .map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label)}</option>`)
+                      .join('')}
+                    <option value="CUSTOM">Własny kod modelu (wpisz obok)</option>
+                  </select>
+                  <input id="ai-gemini-custom-model" type="text" placeholder="Opcjonalnie np. gemini-2.5-pro" class="w-full mt-2 px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-pink-400"/>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-display uppercase text-slate-300 font-bold mb-1">Własne wytyczne dla Vanessy (opcjonalnie)</label>
+                <textarea id="ai-gemini-persona" rows="2" placeholder="Np. Przypominaj o wysyłaniu screenów do niedzieli 22:00 i pisz luźnym sportowym stylem..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-pink-400"></textarea>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2.5 pt-1">
+                <button type="button" onclick="SMPL_APP.handleSaveAiGeminiConfig()" class="btn-league px-4 py-2.5 rounded-xl font-display font-black text-xs uppercase transition">
+                  💾 Zapisz Konfigurację Gemini
+                </button>
+                <button type="button" onclick="SMPL_APP.handleTestAiGeminiConfig()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black text-xs uppercase transition">
+                  🧪 Przetestuj Połączenie na Żywo
+                </button>
+                <button type="button" onclick="SMPL_APP.refreshAiGeminiAdminPanel()" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 font-display font-bold text-xs uppercase transition">
+                  🔄 Odśwież Status
+                </button>
+                <label class="flex items-center gap-1.5 text-[11px] text-rose-300 cursor-pointer ml-auto">
+                  <input id="ai-gemini-clear-key" type="checkbox" class="w-4 h-4 cursor-pointer"/>
+                  <span>Usuń zapisany klucz</span>
+                </label>
+              </div>
+
+              <div id="ai-gemini-test-result" class="p-3.5 rounded-xl bg-slate-900/90 border border-white/10 text-xs text-slate-300">
+                Kliknij <strong>„Przetestuj Połączenie na Żywo”</strong>, aby sprawdzić czy Twój klucz API odpowiada z Google AI Studio.
+              </div>
+            </div>
+
+            <div class="lg:col-span-5 p-4 rounded-xl bg-slate-900/90 border border-amber-400/30 space-y-2.5 text-xs">
+              <div class="font-display font-black text-amber-300 uppercase">
+                💡 Ważne: Abonament 100 zł (Google AI Pro) vs Klucz API
+              </div>
+              <p class="text-slate-300 leading-relaxed">
+                Płatny czat Gemini za ok. 100 zł/mies. (Google AI Pro) i <strong>Gemini API</strong> to dwa osobne systemy rozliczeń, ale na jednym koncie Google dostajesz wszystko od ręki:
+              </p>
+              <div class="space-y-1.5 text-[11px] text-slate-300">
+                <div><strong>1. Darmowy klucz w 30 sekund:</strong> Wejdź na <code class="text-pink-300">aistudio.google.com</code> → <em>Get API key</em> → <em>Create API key</em>. Darmowy plan (Free Tier) działa od razu za 0 zł!</div>
+                <div><strong>2. Bonus z planu 100 zł:</strong> Twój Google AI Pro daje <strong>\$10/mies. darmowych kredytów</strong> w <em>Google Developer Program</em>, które można przypiąć pod Google Cloud Billing dla wyższych limitów.</div>
+                <div><strong>3. Test lokalny w 10 sekund:</strong> Uruchom <code class="text-pink-300">node server.js</code> albo wrzuć na hosting PHP (Hostido), wklej klucz tutaj i kliknij Test!</div>
+              </div>
+            </div>
+          </div>
+        `
+      : `
+          <div class="p-4 rounded-xl bg-slate-900/90 border border-amber-400/35 space-y-3 text-xs">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="font-display font-black text-amber-300 uppercase">
+                🔒 Konfiguracja Klucza Gemini API — Wyłącznie Master Admin (Szymon Komenda)
+              </div>
+            </div>
+            <p class="text-slate-300 leading-relaxed">
+              Zapis, zmiana modelu oraz usuwanie klucza Google Gemini API są zabezpieczone po stronie serwera wyłącznie dla <strong>Master Admina</strong>. Jako Admin możesz sprawdzać status połączenia na żywo oraz uczyć Vanessę nowych odpowiedzi w sekcji poniżej.
+            </p>
+            <div class="flex flex-wrap items-center gap-2.5">
+              <button type="button" onclick="SMPL_APP.handleTestAiGeminiConfig()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black text-xs uppercase transition">
+                🧪 Przetestuj Połączenie na Żywo
+              </button>
+              <button type="button" onclick="SMPL_APP.refreshAiGeminiAdminPanel()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 font-display font-bold text-xs uppercase transition">
+                🔄 Odśwież Status
+              </button>
+            </div>
+            <div id="ai-gemini-test-result" class="p-3 rounded-xl bg-slate-950/90 border border-white/10 text-xs text-slate-300">
+              Kliknij <strong>„Przetestuj Połączenie na Żywo”</strong>, aby sprawdzić status silnika Google Gemini AI.
+            </div>
+          </div>
+        `;
 
     return `
       <div class="space-y-6">
@@ -3298,84 +3408,7 @@ window.SMPL_FORMS_ADMIN = (function () {
             </div>
           </div>
 
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            <div class="lg:col-span-7 space-y-3.5">
-              <div class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/90 border border-white/10">
-                <input id="ai-gemini-enabled" type="checkbox" checked class="w-4 h-4 cursor-pointer"/>
-                <label for="ai-gemini-enabled" class="text-xs font-semibold text-white cursor-pointer">
-                  Włącz silnik Google Gemini AI dla wszystkich pytań graczy w dymku Vanessy
-                </label>
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-[11px] font-display uppercase text-slate-300 font-bold mb-1">Klucz Google Gemini API (AI Studio)</label>
-                  <input id="ai-gemini-key" type="password" autocomplete="off" placeholder="AIzaSy... (wklej klucz API)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-pink-400"/>
-                  <div id="ai-gemini-key-hint" class="text-[11px] text-slate-400 mt-1">
-                    Pozostaw puste, jeśli klucz jest już zapisany i zmieniasz tylko model.
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-[11px] font-display uppercase text-slate-300 font-bold mb-1">Model Gemini</label>
-                  <select id="ai-gemini-model" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-white font-semibold focus:outline-none focus:border-pink-400">
-                    ${(
-                      window.SMPL_AI && typeof window.SMPL_AI.getAvailableGeminiModels === 'function'
-                        ? window.SMPL_AI.getAvailableGeminiModels()
-                        : [
-                            { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (Zalecany)' },
-                            { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
-                            { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite' },
-                            { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }
-                          ]
-                    )
-                      .map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label)}</option>`)
-                      .join('')}
-                    <option value="CUSTOM">Własny kod modelu (wpisz obok)</option>
-                  </select>
-                  <input id="ai-gemini-custom-model" type="text" placeholder="Opcjonalnie np. gemini-2.5-pro" class="w-full mt-2 px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-pink-400"/>
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-[11px] font-display uppercase text-slate-300 font-bold mb-1">Własne wytyczne dla Vanessy (opcjonalnie)</label>
-                <textarea id="ai-gemini-persona" rows="2" placeholder="Np. Przypominaj o wysyłaniu screenów do niedzieli 22:00 i pisz luźnym sportowym stylem..." class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-pink-400"></textarea>
-              </div>
-
-              <div class="flex flex-wrap items-center gap-2.5 pt-1">
-                <button type="button" onclick="SMPL_APP.handleSaveAiGeminiConfig()" class="btn-league px-4 py-2.5 rounded-xl font-display font-black text-xs uppercase transition">
-                  💾 Zapisz Konfigurację Gemini
-                </button>
-                <button type="button" onclick="SMPL_APP.handleTestAiGeminiConfig()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black text-xs uppercase transition">
-                  🧪 Przetestuj Połączenie na Żywo
-                </button>
-                <button type="button" onclick="SMPL_APP.refreshAiGeminiAdminPanel()" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 font-display font-bold text-xs uppercase transition">
-                  🔄 Odśwież Status
-                </button>
-                <label class="flex items-center gap-1.5 text-[11px] text-rose-300 cursor-pointer ml-auto">
-                  <input id="ai-gemini-clear-key" type="checkbox" class="w-4 h-4 cursor-pointer"/>
-                  <span>Usuń zapisany klucz</span>
-                </label>
-              </div>
-
-              <div id="ai-gemini-test-result" class="p-3.5 rounded-xl bg-slate-900/90 border border-white/10 text-xs text-slate-300">
-                Kliknij <strong>„Przetestuj Połączenie na Żywo”</strong>, aby sprawdzić czy Twój klucz API odpowiada z Google AI Studio.
-              </div>
-            </div>
-
-            <div class="lg:col-span-5 p-4 rounded-xl bg-slate-900/90 border border-amber-400/30 space-y-2.5 text-xs">
-              <div class="font-display font-black text-amber-300 uppercase">
-                💡 Ważne: Abonament 100 zł (Google AI Pro) vs Klucz API
-              </div>
-              <p class="text-slate-300 leading-relaxed">
-                Płatny czat Gemini za ok. 100 zł/mies. (Google AI Pro) i <strong>Gemini API</strong> to dwa osobne systemy rozliczeń, ale na jednym koncie Google dostajesz wszystko od ręki:
-              </p>
-              <div class="space-y-1.5 text-[11px] text-slate-300">
-                <div><strong>1. Darmowy klucz w 30 sekund:</strong> Wejdź na <code class="text-pink-300">aistudio.google.com</code> → <em>Get API key</em> → <em>Create API key</em>. Darmowy plan (Free Tier) działa od razu za 0 zł!</div>
-                <div><strong>2. Bonus z planu 100 zł:</strong> Twój Google AI Pro daje <strong>\$10/mies. darmowych kredytów</strong> w <em>Google Developer Program</em>, które można przypiąć pod Google Cloud Billing dla wyższych limitów.</div>
-                <div><strong>3. Test lokalny w 10 sekund:</strong> Uruchom <code class="text-pink-300">node server.js</code> albo wrzuć na hosting PHP (Hostido), wklej klucz tutaj i kliknij Test!</div>
-              </div>
-            </div>
-          </div>
+          ${geminiConfigBodyHtml}
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -4544,7 +4577,11 @@ window.SMPL_FORMS_ADMIN = (function () {
                            (sn) => `
                              <div class="p-2.5 rounded-xl bg-slate-950/85 border border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
                                <div><span class="font-bold text-white">${escapeHtml(sn.name || sn)}</span>${sn.size ? `<span class="text-slate-400 ml-2">(${Math.round(Number(sn.size) / 1024)} KB)</span>` : ''}</div>
-                               <button type="button" onclick="SMPL_APP.adminRestoreSnapshot('${escapeHtml(sn.name || sn).replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-400/40 font-bold">⏪ Przywróć Kopię</button>
+                               ${
+                                 isMasterOwner
+                                   ? `<button type="button" onclick="SMPL_APP.adminRestoreSnapshot('${escapeHtml(sn.name || sn).replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-400/40 font-bold">⏪ Przywróć Kopię</button>`
+                                   : `<span class="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-white/10 text-[10px]">🔒 Przywracanie: tylko Master</span>`
+                               }
                              </div>
                            `
                          )
@@ -4554,16 +4591,22 @@ window.SMPL_FORMS_ADMIN = (function () {
             </div>
           </div>
 
-          <details class="glass-panel rounded-2xl p-5 border border-rose-500/40 bg-rose-950/15">
-            <summary class="cursor-pointer font-display font-black text-sm text-rose-300 uppercase select-none">
-              ⚠️ Strefa Awaryjna — Resety Bazy i Zerowanie Wyników (rozwiń ostrożnie)
-            </summary>
-            <div class="mt-4 pt-3 border-t border-rose-500/25 flex flex-wrap items-center gap-2">
-              <button type="button" onclick="SMPL_APP.handleStartFreshSeason56()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-emerald-500/40 font-display font-bold text-xs uppercase">🔄 Wyzeruj wyniki 0:0 (Sezon ${(state && state.season) || 56})</button>
-              <button type="button" onclick="SMPL_APP.resetSeedConfirm()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/20 font-display font-bold text-xs uppercase">📊 Przywróć dane z Excela</button>
-              <button type="button" onclick="SMPL_APP.handleClearAllTablesSeason56()" class="px-3.5 py-2 rounded-xl bg-rose-950/70 hover:bg-rose-800 text-rose-200 border border-rose-500/50 font-display font-bold text-xs uppercase">⚠️ Reset całej bazy do 0</button>
-            </div>
-          </details>
+          ${
+            isMasterOwner
+              ? `<details class="glass-panel rounded-2xl p-5 border border-rose-500/40 bg-rose-950/15">
+                   <summary class="cursor-pointer font-display font-black text-sm text-rose-300 uppercase select-none">
+                     ⚠️ Strefa Awaryjna (Tylko Master Admin) — Resety Bazy i Zerowanie Wyników (rozwiń ostrożnie)
+                   </summary>
+                   <div class="mt-4 pt-3 border-t border-rose-500/25 flex flex-wrap items-center gap-2">
+                     <button type="button" onclick="SMPL_APP.handleStartFreshSeason56()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-emerald-500/40 font-display font-bold text-xs uppercase">🔄 Wyzeruj wyniki 0:0 (Sezon ${(state && state.season) || 56})</button>
+                     <button type="button" onclick="SMPL_APP.resetSeedConfirm()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/20 font-display font-bold text-xs uppercase">📊 Przywróć dane z Excela</button>
+                     <button type="button" onclick="SMPL_APP.handleClearAllTablesSeason56()" class="px-3.5 py-2 rounded-xl bg-rose-950/70 hover:bg-rose-800 text-rose-200 border border-rose-500/50 font-display font-bold text-xs uppercase">⚠️ Reset całej bazy do 0</button>
+                   </div>
+                 </details>`
+              : `<div class="glass-panel rounded-2xl p-4 border border-white/10 text-xs text-slate-400">
+                   🔒 <strong>Strefa Awaryjna i Przywracanie Kopii (Snapshoty):</strong> dostępne wyłącznie dla Master Admina (Szymon Komenda) ze względów bezpieczeństwa danych ligi.
+                 </div>`
+          }
         </div>
       `;
     } else if (setSub === 'updates') {

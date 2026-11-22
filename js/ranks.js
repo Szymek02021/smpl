@@ -886,10 +886,11 @@ window.SMPL_RANKS = (function () {
           return false;
         });
 
-    const isPlayingAdmin = Boolean((player && player.isAdminPlayer) || matchedAdmin);
+    const hasAdminsList = adminsList.length > 0;
+    const isPlayingAdmin = Boolean(matchedAdmin || (!hasAdminsList && player && player.isAdminPlayer));
     const isMasterPlayingAdmin = Boolean(
       (matchedAdmin && (matchedAdmin.role === 'MASTER_ADMIN' || matchedAdmin.id === 'ADM_MASTER')) ||
-      (player && player.adminRole === 'MASTER_ADMIN')
+      (!hasAdminsList && player && player.adminRole === 'MASTER_ADMIN')
     );
     const resolvedRoleBadge = isPlayingAdmin ? ROLE_RANKS.ADMIN : null;
     const resolvedMasterBadge = isMasterPlayingAdmin ? ROLE_RANKS.OWNER : null;

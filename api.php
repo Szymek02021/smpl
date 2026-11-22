@@ -231,6 +231,19 @@ function smpl_validate_admin_token($tokenFile, $prevDb) {
                 $status = isset($adm['status']) ? (string)$adm['status'] : 'APPROVED';
                 if ($status === 'APPROVED') {
                     $foundApproved = true;
+                    // Zawsze odświeżaj bieżącą rolę, nazwę i login z aktualnego rekordu w bazie (zapobiega przestarzałym tokenom)
+                    if (!empty($adm['role'])) {
+                        $info['role'] = (string)$adm['role'];
+                    }
+                    if (!empty($adm['name'])) {
+                        $info['adminName'] = (string)$adm['name'];
+                        $info['name'] = (string)$adm['name'];
+                    } elseif (isset($info['adminName']) && empty($info['name'])) {
+                        $info['name'] = (string)$info['adminName'];
+                    }
+                    if (!empty($adm['username'])) {
+                        $info['username'] = (string)$adm['username'];
+                    }
                 }
                 break;
             }
@@ -238,6 +251,8 @@ function smpl_validate_admin_token($tokenFile, $prevDb) {
         if (!$foundApproved) {
             return null;
         }
+    } elseif (isset($info['adminName']) && empty($info['name'])) {
+        $info['name'] = (string)$info['adminName'];
     }
     return $info;
 }
@@ -574,6 +589,32 @@ function smpl_validate_coadmin_admins_guard($prevDb, $newDb, $callerAdminId) {
         : array();
     if (!smpl_json_eq($prevBonusCoins, $newBonusCoins)) {
         return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może przyznawać lub zmieniać bonusowe SMPL Coins.';
+    }
+    // Ochrona definicji własnych rang specjalnych (customRanks) — wyłącznie Master Admin
+    $prevCustomRanks = (isset($prevDb['customRanks']) && is_array($prevDb['customRanks'])) ? $prevDb['customRanks'] : array();
+    $newCustomRanks = (isset($newDb['customRanks']) && is_array($newDb['customRanks'])) ? $newDb['customRanks'] : array();
+    if (!smpl_json_eq($prevCustomRanks, $newCustomRanks)) {
+        return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może tworzyć, edytować lub usuwać własne rangi specjalne.';
+    }
+    // Ochrona globalnego brandingu i paska ogłoszeń portalu — wyłącznie Master Admin (Co-Admin zachowuje okno sezonu, maintenanceMode, playerUpdates)
+    $prevPs = (isset($prevDb['portalSettings']) && is_array($prevDb['portalSettings'])) ? $prevDb['portalSettings'] : array();
+    $newPs = (isset($newDb['portalSettings']) && is_array($newDb['portalSettings'])) ? $newDb['portalSettings'] : array();
+    foreach (array('heroBadge', 'heroTitle', 'heroSubtitle', 'announcementText', 'announcementActive') as $brandKey) {
+        $prevB = array_key_exists($brandKey, $prevPs) ? $prevPs[$brandKey] : null;
+        $newB = array_key_exists($brandKey, $newPs) ? $newPs[$brandKey] : null;
+        if (!smpl_json_eq($prevB, $newB)) {
+            return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może zmieniać główny banner i pasek ogłoszeń portalu (' . $brandKey . ').';
+        }
+    }
+    // Ochrona istniejących klanów — Co-Admin może dodawać nowe klany podczas rejestracji/edycji gracza, ale usuwanie lub edycja istniejących klanów wymaga Master Admina
+    $prevClansC = (isset($prevDb['clans']) && is_array($prevDb['clans'])) ? $prevDb['clans'] : array();
+    $newClansC = (isset($newDb['clans']) && is_array($newDb['clans'])) ? $newDb['clans'] : array();
+    $prevClansByIdC = smpl_index_by_id($prevClansC);
+    $newClansByIdC = smpl_index_by_id($newClansC);
+    foreach ($prevClansByIdC as $cid => $oldClan) {
+        if (!isset($newClansByIdC[$cid]) || !smpl_json_eq($oldClan, $newClansByIdC[$cid])) {
+            return 'Odmowa zapisu: wyłącznie Master Admin (Szymon Komenda) może edytować lub usuwać istniejące klany.';
+        }
     }
     return null;
 }
@@ -2318,9 +2359,13 @@ if ($method === 'POST') {
         $rawToken = bin2hex(random_bytes(24));
         $tokHash = hash('sha256', $rawToken);
         $tokens = smpl_load_tokens($tokenFile);
+        $admDisplayName = isset($matchedAdmin['name']) ? (string)$matchedAdmin['name'] : 'Admin';
+        $admUsernameVal = isset($matchedAdmin['username']) ? (string)$matchedAdmin['username'] : '';
         $tokens[$tokHash] = array(
             'adminId' => (string)$matchedAdmin['id'],
-            'adminName' => isset($matchedAdmin['name']) ? (string)$matchedAdmin['name'] : 'Admin',
+            'adminName' => $admDisplayName,
+            'name' => $admDisplayName,
+            'username' => $admUsernameVal,
             'role' => isset($matchedAdmin['role']) ? (string)$matchedAdmin['role'] : 'CO_ADMIN',
             'issuedAt' => time(),
             'expiresAt' => time() + 604800
@@ -2331,7 +2376,8 @@ if ($method === 'POST') {
             'ok' => true,
             'token' => $rawToken,
             'adminId' => (string)$matchedAdmin['id'],
-            'adminName' => isset($matchedAdmin['name']) ? (string)$matchedAdmin['name'] : 'Admin',
+            'adminName' => $admDisplayName,
+            'username' => $admUsernameVal,
             'role' => isset($matchedAdmin['role']) ? (string)$matchedAdmin['role'] : 'CO_ADMIN'
         ));
         exit;
@@ -4072,7 +4118,7 @@ if ($method === 'POST') {
                 $rName = isset($rg['name']) ? (string)$rg['name'] : '';
                 $rNick = isset($rg['nick']) ? (string)$rg['nick'] : '';
                 $rFb = isset($rg['fbLink']) ? (string)$rg['fbLink'] : '';
-                if (function_exists('smpl_is_blacklisted') && smpl_is_blacklisted($prevDb, $rName, $rNick, $rFb)) {
+                if (smpl_is_on_blacklist($prevDb, smpl_fold_pl($rName), smpl_fold_pl($rNick), strtolower(trim($rFb)))) {
                     continue;
                 }
                 $prevDb['registrations'][$idx]['status'] = 'APPROVED_POOL';
@@ -4092,6 +4138,16 @@ if ($method === 'POST') {
                 if ($lockFp) { @flock($lockFp, LOCK_UN); @fclose($lockFp); }
                 http_response_code(404);
                 echo json_encode(array('ok' => false, 'error' => 'Nie znaleziono zgłoszenia rekrutacyjnego na serwerze.'));
+                exit;
+            }
+            $chkReg = $prevDb['registrations'][$foundIdx];
+            $chkName = isset($chkReg['name']) ? (string)$chkReg['name'] : '';
+            $chkNick = isset($chkReg['nick']) ? (string)$chkReg['nick'] : '';
+            $chkFb = isset($chkReg['fbLink']) ? (string)$chkReg['fbLink'] : '';
+            if (smpl_is_on_blacklist($prevDb, smpl_fold_pl($chkName), smpl_fold_pl($chkNick), strtolower(trim($chkFb)))) {
+                if ($lockFp) { @flock($lockFp, LOCK_UN); @fclose($lockFp); }
+                http_response_code(403);
+                echo json_encode(array('ok' => false, 'error' => '⛔ Gracz widnieje na Czarnej Liście SMPL i nie może zostać zatwierdzony do Puli Graczy.'));
                 exit;
             }
             $curSt = isset($prevDb['registrations'][$foundIdx]['status']) ? (string)$prevDb['registrations'][$foundIdx]['status'] : '';
@@ -4191,7 +4247,9 @@ if ($method === 'POST') {
         if ($isAdmActor) {
             $admId = isset($adminTokenInfo['adminId']) ? (string)$adminTokenInfo['adminId'] : 'ADM';
             $actorId = 'ADM_' . $admId;
-            $actorName = isset($adminTokenInfo['name']) ? (string)$adminTokenInfo['name'] : 'Administrator';
+            $actorName = !empty($adminTokenInfo['adminName'])
+                ? (string)$adminTokenInfo['adminName']
+                : (!empty($adminTokenInfo['name']) ? (string)$adminTokenInfo['name'] : 'Administrator');
             $admNameLow = mb_strtolower(trim($actorName), 'UTF-8');
             $admUserLow = isset($adminTokenInfo['username']) ? mb_strtolower(trim((string)$adminTokenInfo['username']), 'UTF-8') : '';
             $fallbackMatchedP = null;
@@ -5239,6 +5297,7 @@ if ($method === 'POST') {
         $bTitle = mb_substr(trim((string)(isset($body['title']) ? $body['title'] : '📢 Ogłoszenie Ligi SMPL')), 0, 180, 'UTF-8');
         $bMsg = mb_substr(trim((string)(isset($body['message']) ? $body['message'] : '')), 0, 1400, 'UTF-8');
         $rB = smpl_dispatch_webhooks($dataDir, 'BROADCAST', $bTitle, $bMsg, !empty($body['adminOnly']));
+        $pushSent = 0;
         $pushSubs = smpl_read_push_subs($dataDir);
         if (is_array($pushSubs) && count($pushSubs) > 0) {
             $bItems = array();
@@ -5259,10 +5318,21 @@ if ($method === 'POST') {
                 );
             }
             if (count($bItems) > 0) {
-                smpl_send_web_push_batch($dataDir, array_slice($bItems, 0, 80));
+                $pushRes = smpl_send_web_push_batch($dataDir, array_slice($bItems, 0, 80));
+                if (is_array($pushRes) && isset($pushRes['sent'])) {
+                    $pushSent = (int)$pushRes['sent'];
+                }
             }
         }
-        echo json_encode($rB);
+        $webhookOk = is_array($rB) && !empty($rB['ok']);
+        $combinedBroadcast = is_array($rB) ? $rB : array();
+        $combinedBroadcast['webhooksOk'] = $webhookOk;
+        $combinedBroadcast['pushSent'] = $pushSent;
+        $combinedBroadcast['ok'] = ($webhookOk || $pushSent > 0);
+        if (!$combinedBroadcast['ok'] && empty($combinedBroadcast['error'])) {
+            $combinedBroadcast['error'] = 'Brak skonfigurowanych webhooków Discord/Telegram oraz aktywnych subskrypcji Web Push.';
+        }
+        echo json_encode($combinedBroadcast);
         exit;
     }
 
@@ -5330,13 +5400,28 @@ if ($method === 'POST') {
             if ($adminTokenInfo !== null) {
                 $verifiedIsAdmin = true;
                 $verifiedAdminId = isset($adminTokenInfo['adminId']) ? (string)$adminTokenInfo['adminId'] : '';
+                $admNameLowPush = !empty($adminTokenInfo['adminName']) ? mb_strtolower(trim((string)$adminTokenInfo['adminName']), 'UTF-8') : '';
+                $admUserLowPush = !empty($adminTokenInfo['username']) ? mb_strtolower(trim((string)$adminTokenInfo['username']), 'UTF-8') : '';
+                $fallbackPushPl = null;
                 if (is_array($prevDb) && isset($prevDb['players']) && is_array($prevDb['players'])) {
                     foreach ($prevDb['players'] as $pl) {
-                        if (is_array($pl) && isset($pl['adminId']) && (string)$pl['adminId'] === $verifiedAdminId) {
+                        if (!is_array($pl) || !empty($pl['isPlaceholder']) || !empty($pl['gdprDeleted'])) continue;
+                        if (isset($pl['adminId']) && (string)$pl['adminId'] === $verifiedAdminId) {
                             $verifiedPid = (string)$pl['id'];
                             $verifiedLeagueId = isset($pl['leagueId']) ? (string)$pl['leagueId'] : '';
                             break;
                         }
+                        if ($fallbackPushPl === null) {
+                            $pNameL = isset($pl['name']) ? mb_strtolower(trim((string)$pl['name']), 'UTF-8') : '';
+                            $pUserL = isset($pl['username']) ? mb_strtolower(trim((string)$pl['username']), 'UTF-8') : '';
+                            if (($admUserLowPush !== '' && $pUserL === $admUserLowPush) || ($admNameLowPush !== '' && $pNameL === $admNameLowPush)) {
+                                $fallbackPushPl = $pl;
+                            }
+                        }
+                    }
+                    if ($verifiedPid === '' && $fallbackPushPl !== null) {
+                        $verifiedPid = (string)$fallbackPushPl['id'];
+                        $verifiedLeagueId = isset($fallbackPushPl['leagueId']) ? (string)$fallbackPushPl['leagueId'] : '';
                     }
                 }
             } elseif ($pTokInfo !== null && (isset($pTokInfo['subjectKind']) ? (string)$pTokInfo['subjectKind'] : 'PLAYER') === 'PLAYER') {
@@ -5434,10 +5519,10 @@ if ($method === 'POST') {
         $lockFp = smpl_lock_db($dataDir);
         $prevDb = smpl_read_db($dbFile, $backupFile);
         $adminTokenInfo = smpl_validate_admin_token($tokenFile, $prevDb);
-        if ($adminTokenInfo === null) {
+        if ($adminTokenInfo === null || !isset($adminTokenInfo['role']) || (string)$adminTokenInfo['role'] !== 'MASTER_ADMIN') {
             smpl_unlock_db($lockFp);
             http_response_code(403);
-            echo json_encode(array('ok' => false, 'error' => 'Przywracanie kopii wymaga sesji Administratora.'));
+            echo json_encode(array('ok' => false, 'error' => '⛔ Przywracanie kopii zapasowej (Snapshot) jest zastrzeżone wyłącznie dla Master Admina (Szymon Komenda).'));
             exit;
         }
         $body = @json_decode((string)$input, true);
@@ -5544,9 +5629,9 @@ if ($method === 'POST') {
     if ($action === 'ai_config_save') {
         $prevDb = smpl_read_db($dbFile, $backupFile);
         $adminTokenInfo = smpl_validate_admin_token($tokenFile, $prevDb);
-        if ($adminTokenInfo === null) {
+        if ($adminTokenInfo === null || !isset($adminTokenInfo['role']) || (string)$adminTokenInfo['role'] !== 'MASTER_ADMIN') {
             http_response_code(403);
-            echo json_encode(array('ok' => false, 'error' => 'Odmowa zapisu konfiguracji AI: wymagana sesja Administratora z ważnym tokenem.'));
+            echo json_encode(array('ok' => false, 'error' => '⛔ Wyłącznie Master Admin (Szymon Komenda) może zmieniać lub usuwać konfigurację klucza Google Gemini API.'));
             exit;
         }
         $body = @json_decode((string)$input, true);
@@ -5979,9 +6064,10 @@ if ($method === 'POST') {
         @copy($dbFile, $backupFile);
     }
 
-    // OCHRONA SERWEROWA (v53): Zapobieganie przypadkowej utracie kont graczy oraz trofeów/historii S1-S55 przy pełnej synchronizacji POST
+    // OCHRONA SERWEROWA (v53/v68): Zapobieganie przypadkowej utracie kont graczy oraz trofeów/historii S1-S55 przy pełnej synchronizacji POST
+    $isMasterAdminCaller = ($adminTokenInfo !== null && isset($adminTokenInfo['role']) && (string)$adminTokenInfo['role'] === 'MASTER_ADMIN');
     $allowHardDeletePlayerId = ($adminTokenInfo !== null && isset($decoded['allowHardDeletePlayerId'])) ? trim((string)$decoded['allowHardDeletePlayerId']) : '';
-    $allowBulkPlayerWipe = ($adminTokenInfo !== null && !empty($decoded['allowBulkPlayerWipe']));
+    $allowBulkPlayerWipe = ($isMasterAdminCaller && !empty($decoded['allowBulkPlayerWipe']));
     if (array_key_exists('allowHardDeletePlayerId', $decoded)) unset($decoded['allowHardDeletePlayerId']);
     if (array_key_exists('allowBulkPlayerWipe', $decoded)) unset($decoded['allowBulkPlayerWipe']);
 
@@ -5998,6 +6084,7 @@ if ($method === 'POST') {
             if (!is_array($oldP) || !empty($oldP['isPlaceholder']) || !empty($oldP['gdprDeleted'])) continue;
             $oldId = isset($oldP['id']) ? (string)$oldP['id'] : '';
             $oldUser = isset($oldP['username']) ? strtolower(trim((string)$oldP['username'])) : '';
+            $isUatBot = (!empty($oldP['isUatTester']) || strpos($oldId, 'UAT_') === 0);
             $matchedIdx = null;
             if ($oldId !== '' && isset($newById[$oldId])) {
                 $matchedIdx = $newById[$oldId];
@@ -6005,7 +6092,10 @@ if ($method === 'POST') {
                 $matchedIdx = $newByUser[$oldUser];
             }
             if ($matchedIdx === null) {
-                if (!$allowBulkPlayerWipe && ($allowHardDeletePlayerId === '' || $allowHardDeletePlayerId !== $oldId)) {
+                $canDeleteThisPlayer = $allowBulkPlayerWipe
+                    || ($allowHardDeletePlayerId !== '' && $allowHardDeletePlayerId === $oldId)
+                    || ($adminTokenInfo !== null && $isUatBot);
+                if (!$canDeleteThisPlayer) {
                     $restoredP = $oldP;
                     $restoredP['leagueId'] = 'POOL';
                     $restoredP['active'] = false;
@@ -6016,7 +6106,7 @@ if ($method === 'POST') {
                     if ($oldId !== '') $newById[$oldId] = $addedIdx;
                     if ($oldUser !== '') $newByUser[$oldUser] = $addedIdx;
                 }
-            } else {
+            } elseif (!$allowBulkPlayerWipe) {
                 $oldHasTrophies = isset($oldP['trophies']) && is_array($oldP['trophies']) && count($oldP['trophies']) > 0;
                 $oldHasHist = isset($oldP['historicalStats']) && is_array($oldP['historicalStats']) && count($oldP['historicalStats']) > 0;
                 $curPl = $decoded['players'][$matchedIdx];

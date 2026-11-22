@@ -1,6 +1,6 @@
 {
   "name": "smpl-portal",
-  "version": "67.0.0",
+  "version": "68.0.0",
   "description": "Score Match Liga Polska (SMPL) — Oficjalny Portal Rozgrywek, Pucharów, Rankingów i Pełnej Historii Ligi",
   "private": true,
   "main": "server.js",

@@ -3112,6 +3112,22 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_14',
+      version: 'V2.14',
+      date: '2026-11-22',
+      category: 'ULEPSZENIA',
+      title: 'Pełna Integracja Grających Adminów, Szybszy VAR i Wzmocnione Bezpieczeństwo Portalu!',
+      summary: 'Zakończyliśmy pełny audyt panelu zarządzania oraz profili grających administratorów. Grający admini korzystają teraz ze wszystkich funkcji gracza bez żadnych ograniczeń, a odświeżanie sporów VAR, terminów „Kiedy Gramy?” oraz ochrona danych ligowych działają jeszcze pewniej.',
+      highlights: [
+        'Grający administratorzy widzą teraz własne mecze w sekcji „Moje mecze w kolejce”, własne podsumowanie SMPL Wrapped, oznaczenia „To Ty” / gospodarza w formularzu wyników oraz szybkie przyciski Messenger i „Kiedy Gramy?”.',
+        'Natychmiastowe wymuszone odświeżanie stanu meczów po wysłaniu propozycji terminu („Kiedy Gramy?”), odpowiedzi na propozycję oraz zgłoszeniu sporu VAR.',
+        'Czystsze wyświetlanie odznak ról — konta, którym odebrano uprawnienia administracyjne, automatycznie tracą starą odznakę Admina w tabelach i na kartach UT.',
+        'Rozbudowany podział ról Admin / Master Admin z dodatkową ochroną ustawień portalu, rang, klanów, kopii zapasowych oraz niezawodnym wysyłaniem powiadomień Push z transmisji.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_13',
       version: 'V2.13',
       date: '2026-11-22',
