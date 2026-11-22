@@ -6286,7 +6286,10 @@ window.SMPL_APP = (function () {
   // =========================================================================
   // MODALE: LIGHTBOX SCREENÓW, PROFIL GRACZA, WYBÓR GRACZA
   // =========================================================================
-  function openModal(htmlContent, maxWidthClass) {
+  function openModal(htmlContent, maxWidthClass, opts) {
+    if (!opts || !opts.keepShopPreview) {
+      coinShopPreviewOverrides = {};
+    }
     closeRankTooltip();
     const modalRoot = document.getElementById('global-modal-root');
     if (!modalRoot) return;
@@ -6310,6 +6313,7 @@ window.SMPL_APP = (function () {
   }
 
   function closeModal() {
+    coinShopPreviewOverrides = {};
     stopOnboardingTutorialVideo();
     const dlg = document.getElementById('smpl-tutorial-dialog');
     if (dlg && dlg.open && typeof dlg.close === 'function') {
@@ -9306,6 +9310,69 @@ window.SMPL_APP = (function () {
   }
 
   let coinShopCategoryFilter = 'all';
+  let coinShopPreviewOverrides = {};
+
+  function getActiveShopPreviewKeys() {
+    const keys = ['frame', 'bgStyle', 'profileBadge', 'nickEffect', 'posterTheme', 'customTitle'];
+    return keys.filter((k) => coinShopPreviewOverrides && coinShopPreviewOverrides[k] !== undefined);
+  }
+
+  function preserveShopCatalogScrollAndRender(categoryFilter) {
+    const listEl = document.getElementById('smpl-shop-catalog-scroll');
+    const savedScrollTop = listEl ? listEl.scrollTop : 0;
+    openCoinShopModal(categoryFilter);
+    const nextListEl = document.getElementById('smpl-shop-catalog-scroll');
+    if (nextListEl && savedScrollTop > 0) {
+      nextListEl.scrollTop = savedScrollTop;
+    }
+  }
+
+  function resetCoinShopPreview(reopen) {
+    coinShopPreviewOverrides = {};
+    if (reopen) {
+      preserveShopCatalogScrollAndRender();
+      showToast('↩️ Wyłączono tryb TEST — przywrócono podgląd Twojego prawdziwego stylu.');
+    }
+  }
+
+  function toggleShopItemPreview(itemId, customTitleInputId) {
+    const catalog = (window.SMPL_STUDIO && window.SMPL_STUDIO.SHOP_CATALOG) || [];
+    const item = catalog.find((x) => x && x.id === itemId);
+    if (!item) return;
+    if (item.category === 'sound' || item.category === 'joinSound') {
+      previewShopSound(item.value);
+      return;
+    }
+    let slot = '';
+    let val = item.value;
+    if (item.category === 'frame') slot = 'frame';
+    else if (item.category === 'bg' || item.category === 'bgStyle') slot = 'bgStyle';
+    else if (item.category === 'badge') slot = 'profileBadge';
+    else if (item.category === 'nickfx') slot = 'nickEffect';
+    else if (item.category === 'poster') slot = 'posterTheme';
+    else if (item.category === 'title') {
+      slot = 'customTitle';
+      if (item.value === 'custom') {
+        const inp = customTitleInputId ? document.getElementById(customTitleInputId) : null;
+        const typed = inp ? String(inp.value || '').replace(/<[^>]*>/g, '').trim().slice(0, 28) : '';
+        val = typed || 'MISTRZ SMPL';
+      } else {
+        val = String(item.value || '').trim().slice(0, 28);
+      }
+    }
+    if (!slot) return;
+
+    const alreadyTestingSame = coinShopPreviewOverrides._itemIds && coinShopPreviewOverrides._itemIds[slot] === item.id;
+    if (alreadyTestingSame) {
+      delete coinShopPreviewOverrides[slot];
+      if (coinShopPreviewOverrides._itemIds) delete coinShopPreviewOverrides._itemIds[slot];
+    } else {
+      coinShopPreviewOverrides[slot] = val;
+      if (!coinShopPreviewOverrides._itemIds) coinShopPreviewOverrides._itemIds = {};
+      coinShopPreviewOverrides._itemIds[slot] = item.id;
+    }
+    preserveShopCatalogScrollAndRender();
+  }
 
   function setCoinShopCategory(cat) {
     coinShopCategoryFilter = String(cat || 'all');
@@ -9364,6 +9431,11 @@ window.SMPL_APP = (function () {
       .filter((x) => x.category === 'title' && x.value !== 'custom')
       .map((x) => x.value);
     const ownedCount = cos.unlockedItems.length;
+    const activePreviewKeys = getActiveShopPreviewKeys();
+    const hasActivePreview = activePreviewKeys.length > 0;
+    const viewCos = (hasActivePreview && typeof window.SMPL_STUDIO.resolveShopPreviewCosmetics === 'function')
+      ? window.SMPL_STUDIO.resolveShopPreviewCosmetics(cos, coinShopPreviewOverrides)
+      : cos;
     const tabsHtml = tabs.map((t) => {
       const active = coinShopCategoryFilter === t.id;
       const cntTxt = t.cnt !== '' ? (' (' + t.cnt + ')') : '';
@@ -9462,11 +9534,21 @@ window.SMPL_APP = (function () {
           ? '<span class="smpl-shop-rarity">' + studioEsc(item.rarity) + '</span>'
           : '';
         const customInpHtml = isCustomTitleItem
-          ? '<input id="' + extraInputId + '" type="text" maxlength="28" value="' + studioEsc(cos.customTitle || '') + '" placeholder="Wpisz własny tytuł UT (max 28 zn.)" class="mt-2 w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/15 text-white"/>'
+          ? '<input id="' + extraInputId + '" type="text" maxlength="28" value="' + studioEsc((coinShopPreviewOverrides._itemIds && coinShopPreviewOverrides._itemIds.customTitle === item.id && coinShopPreviewOverrides.customTitle) ? coinShopPreviewOverrides.customTitle : (cos.customTitle || '')) + '" placeholder="Wpisz własny tytuł UT (max 28 zn.)" class="mt-2 w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/15 text-white"/>'
           : '';
+        const previewSlotKey = item.category === 'frame' ? 'frame'
+          : (item.category === 'bg' || item.category === 'bgStyle') ? 'bgStyle'
+          : item.category === 'badge' ? 'profileBadge'
+          : item.category === 'nickfx' ? 'nickEffect'
+          : item.category === 'poster' ? 'posterTheme'
+          : item.category === 'title' ? 'customTitle'
+          : '';
+        const isTestingThis = Boolean(previewSlotKey && coinShopPreviewOverrides._itemIds && coinShopPreviewOverrides._itemIds[previewSlotKey] === item.id);
         const testBtnHtml = isSoundItem
-          ? '<button type="button" onclick="SMPL_APP.previewShopSound(\'' + studioEsc(item.value) + '\')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-bold" title="Odsłuchaj dźwięk przed zakupem">🔊 Test</button>'
-          : '';
+          ? '<button type="button" onclick="SMPL_APP.previewShopSound(\'' + studioEsc(item.value) + '\')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-white/10 font-bold" title="Odsłuchaj dźwięk przed zakupem (tylko podgląd)">🔊 Test</button>'
+          : (!isEquipped || isCustomTitleItem)
+            ? '<button type="button" aria-pressed="' + (isTestingThis ? 'true' : 'false') + '" onclick="SMPL_APP.toggleShopItemPreview(\'' + studioEsc(item.id) + '\', \'' + extraInputId + '\')" class="px-2.5 py-1.5 rounded-lg font-bold transition ' + (isTestingThis ? 'bg-fuchsia-600/35 hover:bg-fuchsia-600/50 text-fuchsia-100 border border-fuchsia-400/75 shadow' : 'bg-slate-800 hover:bg-slate-700 text-sky-200 hover:text-white border border-sky-400/30') + '" title="Podgląd TEST tylko wewnątrz Sklepiku przed zakupem">' + (isTestingThis ? '🧪 Test ✓' : '👁️ Test') + '</button>'
+            : '';
 
         let actionBtnsHtml = '';
         if (!owned && dropClosed) {
@@ -9482,7 +9564,7 @@ window.SMPL_APP = (function () {
           actionBtnsHtml = '<button type="button" onclick="SMPL_APP.handleEquipShopItem(\'' + studioEsc(item.category) + '\', \'' + studioEsc(item.value) + '\', \'' + extraInputId + '\')" class="px-3 py-1.5 rounded-lg bg-blue-600/35 hover:bg-blue-600/50 text-blue-100 border border-blue-400/40 font-bold uppercase">✨ Załóż</button>';
         }
 
-        const borderCls = isEquipped ? 'border-emerald-400/50' : owned ? 'border-amber-400/40' : 'border-white/10';
+        const borderCls = isTestingThis ? 'border-fuchsia-400/75 bg-fuchsia-950/20' : isEquipped ? 'border-emerald-400/50' : owned ? 'border-amber-400/40' : 'border-white/10';
         const missingHtml = (!owned && !dropClosed && coins.balance < itemPrice)
           ? '<span class="text-[10px] text-rose-300/90 font-semibold">• brakuje ' + (itemPrice - coins.balance) + '</span>'
           : '';
@@ -9552,35 +9634,79 @@ window.SMPL_APP = (function () {
     const shopPlRk = (shopPlObj && window.SMPL_RANKS) ? window.SMPL_RANKS.getPlayerRank(shopPlObj, state) : null;
     const shopPlRkNameCls = (shopPlRk && window.SMPL_RANKS) ? window.SMPL_RANKS.nameClass(shopPlRk) : '';
     const shopPlAvatar = (shopPlObj && shopPlObj.avatar) || (window.SMPL_MEDIA ? window.SMPL_MEDIA.generatePlayerAvatar(shopPlName, shopPlNick || 'SMPL', 1) : '');
-    const shopPreviewBadgeHtml = cos.badgeLabel
-      ? '<span class="smpl-shop-badge-pill" style="border-color:' + studioEsc(cos.badgeColor || '#38bdf8') + ';color:' + studioEsc(cos.badgeColor || '#38bdf8') + ';box-shadow:0 0 10px ' + studioEsc(cos.badgeColor || '#38bdf8') + '44;">' + studioEsc(cos.badgeLabel) + '</span>'
+    const shopPreviewBadgeHtml = viewCos.badgeLabel
+      ? '<span class="smpl-shop-badge-pill" style="border-color:' + studioEsc(viewCos.badgeColor || '#38bdf8') + ';color:' + studioEsc(viewCos.badgeColor || '#38bdf8') + ';box-shadow:0 0 10px ' + studioEsc(viewCos.badgeColor || '#38bdf8') + '44;">' + studioEsc(viewCos.badgeLabel) + '</span>'
       : '';
-    const shopPreviewTitleHtml = cos.customTitle
-      ? '<span class="smpl-coin-title-ribbon">🪙 ' + studioEsc(cos.customTitle) + '</span>'
+    const shopPreviewTitleHtml = viewCos.customTitle
+      ? '<span class="smpl-coin-title-ribbon">🪙 ' + studioEsc(viewCos.customTitle) + '</span>'
       : '';
     const findCatalogTitle = (cat, val) => {
       if (!val || val === 'default') return 'domyślny';
       const hit = catalog.find((it) => it && it.category === cat && it.value === val);
       return hit ? String(hit.title || val).replace(/^(Tło|Blask Nicku|Skórka PNG|Dźwięk|Odznaka|Tytuł|DROP S56):\s*/i, '') : String(val);
     };
-    const livePreviewCardHtml =
-      '<div class="smpl-cosmetic-card smpl-shop-live-preview ' + studioEsc(cos.bgCss || '') + ' ' + studioEsc(cos.frameCss || '') + ' border border-white/15">' +
-        '<div class="flex items-center gap-3 min-w-0">' +
-          (shopPlAvatar ? '<img src="' + shopPlAvatar + '" alt="' + studioEsc(shopPlName) + '" class="w-12 h-12 rounded-full object-cover border-2 border-amber-400/70 shadow-lg flex-shrink-0"/>' : '') +
-          '<div class="min-w-0">' +
-            '<div class="text-[9.5px] font-display font-bold uppercase tracking-wider text-slate-300">✨ PODGLĄD TWOJEGO STYLU NA ŻYWO (KARTA UT + PROFIL + TABELA)</div>' +
-            '<div class="flex items-center gap-2 flex-wrap mt-0.5">' +
-              '<span class="font-display font-black text-base text-white uppercase ' + studioEsc(shopPlRkNameCls) + ' ' + studioEsc(cos.nickFxCss || '') + '">' + studioEsc(shopPlName) + '</span>' +
-              shopPreviewBadgeHtml +
-            '</div>' +
-            (shopPreviewTitleHtml ? '<div class="mt-1">' + shopPreviewTitleHtml + '</div>' : '<div class="text-[10.5px] text-slate-300 mt-0.5">@' + studioEsc(shopPlNick) + '</div>') +
-          '</div>' +
-        '</div>' +
-        '<div class="flex flex-wrap items-center gap-1.5 flex-shrink-0">' +
+    const testedChipsHtml = hasActivePreview
+      ? activePreviewKeys.map((slotKey) => {
+          const catMap = { frame: 'frame', bgStyle: 'bg', profileBadge: 'badge', nickEffect: 'nickfx', posterTheme: 'poster', customTitle: 'title' };
+          const lblMap = { frame: '🖼️ Ramka', bgStyle: '🏟️ Tło', profileBadge: '🎯 Odznaka', nickEffect: '✨ Blask', posterTheme: '🎨 PNG', customTitle: '🏷️ Tytuł' };
+          const slotVal = coinShopPreviewOverrides[slotKey];
+          const prettyVal = slotKey === 'customTitle' ? ('„' + slotVal + '”') : findCatalogTitle(catMap[slotKey], slotVal);
+          return '<span class="px-2 py-0.5 rounded-full bg-fuchsia-500/25 border border-fuchsia-400/50 text-fuchsia-100 text-[10px] font-bold">' + lblMap[slotKey] + ': ' + studioEsc(prettyVal) + '</span>';
+        }).join('')
+      : '';
+    const posterPreviewMockHtml = (coinShopPreviewOverrides.posterTheme && viewCos.posterThemeMeta)
+      ? (() => {
+          const pm = viewCos.posterThemeMeta;
+          return (
+            '<div class="smpl-shop-poster-test-preview w-full mt-2" style="background:linear-gradient(135deg,' + studioEsc(pm.bg0) + ' 0%,' + studioEsc(pm.bg1) + ' 55%,' + studioEsc(pm.bg2) + ' 100%);border-color:' + studioEsc(pm.accent) + '88;box-shadow:0 0 22px rgba(' + studioEsc(pm.accentRgb || '250, 204, 21') + ',0.24);">' +
+              '<div class="flex items-center justify-between gap-2 flex-wrap">' +
+                '<div class="flex items-center gap-2">' +
+                  '<span class="px-2 py-0.5 rounded-full text-[9.5px] font-display font-black uppercase" style="background:' + studioEsc(pm.accent) + '28;border:1px solid ' + studioEsc(pm.accent) + ';color:' + studioEsc(pm.headerFill || '#fff') + ';">🎨 SKÓRKA PNG: ' + studioEsc(pm.label || viewCos.posterTheme) + '</span>' +
+                  '<span class="text-[10px] text-slate-200 font-semibold">Tabela Ligi • Hit VS • Karta UT • Wrapped</span>' +
+                '</div>' +
+                '<span class="px-2 py-0.5 rounded bg-black/55 border border-fuchsia-400/55 text-[9px] font-display font-black uppercase text-fuchsia-200">🧪 TEST — KUP ABY POBRAĆ PNG</span>' +
+              '</div>' +
+              '<div class="grid grid-cols-3 gap-1.5 mt-2">' +
+                '<div class="h-2 rounded-full" style="background:linear-gradient(90deg,' + studioEsc(pm.accent) + ',' + studioEsc(pm.accent2) + ');"></div>' +
+                '<div class="h-2 rounded-full opacity-75" style="background:' + studioEsc(pm.accent2) + ';"></div>' +
+                '<div class="h-2 rounded-full opacity-45" style="background:' + studioEsc(pm.headerFill || pm.accent) + ';"></div>' +
+              '</div>' +
+            '</div>'
+          );
+        })()
+      : '';
+    const livePreviewActionsHtml = hasActivePreview
+      ? '<div class="flex flex-wrap items-center gap-1.5 flex-shrink-0">' +
+          '<button type="button" onclick="SMPL_APP.resetCoinShopPreview(true)" class="px-3 py-1.5 rounded-lg bg-fuchsia-600/35 hover:bg-fuchsia-600/55 text-fuchsia-100 border border-fuchsia-400/70 text-[11px] font-display font-black uppercase shadow">↩️ Wyłącz Test</button>' +
+        '</div>'
+      : '<div class="flex flex-wrap items-center gap-1.5 flex-shrink-0">' +
           '<button type="button" onclick="SMPL_APP.closeModal(); SMPL_APP.openPlayerProfileTab(\'' + studioEsc(pid) + '\');" class="px-2.5 py-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/50 text-[11px] font-display font-black uppercase">🎴 Karta UT</button>' +
           '<button type="button" onclick="SMPL_APP.downloadUtCardPosterPng(\'' + studioEsc(pid) + '\')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-400/45 text-[11px] font-display font-black uppercase">📸 Karta PNG</button>' +
           '<button type="button" onclick="SMPL_APP.downloadStandingsPosterPng(\'' + studioEsc(shopPlLeague) + '\')" class="px-2.5 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/35 text-sky-200 border border-sky-400/45 text-[11px] font-display font-black uppercase">📊 Tabela PNG</button>' +
+        '</div>';
+    const livePreviewCardHtml =
+      '<div aria-live="polite" class="smpl-cosmetic-card smpl-shop-live-preview ' + studioEsc(viewCos.bgCss || '') + ' ' + studioEsc(viewCos.frameCss || '') + ' border ' + (hasActivePreview ? 'border-fuchsia-400/60' : 'border-white/15') + '">' +
+        (hasActivePreview
+          ? '<div class="smpl-shop-test-banner w-full flex flex-wrap items-center justify-between gap-1.5 mb-1">' +
+              '<span class="text-[10px] font-display font-black uppercase tracking-wider text-fuchsia-200">🧪 TRYB PODGLĄDU (TEST) — WIDOCZNY TYLKO W SKLEPIKU • POZA SKLEPIKIEM NIE DZIAŁA</span>' +
+              '<div class="flex flex-wrap items-center gap-1">' + testedChipsHtml + '</div>' +
+            '</div>'
+          : '') +
+        '<div class="flex items-center justify-between gap-3 flex-wrap w-full">' +
+          '<div class="flex items-center gap-3 min-w-0">' +
+            (shopPlAvatar ? '<img src="' + shopPlAvatar + '" alt="' + studioEsc(shopPlName) + '" class="w-12 h-12 rounded-full object-cover border-2 border-amber-400/70 shadow-lg flex-shrink-0"/>' : '') +
+            '<div class="min-w-0">' +
+              '<div class="text-[9.5px] font-display font-bold uppercase tracking-wider text-slate-300">' + (hasActivePreview ? '👁️ PRZYMIERZALNIA NA ŻYWO (KLIKNIJ „KUP”, ABY ZAPISAĆ NA STAŁE)' : '✨ PODGLĄD TWOJEGO STYLU NA ŻYWO (KARTA UT + PROFIL + TABELA)') + '</div>' +
+              '<div class="flex items-center gap-2 flex-wrap mt-0.5">' +
+                '<span class="font-display font-black text-base text-white uppercase ' + studioEsc(shopPlRkNameCls) + ' ' + studioEsc(viewCos.nickFxCss || '') + '">' + studioEsc(shopPlName) + '</span>' +
+                shopPreviewBadgeHtml +
+              '</div>' +
+              (shopPreviewTitleHtml ? '<div class="mt-1">' + shopPreviewTitleHtml + '</div>' : '<div class="text-[10.5px] text-slate-300 mt-0.5">@' + studioEsc(shopPlNick) + '</div>') +
+            '</div>' +
+          '</div>' +
+          livePreviewActionsHtml +
         '</div>' +
+        posterPreviewMockHtml +
       '</div>';
 
     const html = `
@@ -9600,10 +9726,19 @@ window.SMPL_APP = (function () {
           <div class="text-slate-400">Aktywne teraz: Ramka <strong class="text-white">${studioEsc(findCatalogTitle('frame', cos.frame))}</strong> • Tło <strong class="text-white">${studioEsc(findCatalogTitle('bg', cos.bgStyle))}</strong> • Skórka PNG <strong class="text-white">${studioEsc(findCatalogTitle('poster', cos.posterTheme))}</strong> • Odznaka <strong class="text-white">${studioEsc(cos.badgeLabel || 'brak')}</strong> • Blask <strong class="text-white">${studioEsc(findCatalogTitle('nickfx', cos.nickEffect))}</strong> • Dźwięk <strong class="text-white">${studioEsc(findCatalogTitle('sound', cos.joinSound))}</strong></div>
         </div>
         <div class="flex flex-wrap gap-1.5">${tabsHtml}</div>
-        <div class="space-y-2.5 max-h-96 overflow-y-auto pr-1 text-xs">${bodyHtml}</div>
+        <div id="smpl-shop-catalog-scroll" class="space-y-2.5 max-h-96 overflow-y-auto pr-1 text-xs">${bodyHtml}</div>
       </div>
     `;
-    openModal(html, 'max-w-3xl');
+    openModal(html, 'max-w-3xl', { keepShopPreview: true });
+  }
+
+  function clearShopPreviewSlotByCategory(cat) {
+    const slotMap = { frame: 'frame', bg: 'bgStyle', bgStyle: 'bgStyle', badge: 'profileBadge', nickfx: 'nickEffect', poster: 'posterTheme', title: 'customTitle' };
+    const slot = slotMap[cat];
+    if (slot) {
+      delete coinShopPreviewOverrides[slot];
+      if (coinShopPreviewOverrides._itemIds) delete coinShopPreviewOverrides._itemIds[slot];
+    }
   }
 
   function handleBuyShopItem(itemId, customTitleInputId) {
@@ -9614,6 +9749,7 @@ window.SMPL_APP = (function () {
       const res = window.SMPL_DB.buyShopItem({ itemId: itemId, customTitle: effectiveCustomTitle });
       const catalog = (window.SMPL_STUDIO && window.SMPL_STUDIO.SHOP_CATALOG) || [];
       const boughtItem = catalog.find((x) => x.id === itemId);
+      if (boughtItem) clearShopPreviewSlotByCategory(boughtItem.category);
       if (boughtItem && boughtItem.category === 'sound' && window.SMPL_NOTIF && typeof window.SMPL_NOTIF.playShopSound === 'function') {
         window.SMPL_NOTIF.playShopSound(boughtItem.value, false);
       }
@@ -9623,7 +9759,7 @@ window.SMPL_APP = (function () {
           : '🪙 Zakupiono i aktywowano element kosmetyczny!'
       );
       renderAll();
-      openCoinShopModal();
+      preserveShopCatalogScrollAndRender();
       if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
         res.remotePromise.then((srv) => {
           if (srv && srv.ok === false && srv.error) {
@@ -9643,12 +9779,13 @@ window.SMPL_APP = (function () {
     const effectiveCustomTitle = (category === 'title' && value === 'custom' && !rawCustomTitle) ? 'MISTRZ SMPL' : rawCustomTitle;
     try {
       const res = window.SMPL_DB.equipShopItem({ category: category, value: value, customTitle: effectiveCustomTitle });
+      clearShopPreviewSlotByCategory(category);
       if (category === 'sound' && value && value !== 'default' && window.SMPL_NOTIF && typeof window.SMPL_NOTIF.playShopSound === 'function') {
         window.SMPL_NOTIF.playShopSound(value, false);
       }
       showToast(value === 'default' ? '🎨 Przywrócono domyślny element kosmetyczny.' : '✨ Zaktualizowano wygląd i styl profilu!');
       renderAll();
-      openCoinShopModal();
+      preserveShopCatalogScrollAndRender();
       if (res && res.remotePromise && typeof res.remotePromise.then === 'function') {
         res.remotePromise.then((srv) => {
           if (srv && srv.ok === false && srv.error) {
@@ -11224,6 +11361,8 @@ window.SMPL_APP = (function () {
     openCoinShopModal,
     setCoinShopCategory,
     previewShopSound,
+    toggleShopItemPreview,
+    resetCoinShopPreview,
     handleBuyShopItem,
     handleEquipShopItem,
     handleClaimShopQuest,

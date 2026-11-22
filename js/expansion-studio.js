@@ -400,6 +400,34 @@ window.SMPL_STUDIO = (function () {
     };
   }
 
+  function resolveShopPreviewCosmetics(baseCos, overrides) {
+    var b = baseCos || {};
+    var ov = (overrides && typeof overrides === 'object') ? overrides : {};
+    var frame = ov.frame !== undefined ? String(ov.frame || 'default') : String(b.frame || 'default');
+    var bgStyle = ov.bgStyle !== undefined ? String(ov.bgStyle || 'default') : String(b.bgStyle || 'default');
+    var profileBadge = ov.profileBadge !== undefined ? String(ov.profileBadge || 'default') : String(b.profileBadge || 'default');
+    var nickEffect = ov.nickEffect !== undefined ? String(ov.nickEffect || 'default') : String(b.nickEffect || 'default');
+    var posterTheme = ov.posterTheme !== undefined ? String(ov.posterTheme || 'default') : String(b.posterTheme || 'default');
+    var customTitle = ov.customTitle !== undefined ? String(ov.customTitle || '') : String(b.customTitle || '');
+    var posterThemeMeta = POSTER_THEMES_MAP[posterTheme] || POSTER_THEMES_MAP['default'];
+    var badgeMeta = BADGE_DISPLAY_MAP[profileBadge] || null;
+    return {
+      frame: frame,
+      bgStyle: bgStyle,
+      customTitle: customTitle,
+      joinSound: String(b.joinSound || 'default'),
+      profileBadge: profileBadge,
+      badgeLabel: badgeMeta ? badgeMeta.badge : '',
+      badgeColor: badgeMeta ? badgeMeta.color : '#38bdf8',
+      nickEffect: nickEffect,
+      nickFxCss: NICKFX_CSS_MAP[nickEffect] || '',
+      posterTheme: posterTheme,
+      posterThemeMeta: posterThemeMeta,
+      frameCss: FRAME_CSS_MAP[frame] || '',
+      bgCss: BG_CSS_MAP[bgStyle] || ''
+    };
+  }
+
   function computePlayerWeeklyQuests(state, playerId) {
     var s = state || {};
     var pid = String(playerId || '');
@@ -3084,6 +3112,21 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_13',
+      version: 'V2.13',
+      date: '2026-11-22',
+      category: 'NOWOŚCI',
+      title: 'Przymierzalnia „👁️ Test” w Sklepiku SMPL Coins — Przetestuj Każdy Przedmiot Przed Zakupem!',
+      summary: 'Nie musisz już kupować w ciemno! Dodaliśmy tryb podglądu „👁️ Test” dla wszystkich 51 przedmiotów w Sklepiku SMPL Coins — łącz dowolne ramki, tła, blaski nicku, odznaki, tytuły, dźwięki i skórki PNG na karcie podglądu przed wydaniem monet.',
+      highlights: [
+        'Przycisk „👁️ Test” przy każdej ramce, tle, odznace, blasku nicku, tytule i skórce PNG (+ „🔊 Test” dla dźwięków) — możesz testować całe zestawy naraz na żywo!',
+        'Podgląd Skórek PNG na żywo (Cyber Arena, Złota Gala, Derby Inferno, Arktyczna Noc, Królewskie Zaćmienie) z mini-wizualizacją kolorystyki bez konieczności zakupu.',
+        'Tryb TEST działa wyłącznie wewnątrz okna Sklepiku i znika automatycznie po jego zamknięciu — poza sklepikiem widoczne są wyłącznie zakupione i założone kosmetyki.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_12',
       version: 'V2.12',
       date: '2026-11-22',
@@ -3566,9 +3609,12 @@ window.SMPL_STUDIO = (function () {
     BUILTIN_PLAYER_UPDATES: BUILTIN_PLAYER_UPDATES,
     SHOP_CATALOG: SHOP_CATALOG,
     POSTER_THEMES_MAP: POSTER_THEMES_MAP,
+    FRAME_CSS_MAP: FRAME_CSS_MAP,
+    BG_CSS_MAP: BG_CSS_MAP,
     WEEKLY_QUESTS_DEF: WEEKLY_QUESTS_DEF,
     BADGE_DISPLAY_MAP: BADGE_DISPLAY_MAP,
     NICKFX_CSS_MAP: NICKFX_CSS_MAP,
+    resolveShopPreviewCosmetics: resolveShopPreviewCosmetics,
     computePlayerWeeklyQuests: computePlayerWeeklyQuests,
     foldName: foldName,
     todayYmd: todayYmd,
