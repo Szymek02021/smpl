@@ -1976,19 +1976,19 @@ window.SMPL_VIEWS = (function () {
       }
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
         <!-- LEWA KOLUMNA: ZŁOTA KARTA ULTIMATE TEAM -->
-        <div class="lg:col-span-5 smpl-ut-3d-wrap">
-          <div class="ut-card-foil-surface smpl-ut-card-holo rounded-3xl p-6 ${cardBgClass} ${utCosmetics.bgCss || ''} ${utCosmetics.frameCss || ''} border-2 shadow-2xl relative overflow-hidden" onmousemove="SMPL_APP.handleUtCardTilt(event, this)" onmouseleave="SMPL_APP.resetUtCardTilt(this)">
+        <div class="lg:col-span-5 smpl-ut-3d-wrap w-full max-w-[460px] mx-auto lg:max-w-none">
+          <div class="ut-card-foil-surface smpl-ut-card-holo rounded-3xl p-4 sm:p-6 ${cardBgClass} ${utCosmetics.bgCss || ''} ${utCosmetics.frameCss || ''} border-2 shadow-2xl relative overflow-hidden" onpointermove="SMPL_APP.handleUtCardTilt(event, this)" onpointerleave="SMPL_APP.resetUtCardTilt(this)">
             <div class="smpl-ut-prism-sheen"></div>
-            <div class="flex items-start justify-between gap-3 mb-4">
-              <div class="smpl-ut-ovr-crest text-center">
-                <div class="font-display font-black text-4xl sm:text-5xl text-amber-300 leading-none">${utData.ovr}</div>
-                <div class="text-[11px] font-display font-black uppercase text-white tracking-widest mt-1">OVR</div>
-                <div class="mt-2 px-2 py-0.5 rounded bg-black/50 border border-white/15 text-[10px] font-display font-bold text-emerald-300">
+            <div class="smpl-ut-card-head grid grid-cols-[minmax(66px,1fr)_auto_minmax(66px,1fr)] items-start gap-2 sm:gap-3 mb-4">
+              <div class="smpl-ut-ovr-crest text-center justify-self-start">
+                <div class="font-display font-black text-3xl sm:text-5xl text-amber-300 leading-none">${utData.ovr}</div>
+                <div class="text-[10px] sm:text-[11px] font-display font-black uppercase text-white tracking-widest mt-1">OVR</div>
+                <div class="mt-1.5 sm:mt-2 px-1.5 sm:px-2 py-0.5 rounded bg-black/50 border border-white/15 text-[10px] font-display font-bold text-emerald-300 whitespace-nowrap">
                   #${row.position} ${escapeHtml(p.leagueId)}
                 </div>
               </div>
 
-              <div class="flex flex-col items-center">
+              <div class="flex flex-col items-center justify-self-center">
                 <div class="relative flex flex-col items-center">
                   ${(() => {
                     const utRk = window.SMPL_RANKS ? window.SMPL_RANKS.getPlayerRank(p, state) : null;
@@ -1996,13 +1996,13 @@ window.SMPL_VIEWS = (function () {
                       return window.SMPL_RANKS.avatarWithGlassBadgeHtml(
                         utAvatar,
                         p.name,
-                        'w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-amber-400 shadow-xl',
+                        'w-20 h-20 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-amber-400 shadow-xl',
                         utRk,
                         p.id,
                         'ut'
                       );
                     }
-                    return `<img src="${utAvatar}" class="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-amber-400 shadow-xl" alt="${escapeHtml(p.name)}"/>`;
+                    return `<img src="${utAvatar}" class="w-20 h-20 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-amber-400 shadow-xl" alt="${escapeHtml(p.name)}"/>`;
                   })()}
                   <span class="mt-2 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-display font-black text-[10px] uppercase whitespace-nowrap shadow">
                     ${escapeHtml(utData.cardLabel)}
@@ -2017,10 +2017,10 @@ window.SMPL_VIEWS = (function () {
                 </div>
               </div>
 
-              <div class="text-right">
-                <div class="text-xs font-display font-bold text-amber-300">🇵🇱 POL</div>
-                <div class="text-[11px] text-slate-300 font-semibold mt-1">Score Match Liga</div>
-                <div class="text-[11px] text-emerald-400 font-bold mt-1">🏆 ${trophies.length}x</div>
+              <div class="text-right justify-self-end">
+                <div class="text-xs font-display font-bold text-amber-300 whitespace-nowrap">🇵🇱 POL</div>
+                <div class="text-[10px] sm:text-[11px] text-slate-300 font-semibold mt-1 leading-tight">SMPL Liga</div>
+                <div class="text-[11px] text-emerald-400 font-bold mt-1 whitespace-nowrap">🏆 ${trophies.length}x</div>
               </div>
             </div>
 

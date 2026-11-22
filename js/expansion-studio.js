@@ -2288,13 +2288,14 @@ window.SMPL_STUDIO = (function () {
     if (!ctx) return null;
 
     var th = getUtVisualTheme(ut, cos);
-    var bgPal = getUtBgPalette(cos ? cos.bgStyle : 'default', cos ? cos.posterThemeMeta : null);
+    var bgKey = cos ? String(cos.bgStyle || 'default') : 'default';
+    var bgPal = getUtBgPalette(bgKey, cos ? cos.posterThemeMeta : null);
     paintStudioBackdrop(
       ctx, W, H,
       '', '', '',
       {
-        bgImg: bgImg,
-        bgAlpha: (cos && cos.bgStyle && cos.bgStyle !== 'default') ? 0.12 : 0.24,
+        bgImg: null,
+        bgAlpha: 0,
         bg0: bgPal.bg0,
         bg1: bgPal.bg1,
         bg2: bgPal.bg2,
@@ -2306,9 +2307,41 @@ window.SMPL_STUDIO = (function () {
       }
     );
 
-    // Aura spotlight behind shield
-    var sGlow = ctx.createRadialGradient(360, 340, 30, 360, 420, 410);
-    sGlow.addColorStop(0, 'rgba(' + th.accentRgb + ', 0.34)');
+    // Symmetrical themed backdrop texture behind the shield
+    ctx.save();
+    if (bgKey === 'galaxies_end' || bgKey === 'drop_s56_starfall') {
+      var starPts = [
+        [74, 88, 2.2], [148, 162, 1.5], [640, 112, 2.4], [588, 198, 1.6],
+        [52, 420, 1.8], [666, 460, 2.0], [92, 790, 1.8], [628, 825, 2.2],
+        [360, 44, 1.6], [220, 930, 1.5], [510, 915, 1.8], [116, 610, 1.4], [614, 640, 1.5]
+      ];
+      starPts.forEach(function (sp) {
+        ctx.beginPath();
+        ctx.arc(sp[0], sp[1], sp[2], 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+        ctx.fill();
+      });
+    } else if (bgKey === 'cyber_grid' || bgKey === 'holo_carbon' || bgKey === 'royal_gold') {
+      var gStep = bgKey === 'holo_carbon' ? 20 : 34;
+      ctx.strokeStyle = bgKey === 'cyber_grid' ? 'rgba(34, 211, 238, 0.11)' : (bgKey === 'royal_gold' ? 'rgba(250, 204, 21, 0.06)' : 'rgba(255, 255, 255, 0.045)');
+      ctx.lineWidth = 1;
+      for (var gx = gStep; gx < W; gx += gStep) {
+        ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+      }
+      for (var gy = gStep; gy < H; gy += gStep) {
+        ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+      }
+    } else if (bgKey === 'emerald_pitch') {
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.06)';
+      for (var py = 0; py < H; py += 96) {
+        ctx.fillRect(0, py, W, 48);
+      }
+    }
+    ctx.restore();
+
+    // Symmetrical center aura spotlight behind shield
+    var sGlow = ctx.createRadialGradient(360, 320, 24, 360, 380, 400);
+    sGlow.addColorStop(0, 'rgba(' + th.accentRgb + ', 0.30)');
     sGlow.addColorStop(1, 'rgba(' + th.accentRgb + ', 0)');
     ctx.fillStyle = sGlow;
     ctx.fillRect(0, 0, W, H);
@@ -2331,32 +2364,35 @@ window.SMPL_STUDIO = (function () {
     var sh = 886;
     ctx.save();
     drawFutShieldPath(ctx, sx, sy, sw, sh);
-    var shGrad = ctx.createLinearGradient(sx, sy, sx + sw, sy + sh);
+    var shGrad = ctx.createLinearGradient(sx, sy, sx, sy + sh);
     shGrad.addColorStop(0, th.shield0);
-    shGrad.addColorStop(0.42, th.shield1);
+    shGrad.addColorStop(0.45, th.shield1);
     shGrad.addColorStop(1, th.shield2);
     ctx.fillStyle = shGrad;
     ctx.fill();
 
-    // Foil light streaks clipped strictly inside shield
+    // Symmetrical top dome glow + clean micro-mesh clipped strictly inside shield
     ctx.save();
     ctx.clip();
-    var spotTop = ctx.createRadialGradient(440, 260, 20, 440, 260, 300);
+    var spotTop = ctx.createRadialGradient(360, 140, 20, 360, 200, 360);
     spotTop.addColorStop(0, 'rgba(' + th.accentRgb + ', 0.28)');
     spotTop.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = spotTop;
     ctx.fillRect(sx, sy, sw, sh);
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
-    for (var f = 0; f < 4; f++) {
-      var fx = sx - 120 + f * 210;
-      ctx.beginPath();
-      ctx.moveTo(fx, sy);
-      ctx.lineTo(fx + 75, sy);
-      ctx.lineTo(fx - 210, sy + sh);
-      ctx.lineTo(fx - 285, sy + sh);
-      ctx.closePath();
-      ctx.fill();
+    var spotBot = ctx.createRadialGradient(360, sy + sh - 40, 16, 360, sy + sh - 40, 280);
+    spotBot.addColorStop(0, 'rgba(' + bgPal.rgb + ', 0.22)');
+    spotBot.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = spotBot;
+    ctx.fillRect(sx, sy, sw, sh);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.032)';
+    ctx.lineWidth = 1;
+    for (var mx = sx + 28; mx < sx + sw; mx += 28) {
+      ctx.beginPath(); ctx.moveTo(mx, sy); ctx.lineTo(mx, sy + sh); ctx.stroke();
+    }
+    for (var my = sy + 28; my < sy + sh; my += 28) {
+      ctx.beginPath(); ctx.moveTo(sx, my); ctx.lineTo(sx + sw, my); ctx.stroke();
     }
     ctx.restore();
 
@@ -3047,6 +3083,22 @@ window.SMPL_STUDIO = (function () {
    * Uwaga: opisujemy wyłącznie funkcje i poprawki dla graczy (zero wewnętrznych detali serwera).
    */
   var BUILTIN_PLAYER_UPDATES = [
+    {
+      id: 'BUILTIN_V2_12',
+      version: 'V2.12',
+      date: '2026-11-22',
+      category: 'ULEPSZENIA',
+      title: 'Nowe, Idealnie Dopasowane Tła Karty UT (Telefon & PC) — Zero Przekrzywień i Przycięć!',
+      summary: 'Przebudowaliśmy od zera tła oraz układ Karty Ultimate Team na smartfonach i komputerach! Zamiast rozciągniętego obrazka z krzywą tarczą i ukośnie latającej obwódki, każda Karta UT ma teraz perfekcyjnie symetryczną, wycentrowaną oprawę Broadcast Carbon i idealnie równe proporcje.',
+      highlights: [
+        'Usunięto stary obrazek wow-ut-foil.jpg z wrysowaną tarczą, który rozjeżdżał się na telefonach i PC, oraz naprawiono błąd z obracającą się pod kątem 22° obwódką ::before.',
+        'Wszystkie 10 Teł Karty UT ze Sklepiku Coins (Murawa UCL, Nocna Arena, Cyber Matrix, Zorza, Królewski Welur, Krater Ognia, Włókno Węglowe, Gwiezdny Kosmos S56 i Deszcz Gwiazd) są teraz w 100% symetryczne, wycentrowane i bez ukośnych pasów.',
+        'Idealne wycentrowanie awatara na Karcie UT dzięki 3-kolumnowej siatce nagłówka oraz responsywnym regułom Container Queries na wąskie telefony.',
+        'Usunięto krzywe przekrzywianie karty i ulepszono symetryczne tła również w eksporcie Karty UT PNG.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
     {
       id: 'BUILTIN_V2_11',
       version: 'V2.11',

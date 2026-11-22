@@ -2523,45 +2523,41 @@ textarea:focus-visible {
   box-shadow: 0 28px 66px rgba(0, 0, 0, 0.82), 0 0 46px rgba(16, 185, 129, 0.26), inset 0 1px 0 rgba(253, 224, 71, 0.26);
 }
 
-@keyframes utFoilSweep {
-  0%, 45% { transform: translateX(-140%) rotate(22deg); opacity: 0; }
-  62% { opacity: 0.78; }
-  85%, 100% { transform: translateX(170%) rotate(22deg); opacity: 0; }
-}
-
 .ut-card-foil-surface {
   position: relative;
   overflow: hidden;
-  background-color: #090D16;
+  container-type: inline-size;
+  background-color: #080d1a;
   background-image:
-    linear-gradient(175deg, rgba(12, 16, 28, 0.72) 0%, rgba(8, 12, 22, 0.84) 52%, rgba(5, 8, 15, 0.94) 100%),
-    url('../img/ut-card-foil-bg.jpg');
-  background-size: cover;
+    radial-gradient(ellipse 90% 42% at 50% 0%, rgba(251, 191, 36, 0.20) 0%, transparent 68%),
+    radial-gradient(ellipse 80% 40% at 50% 100%, rgba(56, 189, 248, 0.14) 0%, transparent 72%),
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(180deg, #10182b 0%, #090f1f 52%, #050812 100%);
+  background-size: 100% 100%, 100% 100%, 18px 18px, 18px 18px, 100% 100%;
   background-position: center center;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat;
   box-shadow:
-    0 30px 72px rgba(0, 0, 0, 0.86),
-    0 0 44px rgba(251, 191, 36, 0.22),
-    inset 0 1px 0 rgba(255, 243, 176, 0.32),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    0 26px 64px rgba(0, 0, 0, 0.82),
+    0 0 36px rgba(251, 191, 36, 0.18),
+    inset 0 1px 0 rgba(255, 243, 176, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
 }
 .ut-card-foil-surface::before {
   content: "";
   position: absolute;
-  top: -40%;
-  left: -30%;
-  width: 65%;
-  height: 180%;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.16) 44%, rgba(253, 224, 71, 0.16) 52%, rgba(56, 189, 248, 0.12) 58%, transparent 100%);
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse 75% 30% at 50% 0%, rgba(255, 255, 255, 0.07) 0%, transparent 72%);
   pointer-events: none;
   z-index: 1;
-  animation: utFoilSweep 5.8s ease-in-out infinite;
 }
 .ut-card-foil-surface::after {
   content: "";
   position: absolute;
-  inset: 9px;
-  border-radius: 1.25rem;
-  border: 1px solid rgba(253, 224, 71, 0.24);
+  inset: 8px;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(253, 224, 71, 0.20);
   pointer-events: none;
   z-index: 1;
 }
@@ -3227,17 +3223,15 @@ textarea:focus-visible {
 }
 
 /* ============================================================================
-   ULTIMATE TEAM HOLO 3D COLLECTIBLE CARD & STAT GAUGES
+   ULTIMATE TEAM BROADCAST COLLECTIBLE CARD & STAT GAUGES
    ============================================================================ */
 .smpl-ut-3d-wrap {
-  perspective: 1100px;
+  width: 100%;
 }
 
 .smpl-ut-card-holo {
   position: relative;
-  transform-style: preserve-3d;
-  transition: transform 0.22s ease-out, box-shadow 0.25s ease;
-  will-change: transform;
+  transition: box-shadow 0.24s ease, border-color 0.24s ease;
 }
 
 .smpl-ut-prism-sheen {
@@ -3245,18 +3239,23 @@ textarea:focus-visible {
   inset: 0;
   pointer-events: none;
   z-index: 1;
-  background: linear-gradient(
-    125deg,
-    rgba(255, 255, 255, 0) 15%,
-    rgba(251, 191, 36, 0.12) 32%,
-    rgba(56, 189, 248, 0.14) 48%,
-    rgba(16, 185, 129, 0.14) 64%,
-    rgba(236, 72, 153, 0.10) 76%,
-    rgba(255, 255, 255, 0) 90%
+  background: radial-gradient(
+    ellipse 78% 42% at 50% 14%,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.025) 45%,
+    transparent 74%
   );
-  background-size: 240% 240%;
-  mix-blend-mode: screen;
-  animation: smplHoloIridescent 6.5s ease-in-out infinite;
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .smpl-ut-prism-sheen {
+    background: radial-gradient(
+      circle 260px at var(--ut-mx, 50%) var(--ut-my, 14%),
+      rgba(255, 255, 255, 0.10) 0%,
+      rgba(255, 255, 255, 0.03) 42%,
+      transparent 72%
+    );
+  }
 }
 
 .smpl-ut-ovr-crest {

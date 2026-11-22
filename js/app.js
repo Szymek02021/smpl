@@ -8880,26 +8880,22 @@ window.SMPL_APP = (function () {
 
   function handleUtCardTilt(ev, el) {
     if (!el || !ev) return;
+    if (ev.pointerType && ev.pointerType !== 'mouse') return;
+    try {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    } catch (e) {}
     const rect = el.getBoundingClientRect();
     if (!rect || !rect.width || !rect.height) return;
-    const px = (ev.clientX - rect.left) / rect.width;
-    const py = (ev.clientY - rect.top) / rect.height;
-    const clampedX = Math.max(0, Math.min(1, px));
-    const clampedY = Math.max(0, Math.min(1, py));
-    const rx = ((0.5 - clampedY) * 14).toFixed(2);
-    const ry = ((clampedX - 0.5) * 16).toFixed(2);
-    el.style.setProperty('--ut-rx', rx + 'deg');
-    el.style.setProperty('--ut-ry', ry + 'deg');
-    el.style.setProperty('--ut-mx', (clampedX * 100).toFixed(1) + '%');
-    el.style.setProperty('--ut-my', (clampedY * 100).toFixed(1) + '%');
+    const px = Math.max(0.18, Math.min(0.82, (ev.clientX - rect.left) / rect.width));
+    const py = Math.max(0.08, Math.min(0.60, (ev.clientY - rect.top) / rect.height));
+    el.style.setProperty('--ut-mx', (px * 100).toFixed(1) + '%');
+    el.style.setProperty('--ut-my', (py * 100).toFixed(1) + '%');
   }
 
   function resetUtCardTilt(el) {
     if (!el) return;
-    el.style.setProperty('--ut-rx', '0deg');
-    el.style.setProperty('--ut-ry', '0deg');
     el.style.setProperty('--ut-mx', '50%');
-    el.style.setProperty('--ut-my', '50%');
+    el.style.setProperty('--ut-my', '14%');
   }
 
   // =========================================================================

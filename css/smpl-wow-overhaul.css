@@ -428,29 +428,47 @@ html[data-smpl-overhaul="wow"] .h2h-showcase-banner {
 }
 
 html[data-smpl-overhaul="wow"] .ut-card-foil-surface {
+  background-color: #070c19 !important;
   background-image:
-    linear-gradient(175deg, rgba(8, 12, 24, 0.54) 0%, rgba(7, 11, 22, 0.72) 56%, rgba(5, 8, 15, 0.90) 100%),
-    url('../img/wow-ut-foil.jpg') !important;
-  border: 1.5px solid rgba(34, 211, 238, 0.48) !important;
+    radial-gradient(ellipse 84% 38% at 50% 0%, rgba(56, 189, 248, 0.24) 0%, transparent 66%),
+    radial-gradient(ellipse 68% 30% at 50% 100%, rgba(251, 191, 36, 0.16) 0%, transparent 70%),
+    radial-gradient(circle at 14% 12%, rgba(251, 191, 36, 0.10) 0%, transparent 38%),
+    radial-gradient(circle at 86% 12%, rgba(34, 211, 238, 0.10) 0%, transparent 38%),
+    linear-gradient(rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(180deg, #0d162c 0%, #080e1e 54%, #050812 100%) !important;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 16px 16px, 16px 16px, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat, no-repeat !important;
+  border: 1.5px solid rgba(56, 189, 248, 0.45) !important;
   box-shadow:
     0 24px 56px rgba(0, 0, 0, 0.78),
-    0 0 34px rgba(34, 211, 238, 0.22),
-    inset 0 1px 0 rgba(251, 191, 36, 0.42) !important;
+    0 0 32px rgba(34, 211, 238, 0.18),
+    inset 0 1px 0 rgba(251, 191, 36, 0.36) !important;
 }
 
-/* Prismatic TOTY Glow wokół Karty UT & Podium TOP 3 */
+/* Prismatic TOTY Perimeter Border wokół Karty UT (100% równa, bez rotacji i bez pływania!) */
 html[data-smpl-overhaul="wow"] .smpl-ut-card-holo::before {
   content: "";
   position: absolute;
-  inset: -1px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  inset: 0;
+  width: auto;
+  height: auto;
+  transform: none;
+  animation: none;
   border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(125deg, rgba(251, 191, 36, 0.65), rgba(34, 211, 238, 0.55), rgba(16, 185, 129, 0.55), rgba(251, 191, 36, 0.65));
+  padding: 1.5px;
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.62) 0%, rgba(56, 189, 248, 0.48) 50%, rgba(16, 185, 129, 0.48) 100%);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
-  opacity: 0.75;
+  opacity: 0.72;
+  z-index: 1;
 }
 
 html[data-smpl-overhaul="wow"] .smpl-podium-card {
@@ -1747,33 +1765,33 @@ dialog.smpl-tutorial-dialog::backdrop {
 
 /* ============================================================================
  * 18. SKLEPIK SMPL COINS — WYSOKOSPECYFICZNE EFEKTY WIZUALNE (WOW + KLASYK + LIGHT)
- * Nadpisują domyślną folię wow-ut-foil.jpg oraz .rk-name-owner/goat/legend/master
+ * Nadpisują domyślne tło Karty UT oraz .rk-name-owner/goat/legend/master
  * ============================================================================ */
 
 @keyframes smplEclipsePulse {
   0%, 100% {
-    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 32px rgba(251, 191, 36, 0.72), 0 0 64px rgba(168, 85, 247, 0.52), inset 0 0 28px rgba(251, 191, 36, 0.22);
+    box-shadow: 0 0 0 2px rgba(192, 132, 252, 0.65), 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 30px rgba(251, 191, 36, 0.70), 0 0 58px rgba(168, 85, 247, 0.48), inset 0 0 26px rgba(251, 191, 36, 0.20);
   }
   50% {
-    box-shadow: 0 26px 64px rgba(0, 0, 0, 0.86), 0 0 46px rgba(251, 191, 36, 0.92), 0 0 82px rgba(192, 132, 252, 0.72), inset 0 0 38px rgba(192, 132, 252, 0.30);
+    box-shadow: 0 0 0 2px rgba(216, 180, 254, 0.88), 0 26px 62px rgba(0, 0, 0, 0.86), 0 0 42px rgba(251, 191, 36, 0.90), 0 0 76px rgba(192, 132, 252, 0.68), inset 0 0 34px rgba(192, 132, 252, 0.28);
   }
 }
 
 @keyframes smplInfernoPulse {
   0%, 100% {
-    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 30px rgba(244, 63, 94, 0.72), 0 0 56px rgba(249, 115, 22, 0.45), inset 0 0 26px rgba(244, 63, 94, 0.24);
+    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 28px rgba(244, 63, 94, 0.70), 0 0 52px rgba(249, 115, 22, 0.42), inset 0 0 24px rgba(244, 63, 94, 0.22);
   }
   50% {
-    box-shadow: 0 26px 62px rgba(0, 0, 0, 0.86), 0 0 44px rgba(251, 113, 133, 0.9), 0 0 74px rgba(250, 204, 21, 0.52), inset 0 0 34px rgba(249, 115, 22, 0.32);
+    box-shadow: 0 26px 60px rgba(0, 0, 0, 0.86), 0 0 40px rgba(251, 113, 133, 0.88), 0 0 68px rgba(250, 204, 21, 0.48), inset 0 0 32px rgba(249, 115, 22, 0.30);
   }
 }
 
 @keyframes smplFrostPulse {
   0%, 100% {
-    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 32px rgba(56, 189, 248, 0.75), 0 0 58px rgba(167, 139, 250, 0.45), inset 0 0 26px rgba(125, 211, 252, 0.24);
+    box-shadow: 0 0 0 1.5px rgba(167, 139, 250, 0.60), 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 30px rgba(56, 189, 248, 0.72), 0 0 54px rgba(167, 139, 250, 0.42), inset 0 0 24px rgba(125, 211, 252, 0.22);
   }
   50% {
-    box-shadow: 0 26px 60px rgba(0, 0, 0, 0.86), 0 0 46px rgba(125, 211, 252, 0.92), 0 0 72px rgba(167, 139, 250, 0.62), inset 0 0 36px rgba(56, 189, 248, 0.32);
+    box-shadow: 0 0 0 1.5px rgba(196, 181, 253, 0.82), 0 26px 58px rgba(0, 0, 0, 0.86), 0 0 42px rgba(125, 211, 252, 0.90), 0 0 68px rgba(167, 139, 250, 0.58), inset 0 0 32px rgba(56, 189, 248, 0.28);
   }
 }
 
@@ -1794,182 +1812,263 @@ html .ut-card-foil-surface[class*="smpl-ut-frame-"]::after {
   position: relative;
   overflow: hidden;
   border-radius: 1.25rem;
-  background-color: #090e1c;
+  background-color: #080d1a;
   color: #f8fafc;
+}
+
+/* Adaptacja wnętrza Karty UT do własnej szerokości kontenera (Container Query — idealnie na telefon i PC!) */
+@container (max-width: 375px) {
+  .smpl-ut-card-head {
+    gap: 0.4rem !important;
+  }
+  .smpl-ut-ovr-crest {
+    padding: 0.36rem 0.52rem !important;
+  }
+  .smpl-ut-stat-tile {
+    padding: 0.52rem 0.58rem !important;
+  }
 }
 
 /* --- A. WSZYSTKIE 11 RAMEK UT & PROFILU (specyficzność > html[data-smpl-overhaul="wow"] .ut-card-foil-surface) --- */
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-emerald,
+html .ut-card-foil-surface.smpl-ut-frame-emerald,
 html .smpl-cosmetic-card.smpl-ut-frame-emerald {
-  border: 3px solid #10b981 !important;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.78), 0 0 32px rgba(16, 185, 129, 0.72), inset 0 0 24px rgba(16, 185, 129, 0.24) !important;
+  border: 2.5px solid #10b981 !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.78), 0 0 30px rgba(16, 185, 129, 0.68), inset 0 0 22px rgba(16, 185, 129, 0.20) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-glacial,
+html .ut-card-foil-surface.smpl-ut-frame-glacial,
 html .smpl-cosmetic-card.smpl-ut-frame-glacial {
-  border: 3px solid #7dd3fc !important;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.78), 0 0 34px rgba(125, 211, 252, 0.78), inset 0 0 26px rgba(186, 230, 253, 0.26) !important;
+  border: 2.5px solid #7dd3fc !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.78), 0 0 32px rgba(125, 211, 252, 0.72), inset 0 0 24px rgba(186, 230, 253, 0.22) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-galaxy,
+html .ut-card-foil-surface.smpl-ut-frame-galaxy,
 html .smpl-cosmetic-card.smpl-ut-frame-galaxy {
-  border: 3px solid #a855f7 !important;
-  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.80), 0 0 36px rgba(168, 85, 247, 0.80), 0 0 64px rgba(232, 121, 249, 0.36), inset 0 0 26px rgba(168, 85, 247, 0.26) !important;
+  border: 2.5px solid #a855f7 !important;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.80), 0 0 34px rgba(168, 85, 247, 0.75), 0 0 60px rgba(232, 121, 249, 0.34), inset 0 0 24px rgba(168, 85, 247, 0.22) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-diamond,
+html .ut-card-foil-surface.smpl-ut-frame-diamond,
 html .smpl-cosmetic-card.smpl-ut-frame-diamond {
-  border: 3px solid #38bdf8 !important;
-  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.80), 0 0 36px rgba(56, 189, 248, 0.84), 0 0 62px rgba(224, 242, 254, 0.38), inset 0 0 28px rgba(56, 189, 248, 0.28) !important;
+  border: 2.5px solid #38bdf8 !important;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.80), 0 0 34px rgba(56, 189, 248, 0.78), 0 0 58px rgba(224, 242, 254, 0.34), inset 0 0 26px rgba(56, 189, 248, 0.24) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-magenta,
+html .ut-card-foil-surface.smpl-ut-frame-magenta,
 html .smpl-cosmetic-card.smpl-ut-frame-magenta {
-  border: 3px solid #ec4899 !important;
-  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 36px rgba(236, 72, 153, 0.82), 0 0 60px rgba(56, 189, 248, 0.35), inset 0 0 28px rgba(236, 72, 153, 0.26) !important;
+  border: 2.5px solid #ec4899 !important;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 34px rgba(236, 72, 153, 0.78), 0 0 56px rgba(56, 189, 248, 0.32), inset 0 0 26px rgba(236, 72, 153, 0.24) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-gold,
+html .ut-card-foil-surface.smpl-ut-frame-gold,
 html .smpl-cosmetic-card.smpl-ut-frame-gold {
-  border: 3px solid #facc15 !important;
-  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 38px rgba(250, 204, 21, 0.82), 0 0 64px rgba(245, 158, 11, 0.42), inset 0 0 28px rgba(250, 204, 21, 0.28) !important;
+  border: 2.5px solid #facc15 !important;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 36px rgba(250, 204, 21, 0.78), 0 0 60px rgba(245, 158, 11, 0.38), inset 0 0 26px rgba(250, 204, 21, 0.24) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-dragon,
+html .ut-card-foil-surface.smpl-ut-frame-dragon,
 html .smpl-cosmetic-card.smpl-ut-frame-dragon {
-  border: 3px solid #34d399 !important;
-  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.84), 0 0 36px rgba(52, 211, 153, 0.82), 0 0 66px rgba(250, 204, 21, 0.42), inset 0 0 30px rgba(250, 204, 21, 0.24) !important;
+  border: 2.5px solid #34d399 !important;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.84), 0 0 34px rgba(52, 211, 153, 0.78), 0 0 62px rgba(250, 204, 21, 0.38), inset 0 0 26px rgba(250, 204, 21, 0.22) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-crimson,
+html .ut-card-foil-surface.smpl-ut-frame-crimson,
 html .smpl-cosmetic-card.smpl-ut-frame-crimson {
-  border: 3px solid #f43f5e !important;
-  animation: smplInfernoPulse 3.2s ease-in-out infinite !important;
+  border: 2.5px solid #f43f5e !important;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 30px rgba(244, 63, 94, 0.72), 0 0 54px rgba(249, 115, 22, 0.44), inset 0 0 24px rgba(244, 63, 94, 0.22) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-obsidian,
+html .ut-card-foil-surface.smpl-ut-frame-obsidian,
 html .smpl-cosmetic-card.smpl-ut-frame-obsidian {
-  border: 3px solid #f1f5f9 !important;
-  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.90), 0 0 36px rgba(226, 232, 240, 0.72), 0 0 60px rgba(148, 163, 184, 0.38), inset 0 0 34px rgba(2, 6, 23, 0.85) !important;
+  border: 2.5px solid #e2e8f0 !important;
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.90), 0 0 34px rgba(226, 232, 240, 0.68), 0 0 56px rgba(148, 163, 184, 0.34), inset 0 0 32px rgba(2, 6, 23, 0.82) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-eclipse,
+html .ut-card-foil-surface.smpl-ut-frame-eclipse,
 html .smpl-cosmetic-card.smpl-ut-frame-eclipse {
-  border: 3.5px solid #fbbf24 !important;
-  outline: 2px solid rgba(192, 132, 252, 0.75);
-  outline-offset: 2px;
-  animation: smplEclipsePulse 3.0s ease-in-out infinite !important;
+  border: 3px solid #fbbf24 !important;
+  box-shadow: 0 0 0 2px rgba(192, 132, 252, 0.68), 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 32px rgba(251, 191, 36, 0.72), 0 0 60px rgba(168, 85, 247, 0.50), inset 0 0 26px rgba(251, 191, 36, 0.20) !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-frostking,
+html .ut-card-foil-surface.smpl-ut-frame-frostking,
 html .smpl-cosmetic-card.smpl-ut-frame-frostking {
-  border: 3px solid #38bdf8 !important;
-  outline: 1.5px solid rgba(167, 139, 250, 0.65);
-  outline-offset: 2px;
-  animation: smplFrostPulse 3.2s ease-in-out infinite !important;
+  border: 2.5px solid #38bdf8 !important;
+  box-shadow: 0 0 0 1.5px rgba(167, 139, 250, 0.62), 0 22px 54px rgba(0, 0, 0, 0.82), 0 0 30px rgba(56, 189, 248, 0.74), 0 0 56px rgba(167, 139, 250, 0.44), inset 0 0 24px rgba(125, 211, 252, 0.22) !important;
 }
 
-/* --- B. WSZYSTKIE 10 TEŁ KARTY UT & PROFILU (całkowicie zastępują wow-ut-foil.jpg!) --- */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-crimson,
+  html .smpl-cosmetic-card.smpl-ut-frame-crimson {
+    animation: smplInfernoPulse 3.6s ease-in-out infinite !important;
+  }
+  html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-eclipse,
+  html .smpl-cosmetic-card.smpl-ut-frame-eclipse {
+    animation: smplEclipsePulse 3.4s ease-in-out infinite !important;
+  }
+  html[data-smpl-overhaul] .ut-card-foil-surface.smpl-ut-frame-frostking,
+  html .smpl-cosmetic-card.smpl-ut-frame-frostking {
+    animation: smplFrostPulse 3.6s ease-in-out infinite !important;
+  }
+}
+
+/* --- B. WSZYSTKIE 10 TEŁ KARTY UT & PROFILU — 100% SYMETRYCZNE, WYCENTROWANE, BEZ KRZYWYCH PASÓW I PRZYCIĘĆ --- */
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-pitch,
+html .ut-card-foil-surface.smpl-profile-bg-pitch,
 html .smpl-cosmetic-card.smpl-profile-bg-pitch {
   background-color: #031a12 !important;
   background-image:
-    radial-gradient(ellipse 85% 55% at 50% 0%, rgba(16, 185, 129, 0.52) 0%, transparent 65%),
-    repeating-linear-gradient(90deg, rgba(16, 185, 129, 0.11) 0px, rgba(16, 185, 129, 0.11) 28px, transparent 28px, transparent 56px),
-    linear-gradient(180deg, #063928 0%, #041d15 55%, #020e0a 100%) !important;
+    radial-gradient(ellipse 88% 42% at 50% 0%, rgba(16, 185, 129, 0.46) 0%, transparent 68%),
+    radial-gradient(ellipse 76% 36% at 50% 100%, rgba(5, 150, 105, 0.34) 0%, transparent 72%),
+    repeating-linear-gradient(180deg, rgba(16, 185, 129, 0.055) 0px, rgba(16, 185, 129, 0.055) 36px, transparent 36px, transparent 72px),
+    linear-gradient(180deg, #063525 0%, #041d15 52%, #020e0a 100%) !important;
+  background-size: 100% 100%, 100% 100%, 100% 72px, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat, no-repeat, repeat-y, no-repeat !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-stadium,
+html .ut-card-foil-surface.smpl-profile-bg-stadium,
 html .smpl-cosmetic-card.smpl-profile-bg-stadium {
   background-color: #051230 !important;
   background-image:
-    radial-gradient(circle at 18% 8%, rgba(59, 130, 246, 0.56) 0%, transparent 45%),
-    radial-gradient(circle at 82% 8%, rgba(56, 189, 248, 0.48) 0%, transparent 45%),
-    linear-gradient(180deg, #0b235a 0%, #071433 55%, #030817 100%) !important;
+    radial-gradient(ellipse 52% 38% at 18% 0%, rgba(59, 130, 246, 0.50) 0%, transparent 66%),
+    radial-gradient(ellipse 52% 38% at 82% 0%, rgba(56, 189, 248, 0.46) 0%, transparent 66%),
+    radial-gradient(ellipse 76% 34% at 50% 100%, rgba(30, 64, 175, 0.34) 0%, transparent 72%),
+    linear-gradient(180deg, #0b245c 0%, #071434 54%, #030817 100%) !important;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-sunset,
+html .ut-card-foil-surface.smpl-profile-bg-sunset,
 html .smpl-cosmetic-card.smpl-profile-bg-sunset {
-  background-color: #1f0a16 !important;
+  background-color: #1d0914 !important;
   background-image:
-    radial-gradient(ellipse 90% 55% at 50% 0%, rgba(251, 146, 60, 0.58) 0%, transparent 62%),
-    radial-gradient(circle at 85% 90%, rgba(244, 63, 94, 0.45) 0%, transparent 55%),
-    linear-gradient(160deg, #431407 0%, #2b0c1c 52%, #11050d 100%) !important;
+    radial-gradient(ellipse 92% 44% at 50% 0%, rgba(251, 146, 60, 0.52) 0%, transparent 66%),
+    radial-gradient(ellipse 84% 38% at 50% 100%, rgba(244, 63, 94, 0.40) 0%, transparent 70%),
+    linear-gradient(180deg, #42150a 0%, #260b18 52%, #11050c 100%) !important;
+  background-size: 100% 100%, 100% 100%, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-cyber,
+html .ut-card-foil-surface.smpl-profile-bg-cyber,
 html .smpl-cosmetic-card.smpl-profile-bg-cyber {
-  background-color: #04141d !important;
+  background-color: #05131f !important;
   background-image:
-    linear-gradient(rgba(20, 184, 166, 0.16) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20, 184, 166, 0.16) 1px, transparent 1px),
-    radial-gradient(circle at 85% 15%, rgba(168, 85, 247, 0.48) 0%, transparent 52%),
-    linear-gradient(135deg, #042f2e 0%, #0a1428 52%, #240a3d 100%) !important;
-  background-size: 26px 26px, 26px 26px, 100% 100%, 100% 100% !important;
+    radial-gradient(ellipse 86% 40% at 50% 0%, rgba(20, 184, 166, 0.44) 0%, transparent 66%),
+    radial-gradient(ellipse 86% 40% at 50% 100%, rgba(168, 85, 247, 0.42) 0%, transparent 68%),
+    linear-gradient(rgba(34, 211, 238, 0.085) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.085) 1px, transparent 1px),
+    linear-gradient(180deg, #062a33 0%, #0a142a 52%, #1a0a33 100%) !important;
+  background-size: 100% 100%, 100% 100%, 28px 28px, 28px 28px, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-aurora,
+html .ut-card-foil-surface.smpl-profile-bg-aurora,
 html .smpl-cosmetic-card.smpl-profile-bg-aurora {
-  background-color: #061824 !important;
+  background-color: #061826 !important;
   background-image:
-    radial-gradient(ellipse 95% 50% at 20% 10%, rgba(45, 212, 191, 0.55) 0%, transparent 60%),
-    radial-gradient(ellipse 85% 55% at 85% 85%, rgba(139, 92, 246, 0.54) 0%, transparent 60%),
-    linear-gradient(145deg, #063038 0%, #0d1633 52%, #1d0e3b 100%) !important;
+    radial-gradient(ellipse 66% 42% at 24% 0%, rgba(45, 212, 191, 0.44) 0%, transparent 66%),
+    radial-gradient(ellipse 66% 42% at 76% 0%, rgba(56, 189, 248, 0.36) 0%, transparent 66%),
+    radial-gradient(ellipse 88% 42% at 50% 100%, rgba(139, 92, 246, 0.46) 0%, transparent 70%),
+    linear-gradient(180deg, #072e38 0%, #0d1634 52%, #180c36 100%) !important;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-royal,
+html .ut-card-foil-surface.smpl-profile-bg-royal,
 html .smpl-cosmetic-card.smpl-profile-bg-royal {
   background-color: #161003 !important;
   background-image:
-    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(250, 204, 21, 0.52) 0%, transparent 62%),
-    radial-gradient(circle at 15% 90%, rgba(217, 119, 6, 0.36) 0%, transparent 52%),
-    linear-gradient(165deg, #3b2604 0%, #1c1305 48%, #0a0702 100%) !important;
+    radial-gradient(ellipse 90% 44% at 50% 0%, rgba(250, 204, 21, 0.46) 0%, transparent 66%),
+    radial-gradient(ellipse 80% 34% at 50% 100%, rgba(217, 119, 6, 0.32) 0%, transparent 70%),
+    linear-gradient(rgba(250, 204, 21, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(250, 204, 21, 0.03) 1px, transparent 1px),
+    linear-gradient(180deg, #352305 0%, #191104 52%, #090602 100%) !important;
+  background-size: 100% 100%, 100% 100%, 20px 20px, 20px 20px, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-volcano,
+html .ut-card-foil-surface.smpl-profile-bg-volcano,
 html .smpl-cosmetic-card.smpl-profile-bg-volcano {
-  background-color: #1c0508 !important;
+  background-color: #1a0508 !important;
   background-image:
-    radial-gradient(ellipse 95% 58% at 50% 100%, rgba(239, 68, 68, 0.68) 0%, transparent 65%),
-    radial-gradient(circle at 20% 20%, rgba(249, 115, 22, 0.42) 0%, transparent 50%),
-    linear-gradient(180deg, #2a070d 0%, #3d090f 52%, #160406 100%) !important;
+    radial-gradient(ellipse 92% 46% at 50% 100%, rgba(239, 68, 68, 0.56) 0%, transparent 68%),
+    radial-gradient(ellipse 82% 36% at 50% 0%, rgba(249, 115, 22, 0.34) 0%, transparent 66%),
+    linear-gradient(180deg, #27070c 0%, #34080e 52%, #150406 100%) !important;
+  background-size: 100% 100%, 100% 100%, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-carbon,
+html .ut-card-foil-surface.smpl-profile-bg-carbon,
 html .smpl-cosmetic-card.smpl-profile-bg-carbon {
   background-color: #0b101b !important;
   background-image:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.065) 0px, rgba(255, 255, 255, 0.065) 3px, transparent 3px, transparent 9px),
-    repeating-linear-gradient(-45deg, rgba(148, 163, 184, 0.06) 0px, rgba(148, 163, 184, 0.06) 3px, transparent 3px, transparent 9px),
-    linear-gradient(145deg, #273449 0%, #0f172a 52%, #050811 100%) !important;
+    radial-gradient(ellipse 84% 40% at 50% 0%, rgba(226, 232, 240, 0.16) 0%, transparent 66%),
+    radial-gradient(ellipse 76% 34% at 50% 100%, rgba(148, 163, 184, 0.14) 0%, transparent 70%),
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, #222e42 0%, #101829 52%, #060912 100%) !important;
+  background-size: 100% 100%, 100% 100%, 10px 10px, 10px 10px, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-cosmos,
+html .ut-card-foil-surface.smpl-profile-bg-cosmos,
 html .smpl-cosmetic-card.smpl-profile-bg-cosmos {
   background-color: #0d0521 !important;
   background-image:
-    radial-gradient(2px 2px at 14% 18%, rgba(255, 255, 255, 0.85), transparent),
-    radial-gradient(2px 2px at 78% 24%, rgba(253, 224, 71, 0.85), transparent),
-    radial-gradient(1.5px 1.5px at 34% 68%, rgba(186, 230, 253, 0.8), transparent),
-    radial-gradient(2px 2px at 88% 72%, rgba(245, 208, 254, 0.85), transparent),
-    radial-gradient(1.5px 1.5px at 56% 12%, rgba(255, 255, 255, 0.78), transparent),
-    radial-gradient(ellipse 85% 58% at 22% 15%, rgba(192, 132, 252, 0.62) 0%, transparent 62%),
-    radial-gradient(ellipse 75% 55% at 86% 88%, rgba(56, 189, 248, 0.48) 0%, transparent 60%),
-    linear-gradient(155deg, #280a52 0%, #130830 50%, #06091e 100%) !important;
+    radial-gradient(1.5px 1.5px at 14% 16%, rgba(255, 255, 255, 0.85), transparent 100%),
+    radial-gradient(1.5px 1.5px at 86% 18%, rgba(253, 224, 71, 0.82), transparent 100%),
+    radial-gradient(1.2px 1.2px at 26% 74%, rgba(186, 230, 253, 0.78), transparent 100%),
+    radial-gradient(1.5px 1.5px at 78% 78%, rgba(245, 208, 254, 0.82), transparent 100%),
+    radial-gradient(1.2px 1.2px at 50% 9%, rgba(255, 255, 255, 0.75), transparent 100%),
+    radial-gradient(ellipse 84% 44% at 50% 0%, rgba(192, 132, 252, 0.48) 0%, transparent 66%),
+    radial-gradient(ellipse 84% 42% at 50% 100%, rgba(56, 189, 248, 0.36) 0%, transparent 68%),
+    linear-gradient(180deg, #24094a 0%, #12082e 52%, #06091e 100%) !important;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
 }
 
 html[data-smpl-overhaul] .ut-card-foil-surface.smpl-profile-bg-starfall,
+html .ut-card-foil-surface.smpl-profile-bg-starfall,
 html .smpl-cosmetic-card.smpl-profile-bg-starfall {
   background-color: #070d24 !important;
   background-image:
-    radial-gradient(2px 2px at 20% 20%, #ffffff, transparent),
-    radial-gradient(2px 2px at 70% 15%, #7dd3fc, transparent),
-    radial-gradient(2px 2px at 42% 82%, #e9d5ff, transparent),
-    radial-gradient(2px 2px at 84% 58%, #ffffff, transparent),
-    linear-gradient(135deg, transparent 46%, rgba(125, 211, 252, 0.22) 48%, rgba(255, 255, 255, 0.32) 49%, transparent 51%),
-    radial-gradient(ellipse 80% 55% at 20% 10%, rgba(56, 189, 248, 0.55) 0%, transparent 60%),
-    radial-gradient(ellipse 80% 55% at 85% 88%, rgba(167, 139, 250, 0.56) 0%, transparent 60%),
-    linear-gradient(160deg, #0b1f48 0%, #101235 55%, #07091b 100%) !important;
+    radial-gradient(1.5px 1.5px at 18% 16%, rgba(255, 255, 255, 0.88), transparent 100%),
+    radial-gradient(1.5px 1.5px at 82% 16%, rgba(125, 211, 252, 0.88), transparent 100%),
+    radial-gradient(1.2px 1.2px at 32% 80%, rgba(233, 213, 255, 0.82), transparent 100%),
+    radial-gradient(1.2px 1.2px at 68% 82%, rgba(255, 255, 255, 0.82), transparent 100%),
+    radial-gradient(ellipse 86% 42% at 50% 0%, rgba(56, 189, 248, 0.46) 0%, transparent 66%),
+    radial-gradient(ellipse 86% 42% at 50% 100%, rgba(167, 139, 250, 0.46) 0%, transparent 68%),
+    linear-gradient(180deg, #0b1f48 0%, #101336 54%, #07091b 100%) !important;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
 }
 
 /* --- C. WSZYSTKIE 5 EFEKTÓW BLASKU NICKU (wygrywają z .rk-name-owner / goat / legend / master i wszystkimi motywami!) --- */
@@ -1984,7 +2083,6 @@ html[data-smpl-theme] [class*="rk-name-"].smpl-nickfx-gold {
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
   filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.92)) drop-shadow(0 0 18px rgba(245, 158, 11, 0.62)) !important;
-  animation: smplNickPrismFlow 3.2s linear infinite !important;
 }
 
 html .smpl-nickfx-emerald,
@@ -1998,7 +2096,6 @@ html[data-smpl-theme] [class*="rk-name-"].smpl-nickfx-emerald {
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
   filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.95)) drop-shadow(0 0 18px rgba(52, 211, 153, 0.65)) !important;
-  animation: smplNickPrismFlow 3.0s linear infinite !important;
 }
 
 html .smpl-nickfx-cyber,
@@ -2012,7 +2109,6 @@ html[data-smpl-theme] [class*="rk-name-"].smpl-nickfx-cyber {
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
   filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 20px rgba(34, 211, 238, 0.68)) !important;
-  animation: smplNickPrismFlow 2.8s linear infinite !important;
 }
 
 html .smpl-nickfx-fire,
@@ -2026,7 +2122,6 @@ html[data-smpl-theme] [class*="rk-name-"].smpl-nickfx-fire {
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
   filter: drop-shadow(0 0 9px rgba(244, 63, 94, 0.95)) drop-shadow(0 0 20px rgba(249, 115, 22, 0.72)) !important;
-  animation: smplNickPrismFlow 2.4s linear infinite !important;
 }
 
 html .smpl-nickfx-prism,
@@ -2040,7 +2135,19 @@ html[data-smpl-theme] [class*="rk-name-"].smpl-nickfx-prism {
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
   filter: drop-shadow(0 0 9px rgba(232, 121, 249, 0.96)) drop-shadow(0 0 20px rgba(56, 189, 248, 0.72)) !important;
-  animation: smplNickPrismFlow 2.2s linear infinite !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html .smpl-nickfx-gold,
+  html [class*="rk-name-"].smpl-nickfx-gold { animation: smplNickPrismFlow 3.4s linear infinite !important; }
+  html .smpl-nickfx-emerald,
+  html [class*="rk-name-"].smpl-nickfx-emerald { animation: smplNickPrismFlow 3.2s linear infinite !important; }
+  html .smpl-nickfx-cyber,
+  html [class*="rk-name-"].smpl-nickfx-cyber { animation: smplNickPrismFlow 3.0s linear infinite !important; }
+  html .smpl-nickfx-fire,
+  html [class*="rk-name-"].smpl-nickfx-fire { animation: smplNickPrismFlow 2.6s linear infinite !important; }
+  html .smpl-nickfx-prism,
+  html [class*="rk-name-"].smpl-nickfx-prism { animation: smplNickPrismFlow 2.4s linear infinite !important; }
 }
 
 /* --- D. KOLEKCJONERSKA SZARFA TYTUŁU & KOLOROWA ODZNAKA FLAIR --- */
