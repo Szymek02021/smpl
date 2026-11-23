@@ -2386,6 +2386,36 @@ window.SMPL_FORMS_ADMIN = (function () {
             <span class="smpl-feature-pill text-[10px] font-display font-bold text-blue-300 uppercase">🎴 Karty UT &amp; Złota Piłka</span>
             <span class="smpl-feature-pill text-[10px] font-display font-bold text-pink-300 uppercase">✨ Vanessa AI</span>
           </div>
+          ${(function () {
+            const cdCfg =
+              window.SMPL_DB && typeof window.SMPL_DB.getSeasonCountdownConfig === 'function'
+                ? window.SMPL_DB.getSeasonCountdownConfig(state)
+                : (state && state.portalSettings && state.portalSettings.seasonCountdown) || null;
+            if (!cdCfg || !cdCfg.enabled) return '';
+            return `
+              <div id="smpl-auth-gate-countdown" class="smpl-cd-gate-strip mt-3 max-w-xl mx-auto rounded-2xl px-3.5 py-2.5 text-left">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="smpl-live-beacon-dot flex-shrink-0"></span>
+                    <div class="min-w-0">
+                      <div class="font-display font-black text-[10px] sm:text-[11px] uppercase tracking-wider text-amber-300 truncate">
+                        🏆 ${escapeHtml(cdCfg.title || ('WIELKI START SEZONU ' + (cdCfg.season || 56)))}
+                      </div>
+                      <div class="text-[10px] text-slate-300 font-semibold truncate" data-smpl-cd-gate-date>
+                        Start: ${escapeHtml(cdCfg.targetDate)} • ${escapeHtml(cdCfg.targetTime)} (CET)
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 font-display font-black text-xs sm:text-sm text-white tabular-nums" data-smpl-cd-gate-clock>
+                    <span class="smpl-cd-gate-chip"><b data-smpl-cd-d>--</b><small>d</small></span>
+                    <span class="smpl-cd-gate-chip"><b data-smpl-cd-h>--</b><small>g</small></span>
+                    <span class="smpl-cd-gate-chip"><b data-smpl-cd-m>--</b><small>m</small></span>
+                    <span class="smpl-cd-gate-chip smpl-cd-gate-sec"><b data-smpl-cd-s>--</b><small>s</small></span>
+                  </div>
+                </div>
+              </div>
+            `;
+          })()}
         </div>
 
         <!-- 3 Przyciski Wyboru Trybu Wejścia (Zawsze 1 wiersz — również na smartfonie!) -->
@@ -3651,6 +3681,42 @@ window.SMPL_FORMS_ADMIN = (function () {
         ? window.SMPL_DB.findPlayerForAdmin(session.adminId, state)
         : null;
     const myAdmActive = myAdmPl && myAdmPl.active !== false && /^L\d+$/i.test(String(myAdmPl.leagueId || ''));
+    const cdEst =
+      window.SMPL_DB && typeof window.SMPL_DB.getExcelSeason56Estimate === 'function'
+        ? window.SMPL_DB.getExcelSeason56Estimate()
+        : {
+            s55L1Played: 138,
+            s55L1Total: 240,
+            s55L1Pct: 57.5,
+            s55L1RemainingMatches: 102,
+            s55L2RealPlayed: 126,
+            s55L2RealTotal: 182,
+            s55L2Pct: 69.2,
+            completedRounds: 8,
+            remainingRounds: 7,
+            roundsPerWeek: 4,
+            s55EstimatedEndDate: '2026-12-06',
+            s55EstimatedEndLabel: 'Niedziela, 6 grudnia 2026',
+            breakWeeks: 2,
+            breakRangeLabel: '7–20 grudnia 2026 (14 dni)',
+            recommendedStartDate: '2026-12-21',
+            recommendedStartTime: '18:00',
+            recommendedStartLabel: 'Poniedziałek, 21 grudnia 2026 • 18:00'
+          };
+    const cdCfg =
+      window.SMPL_DB && typeof window.SMPL_DB.getSeasonCountdownConfig === 'function'
+        ? window.SMPL_DB.getSeasonCountdownConfig(state)
+        : {
+            enabled: false,
+            season: 56,
+            targetDate: cdEst.recommendedStartDate,
+            targetTime: cdEst.recommendedStartTime,
+            breakWeeks: 2,
+            title: 'WIELKI START SEZONU 56',
+            subtitle: 'Ekstraklasa & 2. Liga • Nowe Karty UT, Sklepik Coins i Walka o Puchar Mistrzów!',
+            ctaLabel: '📝 Zapisz się do Sezonu 56',
+            ctaTab: 'register'
+          };
 
     return `
       <div class="space-y-5">
@@ -3710,6 +3776,155 @@ window.SMPL_FORMS_ADMIN = (function () {
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- STUDIO WIELKIEGO ODLICZANIA DO STARTU SEZONU 56 (OBLICZONE Z EXCELA S55 + 2 TYG. PRZERWY) -->
+        <div id="admin-countdown-studio-card" class="smpl-cd-admin-card glass-panel rounded-3xl p-5 sm:p-6 border ${cdCfg.enabled ? 'border-amber-400/75 bg-gradient-to-br from-amber-950/35 via-slate-950/95 to-emerald-950/30' : 'border-amber-400/40 bg-slate-950/92'} relative overflow-hidden">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full ${cdCfg.enabled ? 'bg-emerald-500/20 border border-emerald-400/55 text-emerald-200' : 'bg-amber-500/15 border border-amber-400/45 text-amber-200'} font-display font-black text-[10px] uppercase tracking-wider">
+                <span class="${cdCfg.enabled ? 'smpl-live-beacon-dot' : ''}"></span>
+                <span>${cdCfg.enabled ? '🟢 ODLICZANIE AKTYWNE NA PORTALU (LIVE DLA GRACZY)' : '⏱️ STUDIO WIELKIEGO ODLICZANIA • SEZON ' + Number(cdCfg.season || 56)}</span>
+              </div>
+              <h3 class="font-display font-black text-lg sm:text-xl text-white uppercase tracking-tight mt-2">
+                🏆 Wielkie Odliczanie do Startu Sezonu ${Number(cdCfg.season || 56)}
+              </h3>
+              <p class="text-xs text-slate-300 mt-0.5 max-w-2xl">
+                Jednym kliknięciem odpal zjawiskowy, stadionowy zegar odliczający na żywo dla wszystkich graczy (na górze portalu, na ekranie logowania oraz w pełnoekranowym Trybie Kinowym + Plakat PNG na Messengera).
+              </p>
+            </div>
+            <div class="smpl-cd-admin-mini-clock rounded-2xl px-3.5 py-2.5 bg-slate-900/90 border border-amber-400/45 text-center shadow-lg" data-smpl-cd-admin-preview>
+              <div class="text-[9px] font-display font-bold uppercase tracking-widest text-amber-300 mb-1">PODGLĄD NA ŻYWO</div>
+              <div class="flex items-center gap-1.5 font-display font-black text-base sm:text-lg text-white tabular-nums">
+                <span class="px-2 py-0.5 rounded-lg bg-slate-950 border border-amber-400/35"><b data-smpl-cd-d>--</b><small class="text-[9px] text-amber-300 ml-0.5">d</small></span>
+                <span class="text-amber-400">:</span>
+                <span class="px-2 py-0.5 rounded-lg bg-slate-950 border border-amber-400/35"><b data-smpl-cd-h>--</b><small class="text-[9px] text-amber-300 ml-0.5">g</small></span>
+                <span class="text-amber-400">:</span>
+                <span class="px-2 py-0.5 rounded-lg bg-slate-950 border border-amber-400/35"><b data-smpl-cd-m>--</b><small class="text-[9px] text-amber-300 ml-0.5">m</small></span>
+                <span class="text-amber-400">:</span>
+                <span class="px-2 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-400/50 text-emerald-200"><b data-smpl-cd-s>--</b><small class="text-[9px] text-emerald-300 ml-0.5">s</small></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Wyliczenie wprost z Excela S55 + 2 tygodnie przerwy międzysezonowej -->
+          <div class="rounded-2xl p-3.5 sm:p-4 bg-slate-900/80 border border-emerald-400/30 mb-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+              <div class="text-[11px] font-display font-black uppercase text-emerald-300 tracking-wide">
+                📊 AUTOMATYCZNA KALKULACJA Z EXCELA S55 (ODSWIEŻONA WERSJA LIGI)
+              </div>
+              <span class="text-[10px] font-bold text-slate-400">
+                Tempo regulaminowe: ${Number(cdEst.roundsPerWeek || 4)} kolejki/tydz. • Stan arkusza: ${escapeHtml(cdEst.asOfDate || '2026-11-23')}
+              </span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+              <div class="rounded-xl p-2.5 bg-slate-950/90 border border-white/10">
+                <div class="text-[10px] font-display font-bold uppercase text-amber-300">1. Ekstraklasa S55</div>
+                <div class="font-display font-black text-white text-sm mt-0.5">${cdEst.s55L1Played} / ${cdEst.s55L1Total} (${cdEst.s55L1Pct}%)</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">K1–K8 (100%) • zostało ${cdEst.remainingRounds} kol. (K9–K15)</div>
+              </div>
+              <div class="rounded-xl p-2.5 bg-slate-950/90 border border-white/10">
+                <div class="text-[10px] font-display font-bold uppercase text-sky-300">2. Liga 2 S55</div>
+                <div class="font-display font-black text-white text-sm mt-0.5">${cdEst.s55L2RealPlayed} / ${cdEst.s55L2RealTotal} (${cdEst.s55L2Pct}%)</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">K1–K8 (100%) • wyprzedza Ekstraklasę</div>
+              </div>
+              <div class="rounded-xl p-2.5 bg-slate-950/90 border border-white/10">
+                <div class="text-[10px] font-display font-bold uppercase text-emerald-300">3. Finisz S55 (≈ 2 tyg.)</div>
+                <div class="font-display font-black text-white text-sm mt-0.5">~6 grudnia 2026</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Tydz. 3 (K9–12) + Tydz. 4 (K13–15)</div>
+              </div>
+              <div class="rounded-xl p-2.5 bg-amber-500/15 border border-amber-400/50">
+                <div class="text-[10px] font-display font-bold uppercase text-amber-200">4. + 2 Tyg. Przerwy ➔ S56</div>
+                <div class="font-display font-black text-amber-300 text-sm mt-0.5">21.12.2026 • 18:00</div>
+                <div class="text-[10px] text-amber-100/80 mt-0.5">Przerwa 7–20.12 (14 dni) ➔ Start!</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Główne Przyciski 1-Klik -->
+          <div class="flex flex-wrap items-center gap-2.5 mb-4">
+            ${
+              cdCfg.enabled
+                ? `<button type="button" onclick="SMPL_APP.adminSaveSeasonCountdown(true)" class="flex-1 min-w-[200px] py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-emerald-400 hover:brightness-110 text-slate-950 font-display font-black text-xs sm:text-sm uppercase tracking-wider shadow-xl transition">
+                     💾 Zapisz Zmiany Odliczania (LIVE)
+                   </button>
+                   <button type="button" onclick="SMPL_APP.adminStopSeasonCountdown()" class="py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-display font-black text-xs uppercase tracking-wider shadow-lg transition">
+                     ⏹️ Zatrzymaj / Ukryj
+                   </button>`
+                : `<button type="button" onclick="SMPL_APP.adminLaunchSeasonCountdown()" class="flex-1 min-w-[230px] py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-300 to-emerald-400 hover:brightness-110 text-slate-950 font-display font-black text-xs sm:text-sm uppercase tracking-wider shadow-xl transition">
+                     🚀 URUCHOM WIELKIE ODLICZANIE SEZONU ${Number(cdCfg.season || 56)} (1-KLIK)
+                   </button>`
+            }
+            <button type="button" onclick="SMPL_APP.openCountdownCinemaModal(false)" class="py-3 px-4 rounded-2xl bg-indigo-600/85 hover:bg-indigo-500 text-white font-display font-black text-xs uppercase tracking-wider border border-indigo-300/40 shadow-lg transition">
+              🎬 Podgląd Kinowy
+            </button>
+            <button type="button" onclick="SMPL_APP.downloadCountdownPosterPng()" class="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-200 font-display font-black text-xs uppercase tracking-wider border border-amber-400/40 shadow transition">
+              📸 Plakat PNG (Messenger)
+            </button>
+            <button type="button" onclick="SMPL_APP.openCountdownCinemaModal(true)" class="py-3 px-3.5 rounded-2xl bg-purple-600/35 hover:bg-purple-600/55 text-purple-100 font-display font-bold text-xs uppercase border border-purple-400/45 transition" title="Lokalny 10-sekundowy podgląd finału 00:00:00 i fajerwerków bez zmiany daty na serwerze">
+              🎆 Test 10s
+            </button>
+          </div>
+
+          <!-- Szybkie Presety Daty & Przerwy -->
+          <div class="flex flex-wrap items-center gap-1.5 mb-3.5">
+            <span class="text-[10px] font-display font-bold uppercase text-slate-400 mr-1">⚡ Szybkie presety:</span>
+            <button type="button" onclick="SMPL_APP.adminApplyCountdownPreset('excel_2w')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/50 text-emerald-200 font-display font-bold text-[10px] uppercase transition">
+              📊 Excel S55 + 2 tyg. (21.12 • 18:00)
+            </button>
+            <button type="button" onclick="SMPL_APP.adminApplyCountdownPreset('excel_3w')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/15 text-slate-200 font-display font-bold text-[10px] uppercase transition">
+              ⏳ +1 tydz. zapasu (28.12 • 18:00)
+            </button>
+            <button type="button" onclick="SMPL_APP.adminApplyCountdownPreset('new_year')" class="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/30 border border-amber-400/45 text-amber-200 font-display font-bold text-[10px] uppercase transition">
+              🎄 Po Świętach (04.01.2027 • 18:00)
+            </button>
+          </div>
+
+          <!-- Szczegóły Konfiguracji (Data, Godzina, Przerwa, Teksty) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            <label class="block">
+              <span class="text-[10px] font-display font-bold uppercase text-slate-400">Data Startu (Europe/Warsaw)</span>
+              <input id="admin-cd-date" type="date" value="${escapeHtml(cdCfg.targetDate || cdEst.recommendedStartDate)}" oninput="SMPL_APP.refreshAdminCountdownPreview()" class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"/>
+            </label>
+            <label class="block">
+              <span class="text-[10px] font-display font-bold uppercase text-slate-400">Godzina Startu</span>
+              <input id="admin-cd-time" type="time" value="${escapeHtml(cdCfg.targetTime || '18:00')}" oninput="SMPL_APP.refreshAdminCountdownPreview()" class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"/>
+            </label>
+            <label class="block">
+              <span class="text-[10px] font-display font-bold uppercase text-slate-400">Przerwa Międzysezonowa (tyg.)</span>
+              <input id="admin-cd-break-weeks" type="number" min="0" max="12" value="${Number(cdCfg.breakWeeks !== undefined ? cdCfg.breakWeeks : 2)}" oninput="SMPL_APP.adminRecalcDateFromBreakWeeks()" class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"/>
+            </label>
+            <label class="block">
+              <span class="text-[10px] font-display font-bold uppercase text-slate-400">Numer Sezonu</span>
+              <input id="admin-cd-season" type="number" min="1" max="999" value="${Number(cdCfg.season || 56)}" class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"/>
+            </label>
+            <label class="block sm:col-span-2">
+              <span class="text-[10px] font-display font-bold uppercase text-slate-400">Nagłówek Odliczania</span>
+              <input id="admin-cd-title" type="text" maxlength="120" value="${escapeHtml(cdCfg.title || 'WIELKI START SEZONU 56')}" class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"/>
+            </label>
+            <label class="block sm:col-span-2">
+              <span class="text-[10px] font-display font-bold uppercase text-slate-400">Podtytuł / Hasło Motywacyjne</span>
+              <input id="admin-cd-subtitle" type="text" maxlength="240" value="${escapeHtml(cdCfg.subtitle || 'Ekstraklasa & 2. Liga • Nowe Karty UT, Sklepik Coins i Walka o Puchar Mistrzów!')}" class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"/>
+            </label>
+            <label class="block sm:col-span-2">
+              <span class="text-[10px] font-display font-bold uppercase text-slate-400">Tekst Przycisku Akcji (CTA)</span>
+              <input id="admin-cd-cta-label" type="text" maxlength="64" value="${escapeHtml(cdCfg.ctaLabel || '📝 Zapisz się do Sezonu 56')}" class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"/>
+            </label>
+            <label class="block sm:col-span-2">
+              <span class="text-[10px] font-display font-bold uppercase text-slate-400">Dokąd prowadzi przycisk CTA?</span>
+              <select id="admin-cd-cta-tab" class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs">
+                <option value="register" ${cdCfg.ctaTab === 'register' ? 'selected' : ''}>📝 Zapisy do Ligi (Polecane przed startem)</option>
+                <option value="standings" ${cdCfg.ctaTab === 'standings' ? 'selected' : ''}>🏆 Tabela Ligowa</option>
+                <option value="profile" ${cdCfg.ctaTab === 'profile' ? 'selected' : ''}>🎴 Moja Karta UT &amp; Sklepik</option>
+                <option value="archive" ${cdCfg.ctaTab === 'archive' ? 'selected' : ''}>🏛️ Archiwum S1–S55</option>
+              </select>
+            </label>
+          </div>
+          ${
+            cdCfg.updatedAt
+              ? `<div class="mt-3 text-[10px] text-slate-400 font-semibold">Ostatnia zmiana: ${escapeHtml(cdCfg.updatedAt)} • ${escapeHtml(cdCfg.updatedBy || 'Admin')}</div>`
+              : ''
+          }
         </div>
 
         <!-- START SEZONU DLA GRACZY + ADMIN JAKO GRACZ -->

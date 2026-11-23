@@ -4065,6 +4065,172 @@ if ($method === 'POST') {
         exit;
     }
 
+    // Akcja 2d-countdown: Atomowe uruchomienie / konfiguracja / zatrzymanie Wielkiego Odliczania do startu sezonu (?action=admin_set_countdown)
+    if ($action === 'admin_set_countdown') {
+        $lockFp = smpl_lock_db($dataDir);
+        $prevDb = smpl_read_db($dbFile, $backupFile);
+        $adminTokenInfo = smpl_validate_admin_token($tokenFile, $prevDb);
+        if ($adminTokenInfo === null) {
+            smpl_unlock_db($lockFp);
+            http_response_code(401);
+            echo json_encode(array(
+                'ok' => false,
+                'code' => 'ADMIN_TOKEN_EXPIRED',
+                'error' => 'Sesja Administratora na serwerze wygasła lub brak tokena (X-SMPL-Admin-Token). Zaloguj się ponownie hasłem Admina.'
+            ), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if (!is_array($prevDb) || !isset($prevDb['players']) || !is_array($prevDb['players'])) {
+            smpl_unlock_db($lockFp);
+            http_response_code(400);
+            echo json_encode(array('ok' => false, 'error' => 'Baza danych SMPL na serwerze jest pusta lub uszkodzona.'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $body = @json_decode((string)$input, true);
+        if (!is_array($body)) $body = array();
+        if (!isset($prevDb['portalSettings']) || !is_array($prevDb['portalSettings'])) {
+            $prevDb['portalSettings'] = array();
+        }
+        $existingCd = (isset($prevDb['portalSettings']['seasonCountdown']) && is_array($prevDb['portalSettings']['seasonCountdown']))
+            ? $prevDb['portalSettings']['seasonCountdown']
+            : array();
+
+        $enabled = !empty($body['enabled']);
+        $seasonNum = isset($body['season']) ? (int)$body['season'] : (isset($existingCd['season']) ? (int)$existingCd['season'] : 56);
+        if ($seasonNum < 1 || $seasonNum > 999) $seasonNum = 56;
+
+        $targetDate = isset($body['targetDate']) ? trim((string)$body['targetDate']) : (isset($existingCd['targetDate']) ? (string)$existingCd['targetDate'] : '2026-12-21');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $targetDate)) {
+            $targetDate = '2026-12-21';
+        }
+        $targetTime = isset($body['targetTime']) ? trim((string)$body['targetTime']) : (isset($existingCd['targetTime']) ? (string)$existingCd['targetTime'] : '18:00');
+        if (!preg_match('/^\d{2}:\d{2}$/', $targetTime)) {
+            $targetTime = '18:00';
+        }
+        $timeZone = isset($body['timeZone']) ? trim((string)$body['timeZone']) : (isset($existingCd['timeZone']) ? (string)$existingCd['timeZone'] : 'Europe/Warsaw');
+        if (!preg_match('/^[A-Za-z0-9_\/+\-]{2,64}$/', $timeZone)) {
+            $timeZone = 'Europe/Warsaw';
+        }
+        $s55EndDate = isset($body['s55EndDate']) ? trim((string)$body['s55EndDate']) : (isset($existingCd['s55EndDate']) ? (string)$existingCd['s55EndDate'] : '2026-12-06');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $s55EndDate)) {
+            $s55EndDate = '2026-12-06';
+        }
+        $breakWeeks = isset($body['breakWeeks']) ? (int)$body['breakWeeks'] : (isset($existingCd['breakWeeks']) ? (int)$existingCd['breakWeeks'] : 2);
+        if ($breakWeeks < 0) $breakWeeks = 0;
+        if ($breakWeeks > 12) $breakWeeks = 12;
+
+        $roundsPerWeek = isset($body['roundsPerWeek']) ? (int)$body['roundsPerWeek'] : (isset($existingCd['roundsPerWeek']) ? (int)$existingCd['roundsPerWeek'] : 4);
+        if ($roundsPerWeek < 1) $roundsPerWeek = 4;
+        if ($roundsPerWeek > 15) $roundsPerWeek = 15;
+
+        $cleanStr = function ($rawVal, $fallback, $maxLen) {
+            $s = str_replace(array("\r\n", "\r", "\n"), ' ', strip_tags((string)$rawVal));
+            $s = preg_replace('/[\x00-\x1F\x7F]/u', '', $s);
+            $s = trim((string)$s);
+            if ($s === '') $s = $fallback;
+            return function_exists('mb_substr') ? mb_substr($s, 0, $maxLen, 'UTF-8') : substr($s, 0, $maxLen);
+        };
+
+        $title = $cleanStr(
+            array_key_exists('title', $body) ? $body['title'] : (isset($existingCd['title']) ? $existingCd['title'] : ''),
+            'WIELKI START SEZONU ' . $seasonNum,
+            120
+        );
+        $subtitle = $cleanStr(
+            array_key_exists('subtitle', $body) ? $body['subtitle'] : (isset($existingCd['subtitle']) ? $existingCd['subtitle'] : ''),
+            'Ekstraklasa & 2. Liga • Nowe Karty UT, Sklepik Coins i Walka o Puchar Mistrzów!',
+            240
+        );
+        $phaseNote = $cleanStr(
+            array_key_exists('phaseNote', $body) ? $body['phaseNote'] : (isset($existingCd['phaseNote']) ? $existingCd['phaseNote'] : ''),
+            'Excel S55: Ekstraklasa 138/240 (K9–K15 ≈ 2 tyg.) + ' . $breakWeeks . ' tyg. przerwy międzysezonowej',
+            200
+        );
+        $ctaLabel = $cleanStr(
+            array_key_exists('ctaLabel', $body) ? $body['ctaLabel'] : (isset($existingCd['ctaLabel']) ? $existingCd['ctaLabel'] : ''),
+            '📝 Zapisz się do Sezonu ' . $seasonNum,
+            64
+        );
+        $allowedTabs = array('register', 'standings', 'schedule', 'profile', 'archive', 'shop');
+        $ctaTab = isset($body['ctaTab']) ? trim((string)$body['ctaTab']) : (isset($existingCd['ctaTab']) ? (string)$existingCd['ctaTab'] : 'register');
+        if (!in_array($ctaTab, $allowedTabs, true)) $ctaTab = 'register';
+
+        $targetIso = isset($body['targetIso']) ? trim((string)$body['targetIso']) : '';
+        if ($targetIso === '' || strlen($targetIso) > 40) {
+            $targetIso = $targetDate . 'T' . $targetTime . ':00';
+        }
+
+        $admName = isset($adminTokenInfo['adminName']) && $adminTokenInfo['adminName'] ? (string)$adminTokenInfo['adminName'] : 'Szymon Komenda';
+        $nowFmt = date('Y-m-d H:i');
+        $tsMs = (int)(microtime(true) * 1000);
+        $wasEnabled = !empty($existingCd['enabled']);
+
+        $prevDb['portalSettings']['seasonCountdown'] = array(
+            'enabled' => (bool)$enabled,
+            'season' => $seasonNum,
+            'targetDate' => $targetDate,
+            'targetTime' => $targetTime,
+            'timeZone' => $timeZone,
+            'targetIso' => $targetIso,
+            's55EndDate' => $s55EndDate,
+            'breakWeeks' => $breakWeeks,
+            'roundsPerWeek' => $roundsPerWeek,
+            'title' => $title,
+            'subtitle' => $subtitle,
+            'phaseNote' => $phaseNote,
+            'ctaLabel' => $ctaLabel,
+            'ctaTab' => $ctaTab,
+            'updatedBy' => $admName,
+            'updatedAt' => $nowFmt
+        );
+        $prevDb['updatedAt'] = $tsMs;
+
+        $logType = $enabled ? ($wasEnabled ? 'COUNTDOWN_UPDATED' : 'COUNTDOWN_STARTED') : 'COUNTDOWN_STOPPED';
+        $logText = $enabled
+            ? ('⏱️ Admin ' . $admName . ' ' . ($wasEnabled ? 'ZAKTUALIZOWAŁ' : 'URUCHOMIŁ') . ' Wielkie Odliczanie do Sezonu ' . $seasonNum . ' (Start: ' . $targetDate . ' ' . $targetTime . ', przerwa ' . $breakWeeks . ' tyg.).')
+            : ('⏹️ Admin ' . $admName . ' ZATRZYMAŁ / UKRYŁ Wielkie Odliczanie do Sezonu ' . $seasonNum . '.');
+
+        $logItem = array(
+            'id' => 'LOG_CD_' . $tsMs . '_' . mt_rand(10, 99),
+            'time' => $nowFmt,
+            'type' => $logType,
+            'text' => $logText
+        );
+        if (!isset($prevDb['activityLog']) || !is_array($prevDb['activityLog'])) $prevDb['activityLog'] = array();
+        array_unshift($prevDb['activityLog'], $logItem);
+        if (count($prevDb['activityLog']) > 120) {
+            $prevDb['activityLog'] = array_slice($prevDb['activityLog'], 0, 120);
+        }
+        if (!isset($prevDb['logs']) || !is_array($prevDb['logs'])) $prevDb['logs'] = array();
+        array_unshift($prevDb['logs'], $logItem);
+        if (count($prevDb['logs']) > 300) {
+            $prevDb['logs'] = array_slice($prevDb['logs'], 0, 300);
+        }
+
+        $encCd = json_encode($prevDb, JSON_UNESCAPED_UNICODE);
+        $written = @file_put_contents($dbFile, $encCd, LOCK_EX);
+        if ($written !== false) {
+            @file_put_contents($backupFile, $encCd, LOCK_EX);
+        }
+        smpl_unlock_db($lockFp);
+        if ($written === false) {
+            http_response_code(500);
+            echo json_encode(array('ok' => false, 'error' => 'Brak uprawnień zapisu do bazy danych na serwerze.'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
+        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_SET_COUNTDOWN | IP: " . $clientIp . " | enabled=" . ($enabled ? '1' : '0') . " target=" . $targetDate . " " . $targetTime . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
+
+        echo json_encode(array(
+            'ok' => true,
+            'seasonCountdown' => $prevDb['portalSettings']['seasonCountdown'],
+            'updatedAt' => $tsMs,
+            'state' => $prevDb
+        ), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // Akcja 2d-approve-pool: Atomowe zatwierdzenie konta rejestracji (lub wszystkich PENDING) do Puli Graczy (?action=admin_approve_pool)
     if ($action === 'admin_approve_pool') {
         $lockPath = $dataDir . DIRECTORY_SEPARATOR . '.smpl-db.lock';

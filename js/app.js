@@ -441,6 +441,9 @@ window.SMPL_APP = (function () {
       } else if (maintEl && maintEl.parentNode) {
         maintEl.parentNode.removeChild(maintEl);
       }
+
+      // Wielkie Stadionowe Odliczanie do Startu Sezonu 56 (Admin-controlled LIVE)
+      renderSeasonCountdownBanner(state, heroBanner, mainPortalWrap);
     }
 
     if (heroBanner && heroBanner.parentNode && typeof document.createElement === 'function') {
@@ -785,6 +788,7 @@ window.SMPL_APP = (function () {
       if (lockedDrawerRoot) lockedDrawerRoot.innerHTML = '';
       const aiRootLocked = document.getElementById('smpl-ai-widget-root');
       if (aiRootLocked) aiRootLocked.innerHTML = '';
+      ensureCountdownTicker();
       dismissLoadingScreen();
       return;
     }
@@ -825,6 +829,7 @@ window.SMPL_APP = (function () {
     renderMobileBottomNav(state, session);
     renderMainContent(state, session);
     renderAiAssistantWidget(state, session);
+    ensureCountdownTicker();
     dismissLoadingScreen();
   }
 
@@ -10600,6 +10605,988 @@ window.SMPL_APP = (function () {
     }
   }
 
+  // =========================================================================
+  // WIELKIE ODLICZANIE DO STARTU SEZONU 56 (Temporal API + DST-safe Fallback + Native <dialog> Cinema + Canvas PNG)
+  // =========================================================================
+  let _cdTickInterval = null;
+  let _cdCollapsed = false;
+  let _cdLastBannerSig = '';
+  let _cdDemoEndEpochMs = 0;
+  let _cdCinemaConfettiFired = false;
+  let _cdSafariClosedByBound = false;
+
+  try {
+    _cdCollapsed = sessionStorage.getItem('smpl_cd_collapsed') === '1';
+  } catch (e) {}
+
+  function plUnitLabel(val, form1, form24, form5) {
+    const n = Math.abs(Math.floor(Number(val) || 0));
+    if (n === 1) return form1;
+    const mod100 = n % 100;
+    const mod10 = n % 10;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return form24;
+    return form5;
+  }
+
+  function pad2(n) {
+    const v = Math.max(0, Math.floor(Number(n) || 0));
+    return v < 10 ? ('0' + v) : String(v);
+  }
+
+  function resolveZonedEpochMsFallback(dateStr, timeStr, timeZone) {
+    const dMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || ''));
+    const tMatch = /^(\d{2}):(\d{2})$/.exec(String(timeStr || ''));
+    const y = dMatch ? Number(dMatch[1]) : 2026;
+    const m = dMatch ? Number(dMatch[2]) : 12;
+    const d = dMatch ? Number(dMatch[3]) : 21;
+    const hh = tMatch ? Number(tMatch[1]) : 18;
+    const mm = tMatch ? Number(tMatch[2]) : 0;
+    const utcGuess = Date.UTC(y, m - 1, d, hh, mm, 0);
+    const tz = timeZone || 'Europe/Warsaw';
+    try {
+      if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
+        const fmt = new Intl.DateTimeFormat('en-CA', {
+          timeZone: tz,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        const parts = fmt.formatToParts(new Date(utcGuess));
+        const map = {};
+        for (let i = 0; i < parts.length; i++) {
+          map[parts[i].type] = Number(parts[i].value);
+        }
+        const hNorm = map.hour === 24 ? 0 : map.hour;
+        const asUtc = Date.UTC(map.year, map.month - 1, map.day, hNorm, map.minute, map.second || 0);
+        const offsetMs = asUtc - utcGuess;
+        return utcGuess - offsetMs;
+      }
+    } catch (e) {}
+    return utcGuess - 3600000;
+  }
+
+  function computeCountdownParts(targetDate, targetTime, timeZone, demoEndMs) {
+    const tz = timeZone || 'Europe/Warsaw';
+    if (demoEndMs && Number(demoEndMs) > 0) {
+      const diffMs = Number(demoEndMs) - Date.now();
+      if (diffMs <= 0) {
+        return { isLive: true, days: 0, hours: 0, minutes: 0, seconds: 0, totalSec: 0, humanText: '0 sekund', targetEpochMs: Number(demoEndMs) };
+      }
+      const totalSec = Math.ceil(diffMs / 1000);
+      const d = Math.floor(totalSec / 86400);
+      const h = Math.floor((totalSec % 86400) / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      return {
+        isLive: false,
+        days: d,
+        hours: h,
+        minutes: m,
+        seconds: s,
+        totalSec: totalSec,
+        humanText: d + ' ' + plUnitLabel(d, 'dzień', 'dni', 'dni') + ', ' + h + ' ' + plUnitLabel(h, 'godzina', 'godziny', 'godzin') + ', ' + m + ' ' + plUnitLabel(m, 'minuta', 'minuty', 'minut') + ', ' + s + ' ' + plUnitLabel(s, 'sekunda', 'sekundy', 'sekund'),
+        targetEpochMs: Number(demoEndMs)
+      };
+    }
+
+    // Native Temporal API path (Chrome 144+, Edge 144+, Firefox 139+) — DST-safe ZonedDateTime differential
+    try {
+      if (typeof Temporal !== 'undefined' && Temporal.Now && Temporal.PlainDate && typeof Temporal.Now.zonedDateTimeISO === 'function') {
+        const nowZdt = Temporal.Now.zonedDateTimeISO(tz);
+        const plainDate = Temporal.PlainDate.from(String(targetDate || '2026-12-21'));
+        const plainDt = plainDate.toPlainDateTime(String(targetTime || '18:00') + ':00');
+        const targetZdt = plainDt.toZonedDateTime(tz, { disambiguation: 'compatible' });
+        const dur = nowZdt.until(targetZdt, { largestUnit: 'day', smallestUnit: 'second' });
+        const targetEpochMs = Math.floor(Number(targetZdt.epochMilliseconds));
+        if (dur.sign <= 0) {
+          return { isLive: true, days: 0, hours: 0, minutes: 0, seconds: 0, totalSec: 0, humanText: 'Sezon wystartował!', targetEpochMs: targetEpochMs };
+        }
+        const d = Math.max(0, Number(dur.days || 0));
+        const h = Math.max(0, Number(dur.hours || 0));
+        const m = Math.max(0, Number(dur.minutes || 0));
+        const s = Math.max(0, Number(dur.seconds || 0));
+        let humanText = '';
+        try {
+          if (typeof Intl !== 'undefined' && typeof Intl.DurationFormat === 'function') {
+            humanText = new Intl.DurationFormat('pl', { style: 'long' }).format({ days: d, hours: h, minutes: m, seconds: s });
+          }
+        } catch (fmtErr) {}
+        if (!humanText) {
+          humanText = d + ' ' + plUnitLabel(d, 'dzień', 'dni', 'dni') + ', ' + h + ' ' + plUnitLabel(h, 'godzina', 'godziny', 'godzin') + ', ' + m + ' ' + plUnitLabel(m, 'minuta', 'minuty', 'minut');
+        }
+        return {
+          isLive: false,
+          days: d,
+          hours: h,
+          minutes: m,
+          seconds: s,
+          totalSec: d * 86400 + h * 3600 + m * 60 + s,
+          humanText: humanText,
+          targetEpochMs: targetEpochMs
+        };
+      }
+    } catch (tErr) {}
+
+    // Offline-safe DST-aware Intl fallback (Safari / starsze przeglądarki / Chakra ES2018)
+    const targetEpochMs = resolveZonedEpochMsFallback(targetDate, targetTime, tz);
+    const diffMs = targetEpochMs - Date.now();
+    if (diffMs <= 0) {
+      return { isLive: true, days: 0, hours: 0, minutes: 0, seconds: 0, totalSec: 0, humanText: 'Sezon wystartował!', targetEpochMs: targetEpochMs };
+    }
+    const totalSec = Math.floor(diffMs / 1000);
+    const d = Math.floor(totalSec / 86400);
+    const h = Math.floor((totalSec % 86400) / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    let humanText = '';
+    try {
+      if (typeof Intl !== 'undefined' && typeof Intl.DurationFormat === 'function') {
+        humanText = new Intl.DurationFormat('pl', { style: 'long' }).format({ days: d, hours: h, minutes: m, seconds: s });
+      }
+    } catch (e2) {}
+    if (!humanText) {
+      humanText = d + ' ' + plUnitLabel(d, 'dzień', 'dni', 'dni') + ', ' + h + ' ' + plUnitLabel(h, 'godzina', 'godziny', 'godzin') + ', ' + m + ' ' + plUnitLabel(m, 'minuta', 'minuty', 'minut');
+    }
+    return {
+      isLive: false,
+      days: d,
+      hours: h,
+      minutes: m,
+      seconds: s,
+      totalSec: totalSec,
+      humanText: humanText,
+      targetEpochMs: targetEpochMs
+    };
+  }
+
+  function formatWarsawStartLabel(targetDate, targetTime, timeZone) {
+    const tz = timeZone || 'Europe/Warsaw';
+    try {
+      if (typeof Temporal !== 'undefined' && Temporal.PlainDate) {
+        const zdt = Temporal.PlainDate.from(String(targetDate || '2026-12-21'))
+          .toPlainDateTime(String(targetTime || '18:00') + ':00')
+          .toZonedDateTime(tz, { disambiguation: 'compatible' });
+        const dStr = zdt.toLocaleString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return dStr.charAt(0).toUpperCase() + dStr.slice(1);
+      }
+    } catch (e) {}
+    try {
+      const ms = resolveZonedEpochMsFallback(targetDate, targetTime, tz);
+      const dt = new Date(ms);
+      const dStr = dt.toLocaleString('pl-PL', {
+        timeZone: tz,
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      return dStr.charAt(0).toUpperCase() + dStr.slice(1);
+    } catch (e2) {}
+    return String(targetDate || '2026-12-21') + ' • ' + String(targetTime || '18:00');
+  }
+
+  function computeRoadmapProgress(cfg) {
+    const startAnchorMs = resolveZonedEpochMsFallback('2026-11-09', '00:00', cfg.timeZone || 'Europe/Warsaw');
+    const s55EndMs = resolveZonedEpochMsFallback(cfg.s55EndDate || '2026-12-06', '23:59', cfg.timeZone || 'Europe/Warsaw');
+    const targetMs = resolveZonedEpochMsFallback(cfg.targetDate || '2026-12-21', cfg.targetTime || '18:00', cfg.timeZone || 'Europe/Warsaw');
+    const nowMs = Date.now();
+    const totalSpan = Math.max(86400000, targetMs - startAnchorMs);
+    const pct = Math.max(6, Math.min(100, Math.round(((nowMs - startAnchorMs) / totalSpan) * 100)));
+    let stage = 1;
+    let stageLabel = 'ETAP 1/3 • FINISZ SEZONU 55 (KOLEJKI K9–K15)';
+    if (nowMs >= targetMs) {
+      stage = 3;
+      stageLabel = 'ETAP 3/3 • SEZON ' + Number(cfg.season || 56) + ' WYSTARTOWAŁ!';
+    } else if (nowMs >= s55EndMs) {
+      stage = 2;
+      stageLabel = 'ETAP 2/3 • PRZERWA MIĘDZYSEZONOWA (' + Number(cfg.breakWeeks !== undefined ? cfg.breakWeeks : 2) + ' TYG.) & ZAPISY';
+    }
+    return { pct: pct, stage: stage, stageLabel: stageLabel };
+  }
+
+  function applyClockValuesToContainer(rootEl, parts) {
+    if (!rootEl || !parts) return;
+    const dEl = rootEl.querySelector('[data-smpl-cd-d]');
+    const hEl = rootEl.querySelector('[data-smpl-cd-h]');
+    const mEl = rootEl.querySelector('[data-smpl-cd-m]');
+    const sEl = rootEl.querySelector('[data-smpl-cd-s]');
+    if (dEl) dEl.textContent = pad2(parts.days);
+    if (hEl) hEl.textContent = pad2(parts.hours);
+    if (mEl) mEl.textContent = pad2(parts.minutes);
+    if (sEl) {
+      const nextS = pad2(parts.seconds);
+      if (sEl.textContent !== nextS) {
+        sEl.textContent = nextS;
+        const tile = sEl.closest ? sEl.closest('.smpl-cd-tile') : null;
+        if (tile && tile.classList) {
+          tile.classList.remove('is-tick');
+          void tile.offsetWidth;
+          tile.classList.add('is-tick');
+        }
+      }
+    }
+    const dl = rootEl.querySelector('[data-smpl-cd-d-lbl]');
+    const hl = rootEl.querySelector('[data-smpl-cd-h-lbl]');
+    const ml = rootEl.querySelector('[data-smpl-cd-m-lbl]');
+    const sl = rootEl.querySelector('[data-smpl-cd-s-lbl]');
+    if (dl) dl.textContent = plUnitLabel(parts.days, 'DZIEŃ', 'DNI', 'DNI');
+    if (hl) hl.textContent = plUnitLabel(parts.hours, 'GODZINA', 'GODZINY', 'GODZIN');
+    if (ml) ml.textContent = plUnitLabel(parts.minutes, 'MINUTA', 'MINUTY', 'MINUT');
+    if (sl) sl.textContent = plUnitLabel(parts.seconds, 'SEKUNDA', 'SEKUNDY', 'SEKUND');
+
+    const gridWrap = rootEl.querySelector('[data-smpl-cd-grid]');
+    const liveWrap = rootEl.querySelector('[data-smpl-cd-live-celebration]');
+    if (gridWrap && liveWrap) {
+      if (parts.isLive) {
+        gridWrap.classList.add('hidden');
+        liveWrap.classList.remove('hidden');
+      } else {
+        gridWrap.classList.remove('hidden');
+        liveWrap.classList.add('hidden');
+      }
+    }
+    const srEl = rootEl.querySelector('[data-smpl-cd-sr]');
+    if (srEl) srEl.textContent = parts.isLive ? 'Sezon wystartował!' : ('Pozostało: ' + parts.humanText);
+  }
+
+  function renderSeasonCountdownBanner(state, heroBanner, mainPortalWrap) {
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') return;
+    const cdCfg =
+      window.SMPL_DB && typeof window.SMPL_DB.getSeasonCountdownConfig === 'function'
+        ? window.SMPL_DB.getSeasonCountdownConfig(state)
+        : null;
+    let cdEl = document.getElementById('smpl-season-countdown-banner');
+    if (!cdCfg || !cdCfg.enabled) {
+      if (cdEl && cdEl.parentNode) cdEl.parentNode.removeChild(cdEl);
+      _cdLastBannerSig = '';
+      return;
+    }
+    if (!heroBanner && !mainPortalWrap) return;
+
+    const esc = (v) => (window.SMPL_VIEWS && window.SMPL_VIEWS.escapeHtml ? window.SMPL_VIEWS.escapeHtml(v) : String(v || ''));
+    const sig = JSON.stringify(cdCfg) + '|collapsed=' + (_cdCollapsed ? '1' : '0');
+    if (!cdEl) {
+      cdEl = document.createElement('section');
+      cdEl.id = 'smpl-season-countdown-banner';
+      cdEl.setAttribute('aria-label', 'Odliczanie do startu Sezonu ' + Number(cdCfg.season || 56));
+      if (heroBanner && heroBanner.parentNode) {
+        heroBanner.parentNode.insertBefore(cdEl, heroBanner);
+      } else if (mainPortalWrap) {
+        mainPortalWrap.insertBefore(cdEl, mainPortalWrap.firstChild);
+      }
+    }
+    if (_cdLastBannerSig === sig && cdEl.innerHTML.trim()) {
+      tickAllCountdowns();
+      return;
+    }
+    _cdLastBannerSig = sig;
+
+    const startLabel = formatWarsawStartLabel(cdCfg.targetDate, cdCfg.targetTime, cdCfg.timeZone);
+    const road = computeRoadmapProgress(cdCfg);
+    const seasonNum = Number(cdCfg.season || 56);
+    const breakW = Number(cdCfg.breakWeeks !== undefined ? cdCfg.breakWeeks : 2);
+    const ctaTab = esc(cdCfg.ctaTab || 'register');
+    const isStrictAdmNow = Boolean(window.SMPL_DB && typeof window.SMPL_DB.isStrictAdminSession === 'function' && window.SMPL_DB.isStrictAdminSession());
+
+    if (_cdCollapsed) {
+      cdEl.className = 'smpl-cd-compact mb-4';
+      cdEl.innerHTML = `
+        <div class="smpl-cd-compact-inner">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="smpl-live-beacon-dot flex-shrink-0"></span>
+            <span class="font-display font-black text-xs sm:text-sm uppercase tracking-wider text-amber-300 truncate">
+              🏆 ${esc(cdCfg.title || ('WIELKI START SEZONU ' + seasonNum))}
+            </span>
+          </div>
+          <div class="flex items-center gap-1.5 font-display font-black text-sm sm:text-base text-white tabular-nums" data-smpl-cd-grid>
+            <span class="smpl-cd-mini-pill"><b data-smpl-cd-d>--</b><small>d</small></span>
+            <span class="text-amber-400">:</span>
+            <span class="smpl-cd-mini-pill"><b data-smpl-cd-h>--</b><small>g</small></span>
+            <span class="text-amber-400">:</span>
+            <span class="smpl-cd-mini-pill"><b data-smpl-cd-m>--</b><small>m</small></span>
+            <span class="text-amber-400">:</span>
+            <span class="smpl-cd-mini-pill smpl-cd-mini-sec"><b data-smpl-cd-s>--</b><small>s</small></span>
+          </div>
+          <div class="hidden font-display font-black text-xs sm:text-sm text-emerald-300 uppercase" data-smpl-cd-live-celebration>
+            🏆 SEZON ${seasonNum} WYSTARTOWAŁ! GRAMY! ⚽🔥
+          </div>
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <button type="button" onclick="SMPL_APP.openCountdownCinemaModal(false)" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/50 text-amber-200 font-display font-bold text-[10px] uppercase transition">
+              🎬 Pełny Ekran
+            </button>
+            <button type="button" onclick="SMPL_APP.toggleCountdownCollapsed(false)" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white font-display font-bold text-[10px] uppercase transition">
+              + Rozwiń
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      cdEl.className = 'smpl-cd-hero mb-6';
+      cdEl.innerHTML = `
+        <div class="smpl-cd-ribbon" aria-hidden="true"></div>
+        <div class="smpl-cd-bg" aria-hidden="true"></div>
+        <div class="smpl-cd-foil" aria-hidden="true"></div>
+        <div class="smpl-cd-inner">
+          <!-- Górny pasek transmisji -->
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div class="inline-flex flex-wrap items-center gap-2">
+              <span class="smpl-cd-live-pill">
+                <span class="smpl-live-beacon-dot"></span>
+                <span>OFICJALNE ODLICZANIE SMPL • SEZON ${seasonNum}</span>
+              </span>
+              <span class="smpl-cd-date-pill">
+                📅 ${esc(startLabel)}
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              ${
+                isStrictAdmNow
+                  ? `<button type="button" onclick="SMPL_APP.switchTab('admin'); SMPL_APP.setAdminSubTab('overview');" class="smpl-cd-ghost-btn" title="Edytuj odliczanie w Panelu Admina">⚙️ Edytuj</button>`
+                  : ''
+              }
+              <button type="button" onclick="SMPL_APP.openCountdownCinemaModal(false)" class="smpl-cd-ghost-btn">
+                🎬 Tryb Kinowy
+              </button>
+              <button type="button" onclick="SMPL_APP.toggleCountdownCollapsed(true)" class="smpl-cd-ghost-btn" title="Zwiń do kompaktowego paska">
+                − Zwiń
+              </button>
+            </div>
+          </div>
+
+          <!-- Główny Tytuł & Podtytuł -->
+          <div class="text-center max-w-3xl mx-auto mb-5">
+            <h2 class="smpl-cd-title">${esc(cdCfg.title || ('WIELKI START SEZONU ' + seasonNum))}</h2>
+            <p class="smpl-cd-subtitle">${esc(cdCfg.subtitle || '')}</p>
+          </div>
+
+          <!-- 4 Gigantyczne Kafle Zegara Stadionowego -->
+          <div class="smpl-cd-grid" data-smpl-cd-grid>
+            <div class="smpl-cd-tile">
+              <div class="smpl-cd-tile-glow" aria-hidden="true"></div>
+              <div class="smpl-cd-tile-split" aria-hidden="true"></div>
+              <div class="smpl-cd-digits" data-smpl-cd-d>--</div>
+              <div class="smpl-cd-unit" data-smpl-cd-d-lbl>DNI</div>
+            </div>
+            <div class="smpl-cd-tile">
+              <div class="smpl-cd-tile-glow" aria-hidden="true"></div>
+              <div class="smpl-cd-tile-split" aria-hidden="true"></div>
+              <div class="smpl-cd-digits" data-smpl-cd-h>--</div>
+              <div class="smpl-cd-unit" data-smpl-cd-h-lbl>GODZIN</div>
+            </div>
+            <div class="smpl-cd-tile">
+              <div class="smpl-cd-tile-glow" aria-hidden="true"></div>
+              <div class="smpl-cd-tile-split" aria-hidden="true"></div>
+              <div class="smpl-cd-digits" data-smpl-cd-m>--</div>
+              <div class="smpl-cd-unit" data-smpl-cd-m-lbl>MINUT</div>
+            </div>
+            <div class="smpl-cd-tile smpl-cd-tile-sec">
+              <div class="smpl-cd-tile-glow" aria-hidden="true"></div>
+              <div class="smpl-cd-tile-split" aria-hidden="true"></div>
+              <div class="smpl-cd-digits smpl-cd-digits-sec" data-smpl-cd-s>--</div>
+              <div class="smpl-cd-unit" data-smpl-cd-s-lbl>SEKUND</div>
+            </div>
+          </div>
+
+          <!-- Ekran Finałowy 00:00:00:00 -->
+          <div class="hidden smpl-cd-kickoff-box" data-smpl-cd-live-celebration>
+            <div class="text-3xl sm:text-5xl mb-2">🏆⚽🔥</div>
+            <div class="font-display font-black text-2xl sm:text-4xl text-amber-300 uppercase tracking-tight">
+              SEZON ${seasonNum} OFICJALNIE WYSTARTOWAŁ!
+            </div>
+            <p class="text-xs sm:text-sm text-emerald-100 mt-1.5 font-semibold">
+              Gwiazdy na murawie — wbijaj w terminarz, umawiaj pierwsze dwumecze i walcz o Złotą Koronę SMPL!
+            </p>
+          </div>
+          <span class="smpl-cd-sr-only" aria-live="off" data-smpl-cd-sr></span>
+
+          <!-- 3-Etapowa Oś Czasu Drogi do Sezonu 56 (Excel S55 + 2 Tyg. Przerwy) -->
+          <div class="smpl-cd-roadmap mt-5">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-[11px] font-display font-bold uppercase mb-1.5">
+              <span class="text-emerald-300">${esc(road.stageLabel)}</span>
+              <span class="text-amber-200">${esc(cdCfg.phaseNote || ('Przerwa międzysezonowa: ' + breakW + ' tyg.'))}</span>
+            </div>
+            <div class="smpl-cd-progress-track">
+              <div class="smpl-cd-progress-fill" style="width:${road.pct}%;"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-2 text-[10px] font-display font-bold uppercase">
+              <div class="${road.stage >= 1 ? 'text-emerald-300' : 'text-slate-400'}">
+                ⚽ 1. Finisz S55 (do ${esc(cdCfg.s55EndDate || '06.12')})
+              </div>
+              <div class="text-center ${road.stage >= 2 ? 'text-amber-300' : 'text-slate-400'}">
+                🌴 2. Przerwa ${breakW} tyg. &amp; Zapisy
+              </div>
+              <div class="text-right ${road.stage >= 3 ? 'text-yellow-300' : 'text-slate-300'}">
+                🏆 3. Start S${seasonNum} (${esc(cdCfg.targetDate || '21.12')})
+              </div>
+            </div>
+          </div>
+
+          <!-- Dolny Pasek Akcji -->
+          <div class="flex flex-wrap items-center justify-center gap-2.5 mt-5">
+            <button type="button" onclick="SMPL_APP.switchTab('${ctaTab}')" class="smpl-cd-primary-cta">
+              ${esc(cdCfg.ctaLabel || ('📝 Zapisz się do Sezonu ' + seasonNum))}
+            </button>
+            <button type="button" onclick="SMPL_APP.downloadCountdownPosterPng()" class="smpl-cd-secondary-cta">
+              📸 Pobierz Plakat PNG
+            </button>
+            <button type="button" onclick="SMPL_APP.copyCountdownMessengerText()" class="smpl-cd-secondary-cta">
+              📋 Kopiuj na Messengera
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    ensureCountdownTicker();
+    tickAllCountdowns();
+  }
+
+  function readAdminCountdownDraft(fallbackCfg) {
+    const base = fallbackCfg || (window.SMPL_DB && typeof window.SMPL_DB.getSeasonCountdownConfig === 'function' ? window.SMPL_DB.getSeasonCountdownConfig() : {});
+    if (typeof document === 'undefined') return base;
+    const g = (id) => document.getElementById(id);
+    const dateEl = g('admin-cd-date');
+    const timeEl = g('admin-cd-time');
+    const breakEl = g('admin-cd-break-weeks');
+    const seasonEl = g('admin-cd-season');
+    const titleEl = g('admin-cd-title');
+    const subEl = g('admin-cd-subtitle');
+    const ctaEl = g('admin-cd-cta-label');
+    const tabEl = g('admin-cd-cta-tab');
+    const breakW = breakEl ? Math.min(12, Math.max(0, Math.round(Number(breakEl.value || 0)))) : (base.breakWeeks !== undefined ? base.breakWeeks : 2);
+    const sNum = seasonEl ? Math.min(999, Math.max(1, Math.round(Number(seasonEl.value || 56)))) : Number(base.season || 56);
+    const tDate = dateEl && /^\d{4}-\d{2}-\d{2}$/.test(dateEl.value) ? dateEl.value : (base.targetDate || '2026-12-21');
+    const tTime = timeEl && /^\d{2}:\d{2}$/.test(timeEl.value) ? timeEl.value : (base.targetTime || '18:00');
+    return {
+      season: sNum,
+      targetDate: tDate,
+      targetTime: tTime,
+      timeZone: base.timeZone || 'Europe/Warsaw',
+      s55EndDate: base.s55EndDate || '2026-12-06',
+      breakWeeks: breakW,
+      roundsPerWeek: Number(base.roundsPerWeek || 4),
+      title: titleEl && titleEl.value.trim() ? titleEl.value.trim() : (base.title || ('WIELKI START SEZONU ' + sNum)),
+      subtitle: subEl && subEl.value.trim() ? subEl.value.trim() : (base.subtitle || 'Ekstraklasa & 2. Liga • Nowe Karty UT, Sklepik Coins i Walka o Puchar Mistrzów!'),
+      phaseNote: 'Excel S55: Ekstraklasa 138/240 (K9–K15 ≈ 2 tyg.) + ' + breakW + ' tyg. przerwy międzysezonowej',
+      ctaLabel: ctaEl && ctaEl.value.trim() ? ctaEl.value.trim() : (base.ctaLabel || ('📝 Zapisz się do Sezonu ' + sNum)),
+      ctaTab: tabEl && tabEl.value ? tabEl.value : (base.ctaTab || 'register')
+    };
+  }
+
+  function triggerCinemaConfetti(dlg) {
+    if (!dlg || _cdCinemaConfettiFired) return;
+    _cdCinemaConfettiFired = true;
+    const host = dlg.querySelector('[data-smpl-cd-confetti]');
+    if (!host) return;
+    const colors = ['#fde047', '#f59e0b', '#34d399', '#38bdf8', '#ffffff', '#ef4444'];
+    const bits = [];
+    for (let i = 0; i < 42; i++) {
+      const left = Math.round((i * 2.4 + (i % 5) * 3) % 100);
+      const delay = ((i % 9) * 0.14).toFixed(2);
+      const dur = (2.2 + (i % 5) * 0.35).toFixed(2);
+      const col = colors[i % colors.length];
+      bits.push('<span class="smpl-cd-confetti-piece" style="left:' + left + '%;background:' + col + ';animation-delay:' + delay + 's;animation-duration:' + dur + 's;"></span>');
+    }
+    host.innerHTML = bits.join('');
+  }
+
+  function tickAllCountdowns() {
+    if (typeof document === 'undefined' || !window.SMPL_DB) return;
+    const cdCfg = typeof window.SMPL_DB.getSeasonCountdownConfig === 'function'
+      ? window.SMPL_DB.getSeasonCountdownConfig()
+      : null;
+    if (!cdCfg) return;
+
+    const bannerEl = document.getElementById('smpl-season-countdown-banner');
+    const gateEl = document.getElementById('smpl-auth-gate-countdown');
+    const adminPrevEl = document.querySelector ? document.querySelector('[data-smpl-cd-admin-preview]') : null;
+    const cinemaDlg = document.getElementById('smpl-countdown-cinema-dialog');
+    const cinemaOpen = Boolean(cinemaDlg && cinemaDlg.open);
+
+    if (!bannerEl && !gateEl && !adminPrevEl && !cinemaOpen) {
+      if (_cdTickInterval) {
+        clearInterval(_cdTickInterval);
+        _cdTickInterval = null;
+      }
+      return;
+    }
+
+    const parts = computeCountdownParts(cdCfg.targetDate, cdCfg.targetTime, cdCfg.timeZone, 0);
+    if (bannerEl) applyClockValuesToContainer(bannerEl, parts);
+    if (gateEl) applyClockValuesToContainer(gateEl, parts);
+
+    if (adminPrevEl) {
+      const draft = readAdminCountdownDraft(cdCfg);
+      const adminParts = computeCountdownParts(draft.targetDate, draft.targetTime, draft.timeZone, 0);
+      applyClockValuesToContainer(adminPrevEl, adminParts);
+    }
+
+    if (cinemaOpen && cinemaDlg) {
+      const useDemo = _cdDemoEndEpochMs > 0;
+      const cinDraft = adminPrevEl ? readAdminCountdownDraft(cdCfg) : cdCfg;
+      const cinParts = computeCountdownParts(cinDraft.targetDate, cinDraft.targetTime, cinDraft.timeZone, useDemo ? _cdDemoEndEpochMs : 0);
+      applyClockValuesToContainer(cinemaDlg, cinParts);
+      if (cinParts.isLive) triggerCinemaConfetti(cinemaDlg);
+    }
+  }
+
+  function ensureCountdownTicker() {
+    if (typeof document === 'undefined') return;
+    tickAllCountdowns();
+    if (!_cdTickInterval) {
+      _cdTickInterval = setInterval(tickAllCountdowns, 1000);
+    }
+  }
+
+  function toggleCountdownCollapsed(collapsed) {
+    _cdCollapsed = Boolean(collapsed);
+    try {
+      sessionStorage.setItem('smpl_cd_collapsed', _cdCollapsed ? '1' : '0');
+    } catch (e) {}
+    _cdLastBannerSig = '';
+    applyPortalSettingsToDom(window.SMPL_DB.getState());
+  }
+
+  function refreshAdminCountdownPreview() {
+    ensureCountdownTicker();
+    tickAllCountdowns();
+  }
+
+  function adminRecalcDateFromBreakWeeks() {
+    if (typeof document === 'undefined') return;
+    const breakEl = document.getElementById('admin-cd-break-weeks');
+    const dateEl = document.getElementById('admin-cd-date');
+    if (!breakEl || !dateEl) return;
+    const bw = Math.min(12, Math.max(0, Math.round(Number(breakEl.value || 0))));
+    // Finisz Sezonu 55 (Excel: Niedziela 2026-12-06) + (bw * 7 + 1) dni -> Poniedziałek po przerwie!
+    const baseMs = Date.UTC(2026, 11, 6, 12, 0, 0);
+    const targetDt = new Date(baseMs + (bw * 7 + 1) * 86400000);
+    const yyyy = targetDt.getUTCFullYear();
+    const mm = pad2(targetDt.getUTCMonth() + 1);
+    const dd = pad2(targetDt.getUTCDate());
+    dateEl.value = yyyy + '-' + mm + '-' + dd;
+    refreshAdminCountdownPreview();
+  }
+
+  function adminApplyCountdownPreset(presetKey) {
+    if (typeof document === 'undefined') return;
+    const dateEl = document.getElementById('admin-cd-date');
+    const timeEl = document.getElementById('admin-cd-time');
+    const breakEl = document.getElementById('admin-cd-break-weeks');
+    const titleEl = document.getElementById('admin-cd-title');
+    if (presetKey === 'excel_2w') {
+      if (dateEl) dateEl.value = '2026-12-21';
+      if (timeEl) timeEl.value = '18:00';
+      if (breakEl) breakEl.value = '2';
+      if (titleEl && !titleEl.value.trim()) titleEl.value = 'WIELKI START SEZONU 56';
+      showToast('📊 Ustawiono dokładną datę z Excela S55 + 2 tyg. przerwy: 21.12.2026 • 18:00!');
+    } else if (presetKey === 'excel_3w') {
+      if (dateEl) dateEl.value = '2026-12-28';
+      if (timeEl) timeEl.value = '18:00';
+      if (breakEl) breakEl.value = '3';
+      showToast('⏳ Ustawiono +1 tydzień zapasu (3 tyg. przerwy): 28.12.2026 • 18:00!');
+    } else if (presetKey === 'new_year') {
+      if (dateEl) dateEl.value = '2027-01-04';
+      if (timeEl) timeEl.value = '18:00';
+      if (breakEl) breakEl.value = '4';
+      showToast('🎄 Ustawiono start po Świętach i Nowym Roku: 04.01.2027 • 18:00!');
+    }
+    refreshAdminCountdownPreview();
+  }
+
+  function adminLaunchSeasonCountdown() {
+    return adminSaveSeasonCountdown(true);
+  }
+
+  function adminSaveSeasonCountdown(forceEnable) {
+    try {
+      const cur = window.SMPL_DB.getSeasonCountdownConfig();
+      const draft = readAdminCountdownDraft(cur);
+      draft.enabled = forceEnable !== undefined ? Boolean(forceEnable) : true;
+      window.SMPL_DB.setSeasonCountdown(draft, getCurrentAdminDisplayName());
+      _cdCollapsed = false;
+      try { sessionStorage.setItem('smpl_cd_collapsed', '0'); } catch (e) {}
+      _cdLastBannerSig = '';
+      applyPortalSettingsToDom(window.SMPL_DB.getState());
+      renderAll();
+      showToast('🚀 Wielkie Odliczanie do Sezonu ' + draft.season + ' jest już AKTYWNE na portalu (Start: ' + draft.targetDate + ' ' + draft.targetTime + ')!');
+    } catch (err) {
+      showToast((err && err.message) || 'Błąd zapisu odliczania do startu sezonu.', 'error');
+    }
+  }
+
+  function adminStopSeasonCountdown() {
+    try {
+      const cur = window.SMPL_DB.getSeasonCountdownConfig();
+      const draft = readAdminCountdownDraft(cur);
+      draft.enabled = false;
+      window.SMPL_DB.setSeasonCountdown(draft, getCurrentAdminDisplayName());
+      _cdLastBannerSig = '';
+      applyPortalSettingsToDom(window.SMPL_DB.getState());
+      renderAll();
+      showToast('⏹️ Zatrzymano i ukryto Wielkie Odliczanie na portalu.');
+    } catch (err) {
+      showToast((err && err.message) || 'Błąd zatrzymania odliczania.', 'error');
+    }
+  }
+
+  function openCountdownCinemaModal(isDemo10s) {
+    if (typeof document === 'undefined' || !window.SMPL_DB) return;
+    const cdCfg = window.SMPL_DB.getSeasonCountdownConfig();
+    const adminPrevEl = document.querySelector ? document.querySelector('[data-smpl-cd-admin-preview]') : null;
+    const cfg = adminPrevEl ? readAdminCountdownDraft(cdCfg) : cdCfg;
+    const esc = (v) => (window.SMPL_VIEWS && window.SMPL_VIEWS.escapeHtml ? window.SMPL_VIEWS.escapeHtml(v) : String(v || ''));
+
+    _cdDemoEndEpochMs = isDemo10s ? (Date.now() + 10500) : 0;
+    _cdCinemaConfettiFired = false;
+
+    let dlg = document.getElementById('smpl-countdown-cinema-dialog');
+    if (!dlg) {
+      dlg = document.createElement('dialog');
+      dlg.id = 'smpl-countdown-cinema-dialog';
+      dlg.className = 'smpl-cd-cinema';
+      dlg.setAttribute('closedby', 'any');
+      dlg.setAttribute('aria-labelledby', 'smpl-cd-cinema-title');
+      document.body.appendChild(dlg);
+      dlg.addEventListener('close', function () {
+        dlg.returnValue = '';
+        _cdDemoEndEpochMs = 0;
+        _cdCinemaConfettiFired = false;
+      });
+      // Fallback dla Safari gdzie closedby="any" nie jest jeszcze natywne
+      if (typeof HTMLDialogElement !== 'undefined' && !('closedBy' in HTMLDialogElement.prototype) && !_cdSafariClosedByBound) {
+        _cdSafariClosedByBound = true;
+        let pressedOut = false;
+        const isOutside = function (ev, el) {
+          const r = el.getBoundingClientRect();
+          return ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom;
+        };
+        dlg.addEventListener('pointerdown', function (ev) { pressedOut = isOutside(ev, dlg); });
+        dlg.addEventListener('pointerup', function (ev) { if (pressedOut && isOutside(ev, dlg) && dlg.open) dlg.close(); });
+      }
+    }
+
+    const seasonNum = Number(cfg.season || 56);
+    const startLabel = isDemo10s
+      ? 'TRYB POKAZOWY — FINAŁ ZA 10 SEKUND! 🎆'
+      : formatWarsawStartLabel(cfg.targetDate, cfg.targetTime, cfg.timeZone);
+    const road = computeRoadmapProgress(cfg);
+
+    dlg.innerHTML = `
+      <div class="smpl-cd-cinema-shell">
+        <div class="smpl-cd-ribbon" aria-hidden="true"></div>
+        <div class="smpl-cd-bg smpl-cd-cinema-bg" aria-hidden="true"></div>
+        <div class="smpl-cd-confetti-layer" data-smpl-cd-confetti aria-hidden="true"></div>
+        <div class="smpl-cd-cinema-body">
+          <div class="flex items-center justify-between gap-3 w-full mb-5">
+            <div class="inline-flex items-center gap-2.5">
+              <img src="css/icon-192.png" alt="Herb SMPL" class="w-10 h-10 rounded-full border-2 border-amber-400/70 shadow-lg"/>
+              <div>
+                <div class="font-display font-black text-[11px] uppercase tracking-widest text-emerald-300">
+                  ● ARENA MISTRZÓW • SCORE MATCH POLSKA LIGA
+                </div>
+                <div class="text-xs font-bold text-amber-200">${esc(startLabel)}</div>
+              </div>
+            </div>
+            <form method="dialog">
+              <button type="submit" value="close" autofocus class="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/25 text-white font-display font-black text-xs uppercase tracking-wider transition">
+                ✕ Zamknij
+              </button>
+            </form>
+          </div>
+
+          <div class="text-center max-w-3xl mx-auto my-auto py-3">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/60 text-amber-200 font-display font-black text-xs uppercase tracking-widest mb-3">
+              🏆 OFICJALNE ODLICZANIE • SEZON ${seasonNum}
+            </div>
+            <h2 id="smpl-cd-cinema-title" class="smpl-cd-title smpl-cd-cinema-title">${esc(cfg.title || ('WIELKI START SEZONU ' + seasonNum))}</h2>
+            <p class="smpl-cd-subtitle mt-2 mb-6">${esc(cfg.subtitle || '')}</p>
+
+            <div class="smpl-cd-grid smpl-cd-cinema-grid" data-smpl-cd-grid>
+              <div class="smpl-cd-tile smpl-cd-cinema-tile">
+                <div class="smpl-cd-tile-glow" aria-hidden="true"></div>
+                <div class="smpl-cd-tile-split" aria-hidden="true"></div>
+                <div class="smpl-cd-digits smpl-cd-cinema-digits" data-smpl-cd-d>--</div>
+                <div class="smpl-cd-unit" data-smpl-cd-d-lbl>DNI</div>
+              </div>
+              <div class="smpl-cd-tile smpl-cd-cinema-tile">
+                <div class="smpl-cd-tile-glow" aria-hidden="true"></div>
+                <div class="smpl-cd-tile-split" aria-hidden="true"></div>
+                <div class="smpl-cd-digits smpl-cd-cinema-digits" data-smpl-cd-h>--</div>
+                <div class="smpl-cd-unit" data-smpl-cd-h-lbl>GODZIN</div>
+              </div>
+              <div class="smpl-cd-tile smpl-cd-cinema-tile">
+                <div class="smpl-cd-tile-glow" aria-hidden="true"></div>
+                <div class="smpl-cd-tile-split" aria-hidden="true"></div>
+                <div class="smpl-cd-digits smpl-cd-cinema-digits" data-smpl-cd-m>--</div>
+                <div class="smpl-cd-unit" data-smpl-cd-m-lbl>MINUT</div>
+              </div>
+              <div class="smpl-cd-tile smpl-cd-tile-sec smpl-cd-cinema-tile">
+                <div class="smpl-cd-tile-glow" aria-hidden="true"></div>
+                <div class="smpl-cd-tile-split" aria-hidden="true"></div>
+                <div class="smpl-cd-digits smpl-cd-digits-sec smpl-cd-cinema-digits" data-smpl-cd-s>--</div>
+                <div class="smpl-cd-unit" data-smpl-cd-s-lbl>SEKUND</div>
+              </div>
+            </div>
+
+            <div class="hidden smpl-cd-kickoff-box smpl-cd-cinema-kickoff" data-smpl-cd-live-celebration>
+              <div class="text-5xl sm:text-6xl mb-3">🏆🎆⚽🔥</div>
+              <div class="font-display font-black text-3xl sm:text-5xl text-amber-300 uppercase tracking-tight">
+                SEZON ${seasonNum} WYSTARTOWAŁ!
+              </div>
+              <p class="text-sm sm:text-base text-emerald-100 mt-2 font-semibold">
+                Pierwszy gwizdek zabrzmiał! Ekstraklasa i 2. Liga SMPL ruszają do boju o Puchar Mistrzów!
+              </p>
+            </div>
+            <span class="smpl-cd-sr-only" aria-live="off" data-smpl-cd-sr></span>
+
+            <div class="smpl-cd-roadmap mt-6 text-left">
+              <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] font-display font-bold uppercase mb-1.5">
+                <span class="text-emerald-300">${esc(road.stageLabel)}</span>
+                <span class="text-amber-200">${esc(cfg.phaseNote || '')}</span>
+              </div>
+              <div class="smpl-cd-progress-track">
+                <div class="smpl-cd-progress-fill" style="width:${road.pct}%;"></div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center gap-3 mt-6">
+              <button type="button" onclick="(function(){ var d=document.getElementById('smpl-countdown-cinema-dialog'); if(d&&d.open) d.close(); SMPL_APP.switchTab('${esc(cfg.ctaTab || 'register')}'); })()" class="smpl-cd-primary-cta">
+                ${esc(cfg.ctaLabel || ('📝 Zapisz się do Sezonu ' + seasonNum))}
+              </button>
+              <button type="button" onclick="SMPL_APP.downloadCountdownPosterPng()" class="smpl-cd-secondary-cta">
+                📸 Plakat PNG na Messengera
+              </button>
+              <button type="button" onclick="SMPL_APP.copyCountdownMessengerText()" class="smpl-cd-secondary-cta">
+                📋 Kopiuj Tekst
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (typeof dlg.showModal === 'function') {
+      if (!dlg.open) dlg.showModal();
+    } else {
+      dlg.setAttribute('open', 'open');
+    }
+    ensureCountdownTicker();
+    tickAllCountdowns();
+  }
+
+  function copyCountdownMessengerText() {
+    const cdCfg = window.SMPL_DB.getSeasonCountdownConfig();
+    const adminPrevEl = typeof document !== 'undefined' && document.querySelector ? document.querySelector('[data-smpl-cd-admin-preview]') : null;
+    const cfg = adminPrevEl ? readAdminCountdownDraft(cdCfg) : cdCfg;
+    const parts = computeCountdownParts(cfg.targetDate, cfg.targetTime, cfg.timeZone, 0);
+    const startLabel = formatWarsawStartLabel(cfg.targetDate, cfg.targetTime, cfg.timeZone);
+    const seasonNum = Number(cfg.season || 56);
+    const msg = parts.isLive
+      ? ('🏆⚽ SEZON ' + seasonNum + ' SCORE MATCH POLSKA LIGA WYSTARTOWAŁ! 🔥\nWbijaj na oficjalny portal SMPL, sprawdź terminarz i graj o Puchar Mistrzów!\n👉 https://host976694.xce.pl/')
+      : ('🏆⏱️ WIELKIE ODLICZANIE DO STARTU SEZONU ' + seasonNum + ' (SMPL)!\n🔥 Zostało już tylko: ' + parts.days + ' ' + plUnitLabel(parts.days, 'dzień', 'dni', 'dni') + ', ' + parts.hours + ' godz., ' + parts.minutes + ' min!\n📅 Planowany start: ' + startLabel + '\n📊 (' + (cfg.phaseNote || 'Finisz S55 + 2 tyg. przerwy międzysezonowej') + ')\n📝 Zapisy, Karty UT i tabele live na portalu:\n👉 https://host976694.xce.pl/');
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(msg)
+        .then(function () { showToast('📋 Skopiowano komunikat z odliczaniem — wklej prosto na Messengera!'); })
+        .catch(function () { showToast('Nie udało się skopiować do schowka.', 'error'); });
+    } else {
+      showToast('📋 Tekst gotowy: Start Sezonu ' + seasonNum + ' (' + startLabel + ')!');
+    }
+  }
+
+  function downloadCountdownPosterPng() {
+    if (typeof document === 'undefined') return Promise.resolve(false);
+    const cdCfg = window.SMPL_DB.getSeasonCountdownConfig();
+    const adminPrevEl = document.querySelector ? document.querySelector('[data-smpl-cd-admin-preview]') : null;
+    const cfg = adminPrevEl ? readAdminCountdownDraft(cdCfg) : cdCfg;
+    const parts = computeCountdownParts(cfg.targetDate, cfg.targetTime, cfg.timeZone, 0);
+    const startLabel = formatWarsawStartLabel(cfg.targetDate, cfg.targetTime, cfg.timeZone);
+    const seasonNum = Number(cfg.season || 56);
+
+    const loadImgSafe = function (src) {
+      return new Promise(function (resolve) {
+        const im = new Image();
+        im.crossOrigin = 'anonymous';
+        im.onload = function () { resolve(im); };
+        im.onerror = function () { resolve(null); };
+        im.src = src;
+      });
+    };
+
+    const p = Promise.all([
+      loadImgSafe('img/hero-league-stage-banner.jpg'),
+      loadImgSafe('css/icon-192.png')
+    ]).then(function (imgs) {
+      const bgImg = imgs[0];
+      const crestImg = imgs[1];
+      const W = 1200;
+      const H = 630;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas 2D niedostępny');
+
+      // Base dark obsidian gradient
+      const baseG = ctx.createLinearGradient(0, 0, W, H);
+      baseG.addColorStop(0, '#030712');
+      baseG.addColorStop(0.55, '#0b152a');
+      baseG.addColorStop(1, '#040814');
+      ctx.fillStyle = baseG;
+      ctx.fillRect(0, 0, W, H);
+
+      if (bgImg) {
+        ctx.save();
+        ctx.globalAlpha = 0.52;
+        const scale = Math.max(W / bgImg.width, H / bgImg.height);
+        const dw = bgImg.width * scale;
+        const dh = bgImg.height * scale;
+        ctx.drawImage(bgImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        ctx.restore();
+      }
+
+      // Dramatic vignette overlay
+      const vig = ctx.createLinearGradient(0, 0, W, 0);
+      vig.addColorStop(0, 'rgba(3, 7, 18, 0.92)');
+      vig.addColorStop(0.58, 'rgba(3, 7, 18, 0.72)');
+      vig.addColorStop(1, 'rgba(3, 7, 18, 0.45)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, W, H);
+
+      // Top Polish-Gold-Emerald Championship Light Ribbon
+      const rib = ctx.createLinearGradient(0, 0, W, 0);
+      rib.addColorStop(0, '#ffffff');
+      rib.addColorStop(0.16, '#dc2626');
+      rib.addColorStop(0.45, '#fde047');
+      rib.addColorStop(0.75, '#10b981');
+      rib.addColorStop(1, '#38bdf8');
+      ctx.fillStyle = rib;
+      ctx.fillRect(0, 0, W, 6);
+
+      // Outer broadcast frame
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(18, 18, W - 36, H - 36);
+
+      // SMPL Crest top-left
+      if (crestImg) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(88, 86, 40, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(crestImg, 48, 46, 80, 80);
+        ctx.restore();
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(88, 86, 41, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Kicker & Start Date
+      ctx.fillStyle = '#34d399';
+      ctx.font = '900 18px "Exo 2", "Segoe UI", Arial, sans-serif';
+      ctx.fillText('● OFICJALNE ODLICZANIE SMPL • SCORE MATCH POLSKA LIGA', 146, 76);
+      ctx.fillStyle = '#fef08a';
+      ctx.font = '700 22px "Plus Jakarta Sans", "Segoe UI", Arial, sans-serif';
+      ctx.fillText('📅 START: ' + startLabel.toUpperCase(), 146, 108);
+
+      // Giant Title
+      const titleG = ctx.createLinearGradient(0, 150, 0, 224);
+      titleG.addColorStop(0, '#ffffff');
+      titleG.addColorStop(0.55, '#fde047');
+      titleG.addColorStop(1, '#f59e0b');
+      ctx.fillStyle = titleG;
+      ctx.font = '900 62px "Exo 2", "Arial Black", sans-serif';
+      ctx.fillText(String(cfg.title || ('WIELKI START SEZONU ' + seasonNum)).toUpperCase().slice(0, 34), 48, 206);
+
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '600 21px "Plus Jakarta Sans", "Segoe UI", Arial, sans-serif';
+      ctx.fillText(String(cfg.subtitle || 'Ekstraklasa & 2. Liga • Karty UT, Sklepik Coins i Walka o Puchar!').slice(0, 96), 48, 246);
+
+      // 4 Giant Stadium Scoreboard Tiles
+      const tiles = [
+        { val: pad2(parts.days), lbl: plUnitLabel(parts.days, 'DZIEŃ', 'DNI', 'DNI'), accent: '#fde047' },
+        { val: pad2(parts.hours), lbl: plUnitLabel(parts.hours, 'GODZINA', 'GODZINY', 'GODZIN'), accent: '#fbbf24' },
+        { val: pad2(parts.minutes), lbl: plUnitLabel(parts.minutes, 'MINUTA', 'MINUTY', 'MINUT'), accent: '#38bdf8' },
+        { val: pad2(parts.seconds), lbl: plUnitLabel(parts.seconds, 'SEKUNDA', 'SEKUNDY', 'SEKUND'), accent: '#34d399' }
+      ];
+      const boxW = 248;
+      const boxH = 190;
+      const gap = 28;
+      const startX = 62;
+      const startY = 286;
+
+      for (let i = 0; i < tiles.length; i++) {
+        const bx = startX + i * (boxW + gap);
+        const t = tiles[i];
+        ctx.save();
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = t.accent;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(bx, startY, boxW, boxH, 20) : ctx.rect(bx, startY, boxW, boxH);
+        ctx.fill();
+        ctx.stroke();
+
+        // Split-flap horizontal stadium line
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(bx + 12, startY + 96);
+        ctx.lineTo(bx + boxW - 12, startY + 96);
+        ctx.stroke();
+
+        // Big Digits
+        ctx.textAlign = 'center';
+        ctx.fillStyle = i === 3 ? '#6ee7b7' : '#ffffff';
+        ctx.font = '900 94px "Exo 2", "Arial Black", sans-serif';
+        ctx.fillText(parts.isLive ? '00' : t.val, bx + boxW / 2, startY + 122);
+
+        // Unit label
+        ctx.fillStyle = t.accent;
+        ctx.font = '800 20px "Exo 2", "Segoe UI", Arial, sans-serif';
+        ctx.fillText(t.lbl, bx + boxW / 2, startY + 166);
+        ctx.restore();
+      }
+
+      // Bottom Roadmap & Portal URL strip
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(48, 514, W - 96, 68);
+      ctx.strokeStyle = 'rgba(52, 211, 153, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(48, 514, W - 96, 68);
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '700 17px "Plus Jakarta Sans", "Segoe UI", Arial, sans-serif';
+      ctx.fillText('📊 ' + String(cfg.phaseNote || 'Finisz S55 + 2 tyg. przerwy międzysezonowej').slice(0, 96), 68, 545);
+      ctx.fillStyle = '#fde047';
+      ctx.font = '800 18px "Exo 2", "Segoe UI", Arial, sans-serif';
+      ctx.fillText('🌐 OFICJALNY PORTAL SMPL: host976694.xce.pl  •  ZAPISY OTWARTE!', 68, 571);
+
+      return {
+        ok: true,
+        dataUrl: canvas.toDataURL('image/png'),
+        filename: 'SMPL-Odliczanie-Sezon-' + seasonNum + '.png'
+      };
+    });
+
+    return handlePosterPngDownload(
+      p,
+      'SMPL-Odliczanie-Sezon-' + seasonNum + '.png',
+      '📸 Pobrano Plakat Odliczania PNG (1200×630) — gotowy na Messengera!',
+      'Nie udało się wygenerować plakatu odliczania PNG.',
+      { title: '⏱️ Plakat Odliczania — Sezon ' + seasonNum }
+    );
+  }
+
   function adminLoadWebhooksPanel(silent) {
     if (!window.SMPL_DB || typeof window.SMPL_DB.fetchWebhooksConfig !== 'function') return;
     window._smplAdminWebhooksLoaded = true;
@@ -11480,6 +12467,16 @@ window.SMPL_APP = (function () {
     openReplacePlayerModal,
     handleConfirmReplacePlayer,
     adminToggleMaintenanceMode,
+    adminLaunchSeasonCountdown,
+    adminSaveSeasonCountdown,
+    adminStopSeasonCountdown,
+    adminApplyCountdownPreset,
+    adminRecalcDateFromBreakWeeks,
+    refreshAdminCountdownPreview,
+    toggleCountdownCollapsed,
+    openCountdownCinemaModal,
+    downloadCountdownPosterPng,
+    copyCountdownMessengerText,
     adminLoadWebhooksPanel,
     adminSaveWebhooks,
     adminTestWebhooks,

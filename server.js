@@ -2206,6 +2206,133 @@ const server = http.createServer((req, res) => {
           });
         }
 
+        if (action === 'admin_set_countdown') {
+          let payload = {};
+          try { payload = JSON.parse(body || '{}') || {}; } catch (e) { payload = {}; }
+          const prevDb = readDbJson();
+          const adminTokenInfo = validateAdminTokenHeader(req, prevDb, payload);
+          if (!adminTokenInfo) {
+            return sendJson(res, 401, {
+              ok: false,
+              code: 'ADMIN_TOKEN_EXPIRED',
+              error: 'Sesja Administratora na serwerze wygasła lub brak tokena (X-SMPL-Admin-Token). Zaloguj się ponownie hasłem Admina.'
+            });
+          }
+          if (!prevDb || !Array.isArray(prevDb.players)) {
+            return sendJson(res, 400, { ok: false, error: 'Baza danych SMPL na serwerze jest pusta lub uszkodzona.' });
+          }
+          if (!prevDb.portalSettings || typeof prevDb.portalSettings !== 'object') prevDb.portalSettings = {};
+          const existingCd = (prevDb.portalSettings.seasonCountdown && typeof prevDb.portalSettings.seasonCountdown === 'object')
+            ? prevDb.portalSettings.seasonCountdown : {};
+
+          const enabled = Boolean(payload.enabled);
+          let seasonNum = Number(payload.season !== undefined ? payload.season : (existingCd.season || 56));
+          if (!Number.isFinite(seasonNum) || seasonNum < 1 || seasonNum > 999) seasonNum = 56;
+          seasonNum = Math.round(seasonNum);
+
+          let targetDate = String(payload.targetDate !== undefined ? payload.targetDate : (existingCd.targetDate || '2026-12-21')).trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) targetDate = '2026-12-21';
+
+          let targetTime = String(payload.targetTime !== undefined ? payload.targetTime : (existingCd.targetTime || '18:00')).trim();
+          if (!/^\d{2}:\d{2}$/.test(targetTime)) targetTime = '18:00';
+
+          let timeZone = String(payload.timeZone !== undefined ? payload.timeZone : (existingCd.timeZone || 'Europe/Warsaw')).trim();
+          if (!/^[A-Za-z0-9_/+\-]{2,64}$/.test(timeZone)) timeZone = 'Europe/Warsaw';
+
+          let s55EndDate = String(payload.s55EndDate !== undefined ? payload.s55EndDate : (existingCd.s55EndDate || '2026-12-06')).trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(s55EndDate)) s55EndDate = '2026-12-06';
+
+          let breakWeeks = Math.round(Number(payload.breakWeeks !== undefined ? payload.breakWeeks : (existingCd.breakWeeks !== undefined ? existingCd.breakWeeks : 2)));
+          if (!Number.isFinite(breakWeeks) || breakWeeks < 0) breakWeeks = 0;
+          if (breakWeeks > 12) breakWeeks = 12;
+
+          let roundsPerWeek = Math.round(Number(payload.roundsPerWeek !== undefined ? payload.roundsPerWeek : (existingCd.roundsPerWeek || 4)));
+          if (!Number.isFinite(roundsPerWeek) || roundsPerWeek < 1) roundsPerWeek = 4;
+          if (roundsPerWeek > 15) roundsPerWeek = 15;
+
+          const cleanStr = (rawVal, fallback, maxLen) => {
+            const s = String(rawVal || '').replace(/<[^>]*>/g, '').replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1F\x7F]/g, '').trim();
+            return (s || fallback).slice(0, maxLen);
+          };
+
+          const title = cleanStr(
+            Object.prototype.hasOwnProperty.call(payload, 'title') ? payload.title : existingCd.title,
+            `WIELKI START SEZONU ${seasonNum}`,
+            120
+          );
+          const subtitle = cleanStr(
+            Object.prototype.hasOwnProperty.call(payload, 'subtitle') ? payload.subtitle : existingCd.subtitle,
+            'Ekstraklasa & 2. Liga • Nowe Karty UT, Sklepik Coins i Walka o Puchar Mistrzów!',
+            240
+          );
+          const phaseNote = cleanStr(
+            Object.prototype.hasOwnProperty.call(payload, 'phaseNote') ? payload.phaseNote : existingCd.phaseNote,
+            `Excel S55: Ekstraklasa 138/240 (K9–K15 ≈ 2 tyg.) + ${breakWeeks} tyg. przerwy międzysezonowej`,
+            200
+          );
+          const ctaLabel = cleanStr(
+            Object.prototype.hasOwnProperty.call(payload, 'ctaLabel') ? payload.ctaLabel : existingCd.ctaLabel,
+            `📝 Zapisz się do Sezonu ${seasonNum}`,
+            64
+          );
+          const allowedTabs = ['register', 'standings', 'schedule', 'profile', 'archive', 'shop'];
+          let ctaTab = String(payload.ctaTab !== undefined ? payload.ctaTab : (existingCd.ctaTab || 'register')).trim();
+          if (!allowedTabs.includes(ctaTab)) ctaTab = 'register';
+
+          let targetIso = String(payload.targetIso || '').trim();
+          if (!targetIso || targetIso.length > 40) targetIso = `${targetDate}T${targetTime}:00`;
+
+          const admName = String(adminTokenInfo.adminName || 'Szymon Komenda');
+          const nowFmt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+          const tsMs = Date.now();
+          const wasEnabled = Boolean(existingCd.enabled);
+
+          prevDb.portalSettings.seasonCountdown = {
+            enabled,
+            season: seasonNum,
+            targetDate,
+            targetTime,
+            timeZone,
+            targetIso,
+            s55EndDate,
+            breakWeeks,
+            roundsPerWeek,
+            title,
+            subtitle,
+            phaseNote,
+            ctaLabel,
+            ctaTab,
+            updatedBy: admName,
+            updatedAt: nowFmt
+          };
+          prevDb.updatedAt = tsMs;
+
+          const logItem = {
+            id: 'LOG_CD_' + tsMs + '_' + Math.floor(10 + Math.random() * 89),
+            time: nowFmt,
+            type: enabled ? (wasEnabled ? 'COUNTDOWN_UPDATED' : 'COUNTDOWN_STARTED') : 'COUNTDOWN_STOPPED',
+            text: enabled
+              ? `⏱️ Admin ${admName} ${wasEnabled ? 'ZAKTUALIZOWAŁ' : 'URUCHOMIŁ'} Wielkie Odliczanie do Sezonu ${seasonNum} (Start: ${targetDate} ${targetTime}, przerwa ${breakWeeks} tyg.).`
+              : `⏹️ Admin ${admName} ZATRZYMAŁ / UKRYŁ Wielkie Odliczanie do Sezonu ${seasonNum}.`
+          };
+          if (!Array.isArray(prevDb.activityLog)) prevDb.activityLog = [];
+          prevDb.activityLog.unshift(logItem);
+          if (prevDb.activityLog.length > 120) prevDb.activityLog = prevDb.activityLog.slice(0, 120);
+          if (!Array.isArray(prevDb.logs)) prevDb.logs = [];
+          prevDb.logs.unshift(logItem);
+          if (prevDb.logs.length > 300) prevDb.logs = prevDb.logs.slice(0, 300);
+
+          const enc = JSON.stringify(prevDb);
+          fs.writeFileSync(DB_FILE, enc, 'utf8');
+          try { fs.writeFileSync(BACKUP_FILE, enc, 'utf8'); } catch (e) {}
+          return sendJson(res, 200, {
+            ok: true,
+            seasonCountdown: prevDb.portalSettings.seasonCountdown,
+            updatedAt: tsMs,
+            state: prevDb
+          });
+        }
+
         if (action === 'admin_approve_pool') {
           let payload = {};
           try { payload = JSON.parse(body || '{}') || {}; } catch (e) { payload = {}; }

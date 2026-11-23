@@ -679,6 +679,9 @@ window.SMPL_DB = (function () {
           const prevAiKnowledgeCount = state && Array.isArray(state.aiKnowledge) ? state.aiKnowledge.length : -1;
           const prevJoinOpen = state && state.portalSettings ? Boolean(state.portalSettings.seasonJoinOpen) : null;
           const prevMaintOn = Boolean(state && state.portalSettings && state.portalSettings.maintenanceMode && state.portalSettings.maintenanceMode.enabled);
+          const prevCdSig = state && state.portalSettings && state.portalSettings.seasonCountdown
+            ? JSON.stringify(state.portalSettings.seasonCountdown)
+            : '';
           const prevChatIdsMap = {};
           const prevDmIdsMap = {};
           const prevNotifIdsMap = {};
@@ -710,10 +713,14 @@ window.SMPL_DB = (function () {
           if (typeof onUpdatedCallback === 'function') onUpdatedCallback(true);
           const nowJoinOpen = state && state.portalSettings ? Boolean(state.portalSettings.seasonJoinOpen) : null;
           const nowMaintOn = Boolean(state && state.portalSettings && state.portalSettings.maintenanceMode && state.portalSettings.maintenanceMode.enabled);
+          const nowCdSig = state && state.portalSettings && state.portalSettings.seasonCountdown
+            ? JSON.stringify(state.portalSettings.seasonCountdown)
+            : '';
           const changed =
             prevUpdated !== state.updatedAt ||
             prevJoinOpen !== nowJoinOpen ||
             prevMaintOn !== nowMaintOn ||
+            prevCdSig !== nowCdSig ||
             prevPlayersCount !== (state.players || []).length ||
             prevMatchesCount !== (state.matches || []).length ||
             prevRegsCount !== (state.registrations || []).length ||
@@ -6862,6 +6869,144 @@ state = enrichFromArchive(data.state);
     return state.portalSettings.maintenanceMode;
   }
 
+  function getExcelSeason56Estimate() {
+    // Dokładne wyliczenie z arkusza Google Sheets „ODSWIEŻONA WERSJA LIGI” (stan 2026-11-23):
+    // Ekstraklasa S55: 138/240 (57.5%) — K1–K8 ukończone w 100%, zostało 7 kolejek (K9–K15 = 102 mecze).
+    // Liga 2 S55: 126/182 realnych meczów (69.2%) — K1–K8 ukończone w 100%, zostało 56 meczów.
+    // Tempo: 4 kolejki/tydzień (termin do niedzieli 23:59) -> Tydz. 3 (K9–K12: 29.11), Tydz. 4 (K13–K15: 6.12.2026).
+    // + 2 tygodnie przerwy międzysezonowej (7.12 – 20.12.2026) -> Start Sezonu 56: Poniedziałek 21.12.2026, 18:00 CET.
+    return {
+      asOfDate: '2026-11-23',
+      sourceLabel: 'Google Sheets: ODSWIEŻONA WERSJA LIGI (Sezon 55)',
+      s55L1Played: 138,
+      s55L1Total: 240,
+      s55L1Pct: 57.5,
+      s55L1RemainingMatches: 102,
+      s55L2RealPlayed: 126,
+      s55L2RealTotal: 182,
+      s55L2Pct: 69.2,
+      s55L2RemainingMatches: 56,
+      completedRounds: 8,
+      totalRounds: 15,
+      remainingRounds: 7,
+      roundsPerWeek: 4,
+      remainingPlayWeeks: 2,
+      s55EstimatedEndDate: '2026-12-06',
+      s55EstimatedEndLabel: 'Niedziela, 6 grudnia 2026 (23:59)',
+      breakWeeks: 2,
+      breakRangeLabel: '7–20 grudnia 2026 (14 dni)',
+      recommendedStartDate: '2026-12-21',
+      recommendedStartTime: '18:00',
+      recommendedStartLabel: 'Poniedziałek, 21 grudnia 2026 • 18:00',
+      timeZone: 'Europe/Warsaw',
+      recommendedStartIso: '2026-12-21T18:00:00+01:00'
+    };
+  }
+
+  function getSeasonCountdownConfig(st) {
+    const est = getExcelSeason56Estimate();
+    const srcState = st || state;
+    const ps = srcState && srcState.portalSettings && typeof srcState.portalSettings === 'object' && !Array.isArray(srcState.portalSettings)
+      ? srcState.portalSettings
+      : {};
+    const raw = ps.seasonCountdown && typeof ps.seasonCountdown === 'object' && !Array.isArray(ps.seasonCountdown)
+      ? ps.seasonCountdown
+      : {};
+    const seasonNum = Math.min(999, Math.max(1, Math.round(Number(raw.season || 56))));
+    const breakWeeks = Math.min(12, Math.max(0, Math.round(Number(raw.breakWeeks !== undefined ? raw.breakWeeks : est.breakWeeks))));
+    const roundsPerWeek = Math.min(15, Math.max(1, Math.round(Number(raw.roundsPerWeek || est.roundsPerWeek))));
+    const targetDate = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.targetDate || '')) ? String(raw.targetDate) : est.recommendedStartDate;
+    const targetTime = /^\d{2}:\d{2}$/.test(String(raw.targetTime || '')) ? String(raw.targetTime) : est.recommendedStartTime;
+    const s55EndDate = /^\d{4}-\d{2}-\d{2}$/.test(String(raw.s55EndDate || '')) ? String(raw.s55EndDate) : est.s55EstimatedEndDate;
+    const timeZone = String(raw.timeZone || est.timeZone || 'Europe/Warsaw');
+    return {
+      enabled: Boolean(raw.enabled),
+      season: seasonNum,
+      targetDate: targetDate,
+      targetTime: targetTime,
+      timeZone: timeZone,
+      targetIso: String(raw.targetIso || (targetDate + 'T' + targetTime + ':00')),
+      s55EndDate: s55EndDate,
+      breakWeeks: breakWeeks,
+      roundsPerWeek: roundsPerWeek,
+      title: String(raw.title || ('WIELKI START SEZONU ' + seasonNum)),
+      subtitle: String(raw.subtitle || 'Ekstraklasa & 2. Liga • Nowe Karty UT, Sklepik Coins i Walka o Puchar Mistrzów!'),
+      phaseNote: String(raw.phaseNote || ('Excel S55: Ekstraklasa 138/240 (K9–K15 ≈ 2 tyg.) + ' + breakWeeks + ' tyg. przerwy międzysezonowej')),
+      ctaLabel: String(raw.ctaLabel || ('📝 Zapisz się do Sezonu ' + seasonNum)),
+      ctaTab: String(raw.ctaTab || 'register'),
+      updatedBy: String(raw.updatedBy || ''),
+      updatedAt: String(raw.updatedAt || '')
+    };
+  }
+
+  function setSeasonCountdown(configInput, adminName = 'Szymon Komenda') {
+    assertAdminAuthenticated();
+    if (!state.portalSettings || typeof state.portalSettings !== 'object' || Array.isArray(state.portalSettings)) {
+      state.portalSettings = {};
+    }
+    const prevCd = state.portalSettings.seasonCountdown && typeof state.portalSettings.seasonCountdown === 'object'
+      ? Object.assign({}, state.portalSettings.seasonCountdown)
+      : null;
+    const cur = getSeasonCountdownConfig(state);
+    const inp = configInput && typeof configInput === 'object' ? configInput : {};
+    const seasonNum = Math.min(999, Math.max(1, Math.round(Number(inp.season !== undefined ? inp.season : cur.season))));
+    const breakWeeks = Math.min(12, Math.max(0, Math.round(Number(inp.breakWeeks !== undefined ? inp.breakWeeks : cur.breakWeeks))));
+    const roundsPerWeek = Math.min(15, Math.max(1, Math.round(Number(inp.roundsPerWeek !== undefined ? inp.roundsPerWeek : cur.roundsPerWeek))));
+    const targetDate = /^\d{4}-\d{2}-\d{2}$/.test(String(inp.targetDate || '')) ? String(inp.targetDate) : cur.targetDate;
+    const targetTime = /^\d{2}:\d{2}$/.test(String(inp.targetTime || '')) ? String(inp.targetTime) : cur.targetTime;
+    const s55EndDate = /^\d{4}-\d{2}-\d{2}$/.test(String(inp.s55EndDate || '')) ? String(inp.s55EndDate) : cur.s55EndDate;
+    const timeZone = String(inp.timeZone || cur.timeZone || 'Europe/Warsaw');
+    const cleanText = function (v, fb, maxL) {
+      const s = String(v !== undefined && v !== null ? v : '').replace(/<[^>]*>/g, '').replace(/[\r\n]+/g, ' ').trim();
+      return (s || fb).slice(0, maxL);
+    };
+    const nextCd = {
+      enabled: inp.enabled !== undefined ? Boolean(inp.enabled) : cur.enabled,
+      season: seasonNum,
+      targetDate: targetDate,
+      targetTime: targetTime,
+      timeZone: timeZone,
+      targetIso: String(inp.targetIso || (targetDate + 'T' + targetTime + ':00')),
+      s55EndDate: s55EndDate,
+      breakWeeks: breakWeeks,
+      roundsPerWeek: roundsPerWeek,
+      title: cleanText(inp.title !== undefined ? inp.title : cur.title, 'WIELKI START SEZONU ' + seasonNum, 120),
+      subtitle: cleanText(inp.subtitle !== undefined ? inp.subtitle : cur.subtitle, 'Ekstraklasa & 2. Liga • Nowe Karty UT, Sklepik Coins i Walka o Puchar Mistrzów!', 240),
+      phaseNote: cleanText(inp.phaseNote !== undefined ? inp.phaseNote : cur.phaseNote, 'Excel S55: Ekstraklasa 138/240 (K9–K15 ≈ 2 tyg.) + ' + breakWeeks + ' tyg. przerwy międzysezonowej', 200),
+      ctaLabel: cleanText(inp.ctaLabel !== undefined ? inp.ctaLabel : cur.ctaLabel, '📝 Zapisz się do Sezonu ' + seasonNum, 64),
+      ctaTab: String(inp.ctaTab || cur.ctaTab || 'register'),
+      updatedBy: adminName,
+      updatedAt: nowFormatted()
+    };
+    state.portalSettings.seasonCountdown = nextCd;
+    addLog(
+      nextCd.enabled ? 'COUNTDOWN_STARTED' : 'COUNTDOWN_STOPPED',
+      nextCd.enabled
+        ? `⏱️ Admin ${adminName} uruchomił Wielkie Odliczanie do Sezonu ${nextCd.season} (Start: ${nextCd.targetDate} ${nextCd.targetTime}).`
+        : `⏹️ Admin ${adminName} wyłączył Wielkie Odliczanie do Sezonu ${nextCd.season}.`
+    );
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {}
+    sendAtomicAdminAction(
+      'admin_set_countdown',
+      nextCd,
+      () => {
+        if (state && state.portalSettings) {
+          if (prevCd) state.portalSettings.seasonCountdown = prevCd;
+          else delete state.portalSettings.seasonCountdown;
+        }
+      },
+      { seasonCountdown: nextCd },
+      (err) => {
+        if (err) {
+          syncToBackend();
+        }
+      }
+    );
+    return state.portalSettings.seasonCountdown;
+  }
+
   function normalizeUpdateVersionClient(raw) {
     if (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.normalizeUpdateVersion === 'function') {
       return window.SMPL_STUDIO.normalizeUpdateVersion(raw);
@@ -11628,6 +11773,9 @@ state = enrichFromArchive(data.state);
     masterManageCompetitions,
     getMaintenanceMode,
     setMaintenanceMode,
+    getExcelSeason56Estimate,
+    getSeasonCountdownConfig,
+    setSeasonCountdown,
     proposeMatchTime,
     respondMatchProposal,
     submitMatchDispute,
