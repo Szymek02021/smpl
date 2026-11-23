@@ -1311,7 +1311,7 @@ window.SMPL_DB = (function () {
     const archData = window.SMPL_ARCHIVE_DATA;
     if (!archData) return { updatedPlayers: 0 };
 
-    const archVer = archData.ARCHIVE_RECALC_VERSION || '2026-11-22-S55-GSHEETS-V4';
+    const archVer = archData.ARCHIVE_RECALC_VERSION || '2026-11-23-S55-GSHEETS-V5';
     const archSeasons = archData.HISTORICAL_SEASONS || [];
     const archGen = archData.GENERAL_RANKING || [];
     const arch5 = archData.FIVE_SEASON_RANKING || [];
@@ -6872,7 +6872,7 @@ state = enrichFromArchive(data.state);
   function getExcelSeason56Estimate() {
     // Dokładne wyliczenie z arkusza Google Sheets „ODSWIEŻONA WERSJA LIGI” (stan 2026-11-23):
     // Ekstraklasa S55: 138/240 (57.5%) — K1–K8 ukończone w 100%, zostało 7 kolejek (K9–K15 = 102 mecze).
-    // Liga 2 S55: 126/182 realnych meczów (69.2%) — K1–K8 ukończone w 100%, zostało 56 meczów.
+    // Liga 2 S55: 128/182 realnych meczów (70.3%) — K1–K8 ukończone w 100%, zostały 54 mecze realne.
     // Tempo: 4 kolejki/tydzień (termin do niedzieli 23:59) -> Tydz. 3 (K9–K12: 29.11), Tydz. 4 (K13–K15: 6.12.2026).
     // + 2 tygodnie przerwy międzysezonowej (7.12 – 20.12.2026) -> Start Sezonu 56: Poniedziałek 21.12.2026, 18:00 CET.
     return {
@@ -6882,10 +6882,10 @@ state = enrichFromArchive(data.state);
       s55L1Total: 240,
       s55L1Pct: 57.5,
       s55L1RemainingMatches: 102,
-      s55L2RealPlayed: 126,
+      s55L2RealPlayed: 128,
       s55L2RealTotal: 182,
-      s55L2Pct: 69.2,
-      s55L2RemainingMatches: 56,
+      s55L2Pct: 70.3,
+      s55L2RemainingMatches: 54,
       completedRounds: 8,
       totalRounds: 15,
       remainingRounds: 7,

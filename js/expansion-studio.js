@@ -3145,6 +3145,21 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_17',
+      version: 'V2.17',
+      date: '2026-11-23',
+      category: 'TURNIEJE',
+      title: 'Aktualizacja Sezonu 55 na Żywo (+16 Meczów: Ekstraklasa 57,5% & 2. Liga 70,3%) + Odliczanie do Sezonu 56!',
+      summary: 'Zaktualizowaliśmy tabele Sezonu 55 w Archiwum prosto z oficjalnego arkusza wyników (+8 meczów Ekstraklasy i +8 meczów 2. Ligi) — przyniosło to potężne przetasowania na podium w obu dywizjach, a dodatkowo uruchomiliśmy na portalu Wielkie Odliczanie do Startu Sezonu 56!',
+      highlights: [
+        'Ekstraklasa S55 (138/240 meczów • 274 gole): Krzysztof Dziubak utrzymuje fotel lidera (37 pkt / 16 M), ale Kacper Kurczewski (36 pkt) wskoczył na 2. miejsce i dogonił Michała Wu na szczycie strzelców (obaj po 25 goli)! Skok kolejki zaliczył Marcin Chorobowicz (+4 miejsca na #5, +8 pkt w 4 meczach i 6 CS).',
+        '2. Liga S55 (128/182 meczów realnych • 232 gole): Walka o złoto rozgrzana do czerwoności! Tomasz Fałat zgarnął komplet +12 pkt (w tym sensacyjne 2:0 i 2:0 z liderem!), wskoczył na 2. miejsce (56 pkt) i został nowym Królem Strzelców (36 goli) — do Patryka Dzierży (57 pkt, 13 CS) brakuje mu już tylko 1 punktu!',
+        'Dodatkowo na portalu pojawiło się oficjalne Wielkie Odliczanie do Startu Sezonu 56 (z trybem Kinowym pełnoekranowym, fajerwerkami na finał i plakatem HD) wyliczone z tempa Sezonu 55 + 2 tygodni przerwy międzysezonowej.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_16',
       version: 'V2.16',
       date: '2026-11-22',
