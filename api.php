@@ -2071,6 +2071,19 @@ function smpl_build_server_league_snapshot($db) {
     $season = isset($db['season']) ? ('Sezon ' . (string)$db['season']) : 'Sezon SMPL';
     $week = isset($weekly['currentWeek']) ? (string)$weekly['currentWeek'] : '?';
     $lines[] = "AKTUALNY SEZON (serwer): {$season} | Tydzień rozgrywkowy: {$week}";
+    if (isset($weekly['extensions']) && is_array($weekly['extensions']) && count($weekly['extensions']) > 0) {
+        $extSummaries = array();
+        foreach ($weekly['extensions'] as $ex) {
+            if (!is_array($ex) || empty($ex['enabled'])) continue;
+            $lbl = isset($ex['scopeLabel']) ? (string)$ex['scopeLabel'] : 'Kolejka';
+            $dt = (isset($ex['extendedUntilDate']) ? $ex['extendedUntilDate'] : '') . ' ' . (isset($ex['extendedUntilTime']) ? $ex['extendedUntilTime'] : '23:59');
+            $rsn = isset($ex['reason']) ? (string)$ex['reason'] : '';
+            $extSummaries[] = "{$lbl} przedłużono do {$dt} ({$rsn})";
+        }
+        if (!empty($extSummaries)) {
+            $lines[] = "AKTYWNE PRZEDŁUŻENIA KOLEJEK: " . implode(' | ', $extSummaries);
+        }
+    }
 
     $activeLeagues = array();
     if (isset($db['leagues']) && is_array($db['leagues'])) {
@@ -4225,6 +4238,252 @@ if ($method === 'POST') {
         echo json_encode(array(
             'ok' => true,
             'seasonCountdown' => $prevDb['portalSettings']['seasonCountdown'],
+            'updatedAt' => $tsMs,
+            'state' => $prevDb
+        ), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // Akcja 2d-round-extension: Atomowe przedłużenie lub zakończenie przedłużenia kolejki / tygodnia przez DOWOLNEGO Admina (?action=admin_set_round_extension)
+    if ($action === 'admin_set_round_extension') {
+        $lockFp = smpl_lock_db($dataDir);
+        $prevDb = smpl_read_db($dbFile, $backupFile);
+        $adminTokenInfo = smpl_validate_admin_token($tokenFile, $prevDb);
+        if ($adminTokenInfo === null) {
+            smpl_unlock_db($lockFp);
+            http_response_code(401);
+            echo json_encode(array(
+                'ok' => false,
+                'code' => 'ADMIN_TOKEN_EXPIRED',
+                'error' => 'Sesja Administratora na serwerze wygasła lub brak tokena (X-SMPL-Admin-Token). Zaloguj się ponownie hasłem Admina.'
+            ), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if (!is_array($prevDb) || !isset($prevDb['players']) || !is_array($prevDb['players'])) {
+            smpl_unlock_db($lockFp);
+            http_response_code(400);
+            echo json_encode(array('ok' => false, 'error' => 'Baza danych SMPL na serwerze jest pusta lub uszkodzona.'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $body = @json_decode((string)$input, true);
+        if (!is_array($body)) $body = array();
+        if (!isset($prevDb['weeklyConfig']) || !is_array($prevDb['weeklyConfig'])) {
+            $prevDb['weeklyConfig'] = array('roundsPerWeek' => 4, 'currentWeek' => 1, 'totalWeeks' => 4);
+        }
+        if (!isset($prevDb['weeklyConfig']['extensions']) || !is_array($prevDb['weeklyConfig']['extensions'])) {
+            $prevDb['weeklyConfig']['extensions'] = array();
+        }
+
+        $admName = isset($adminTokenInfo['adminName']) && $adminTokenInfo['adminName'] ? (string)$adminTokenInfo['adminName'] : 'Szymon Komenda';
+        $nowFmt = date('Y-m-d H:i');
+        $tsMs = (int)(microtime(true) * 1000);
+        $op = isset($body['op']) ? strtolower(trim((string)$body['op'])) : 'set';
+
+        if ($op === 'remove' || $op === 'clear') {
+            $targetId = isset($body['id']) ? trim((string)$body['id']) : '';
+            $removedLabels = array();
+            $kept = array();
+            foreach ($prevDb['weeklyConfig']['extensions'] as $exItem) {
+                if (!is_array($exItem)) continue;
+                $exId = isset($exItem['id']) ? (string)$exItem['id'] : '';
+                if ($targetId === 'ALL' || ($targetId !== '' && $exId === $targetId)) {
+                    $removedLabels[] = isset($exItem['scopeLabel']) ? (string)$exItem['scopeLabel'] : $exId;
+                } else {
+                    $kept[] = $exItem;
+                }
+            }
+            $prevDb['weeklyConfig']['extensions'] = array_values($kept);
+            $prevDb['updatedAt'] = $tsMs;
+            $lblTxt = !empty($removedLabels) ? implode(', ', $removedLabels) : ($targetId === 'ALL' ? 'wszystkie kolejki' : $targetId);
+            $logItem = array(
+                'id' => 'LOG_EXT_CLR_' . $tsMs . '_' . mt_rand(10, 99),
+                'time' => $nowFmt,
+                'type' => 'ROUND_EXTENSION_CLEARED',
+                'text' => '⏹️ Admin ' . $admName . ' zakończył przedłużenie terminu (' . $lblTxt . ').'
+            );
+            if (!isset($prevDb['activityLog']) || !is_array($prevDb['activityLog'])) $prevDb['activityLog'] = array();
+            array_unshift($prevDb['activityLog'], $logItem);
+            if (count($prevDb['activityLog']) > 120) $prevDb['activityLog'] = array_slice($prevDb['activityLog'], 0, 120);
+            if (!isset($prevDb['logs']) || !is_array($prevDb['logs'])) $prevDb['logs'] = array();
+            array_unshift($prevDb['logs'], $logItem);
+            if (count($prevDb['logs']) > 300) $prevDb['logs'] = array_slice($prevDb['logs'], 0, 300);
+
+            $encExt = json_encode($prevDb, JSON_UNESCAPED_UNICODE);
+            $written = @file_put_contents($dbFile, $encExt, LOCK_EX);
+            if ($written !== false) @file_put_contents($backupFile, $encExt, LOCK_EX);
+            smpl_unlock_db($lockFp);
+            if ($written === false) {
+                http_response_code(500);
+                echo json_encode(array('ok' => false, 'error' => 'Brak uprawnień zapisu do bazy danych na serwerze.'), JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
+            $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+            @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_CLEAR_ROUND_EXTENSION | IP: " . $clientIp . " | id=" . $targetId . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
+
+            echo json_encode(array(
+                'ok' => true,
+                'extensions' => $prevDb['weeklyConfig']['extensions'],
+                'updatedAt' => $tsMs,
+                'state' => $prevDb
+            ), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $allowedScopes = array('WEEK', 'ROUND', 'ALL_ACTIVE');
+        $scopeType = isset($body['scopeType']) ? strtoupper(trim((string)$body['scopeType'])) : 'WEEK';
+        if (!in_array($scopeType, $allowedScopes, true)) $scopeType = 'WEEK';
+
+        $rpw = isset($prevDb['weeklyConfig']['roundsPerWeek']) ? max(1, (int)$prevDb['weeklyConfig']['roundsPerWeek']) : 4;
+        $curW = isset($prevDb['weeklyConfig']['currentWeek']) ? max(1, (int)$prevDb['weeklyConfig']['currentWeek']) : 1;
+        $weekNum = isset($body['weekNum']) ? (int)$body['weekNum'] : $curW;
+        if ($weekNum < 1 || $weekNum > 60) $weekNum = $curW;
+
+        $roundNum = isset($body['roundNum']) ? (int)$body['roundNum'] : (($curW - 1) * $rpw + 1);
+        if ($roundNum < 1 || $roundNum > 60) $roundNum = 1;
+
+        $leagueScope = isset($body['leagueScope']) ? strtoupper(trim((string)$body['leagueScope'])) : 'ALL';
+        if ($leagueScope !== 'ALL' && !preg_match('/^L\d{1,2}$/', $leagueScope)) {
+            $leagueScope = 'ALL';
+        }
+
+        $extendedUntilDate = isset($body['extendedUntilDate']) ? trim((string)$body['extendedUntilDate']) : '';
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $extendedUntilDate)) {
+            smpl_unlock_db($lockFp);
+            http_response_code(400);
+            echo json_encode(array('ok' => false, 'error' => 'Wybierz prawidłową datę nowego terminu kolejki (RRRR-MM-DD).'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $extendedUntilTime = isset($body['extendedUntilTime']) ? trim((string)$body['extendedUntilTime']) : '23:59';
+        if (!preg_match('/^\d{2}:\d{2}$/', $extendedUntilTime)) {
+            $extendedUntilTime = '23:59';
+        }
+        $timeZone = isset($body['timeZone']) ? trim((string)$body['timeZone']) : 'Europe/Warsaw';
+        if (!preg_match('/^[A-Za-z0-9_\/+\-]{2,64}$/', $timeZone)) {
+            $timeZone = 'Europe/Warsaw';
+        }
+
+        $allowedTags = array('HOLIDAYS', 'WEEKEND', 'TECH', 'ARREARS', 'CUSTOM');
+        $occasionTag = isset($body['occasionTag']) ? strtoupper(trim((string)$body['occasionTag'])) : 'HOLIDAYS';
+        if (!in_array($occasionTag, $allowedTags, true)) $occasionTag = 'CUSTOM';
+
+        $rawReason = isset($body['reason']) ? (string)$body['reason'] : '';
+        $cleanReason = str_replace(array("\r\n", "\r", "\n"), ' ', strip_tags($rawReason));
+        $cleanReason = preg_replace('/[\x00-\x1F\x7F]/u', '', $cleanReason);
+        $cleanReason = trim((string)$cleanReason);
+        if ($cleanReason === '') {
+            $cleanReason = 'Przedłużenie terminu kolejki ze względu na okoliczności wyjątkowe.';
+        }
+        $cleanReason = function_exists('mb_substr') ? mb_substr($cleanReason, 0, 280, 'UTF-8') : substr($cleanReason, 0, 280);
+
+        $extId = $scopeType === 'WEEK'
+            ? ('EXT_WEEK_' . $weekNum . '_' . $leagueScope)
+            : ($scopeType === 'ROUND' ? ('EXT_ROUND_' . $roundNum . '_' . $leagueScope) : ('EXT_ALL_ACTIVE_' . $leagueScope));
+
+        $leagueNameSuffix = 'Wszystkie ligi';
+        if ($leagueScope !== 'ALL') {
+            $leagueNameSuffix = (isset($prevDb['leagues'][$leagueScope]['name']) && $prevDb['leagues'][$leagueScope]['name'])
+                ? (string)$prevDb['leagues'][$leagueScope]['name']
+                : $leagueScope;
+        }
+        if ($scopeType === 'WEEK') {
+            $rStart = ($weekNum - 1) * $rpw + 1;
+            $rEnd = $weekNum * $rpw;
+            $scopeLabel = 'Tydzień #' . $weekNum . ' (Kolejki K' . $rStart . '–K' . $rEnd . ') • ' . $leagueNameSuffix;
+        } elseif ($scopeType === 'ROUND') {
+            $scopeLabel = 'Kolejka #' . $roundNum . ' • ' . $leagueNameSuffix;
+        } else {
+            $scopeLabel = 'Wszystkie aktywne i zaległe kolejki • ' . $leagueNameSuffix;
+        }
+
+        $extRecord = array(
+            'id' => $extId,
+            'enabled' => true,
+            'scopeType' => $scopeType,
+            'weekNum' => $weekNum,
+            'roundNum' => $roundNum,
+            'leagueScope' => $leagueScope,
+            'scopeLabel' => $scopeLabel,
+            'occasionTag' => $occasionTag,
+            'reason' => $cleanReason,
+            'extendedUntilDate' => $extendedUntilDate,
+            'extendedUntilTime' => $extendedUntilTime,
+            'timeZone' => $timeZone,
+            'updatedBy' => $admName,
+            'updatedAt' => $nowFmt
+        );
+
+        $filteredExt = array();
+        foreach ($prevDb['weeklyConfig']['extensions'] as $oldEx) {
+            if (!is_array($oldEx)) continue;
+            if (isset($oldEx['id']) && (string)$oldEx['id'] === $extId) continue;
+            $filteredExt[] = $oldEx;
+        }
+        array_unshift($filteredExt, $extRecord);
+        if (count($filteredExt) > 20) {
+            $filteredExt = array_slice($filteredExt, 0, 20);
+        }
+        $prevDb['weeklyConfig']['extensions'] = array_values($filteredExt);
+
+        $notifyPlayers = array_key_exists('notifyPlayers', $body) ? !empty($body['notifyPlayers']) : true;
+        $notifiedCount = 0;
+        if ($notifyPlayers) {
+            foreach ($prevDb['players'] as $pIdx => $pl) {
+                if (!is_array($pl) || !empty($pl['isPlaceholder']) || !empty($pl['gdprDeleted'])) continue;
+                if (isset($pl['active']) && $pl['active'] === false) continue;
+                $pLid = isset($pl['leagueId']) ? (string)$pl['leagueId'] : '';
+                if ($pLid === '' || $pLid === 'POOL') continue;
+                if ($leagueScope !== 'ALL' && $pLid !== $leagueScope) continue;
+                if (!isset($prevDb['players'][$pIdx]['notifications']) || !is_array($prevDb['players'][$pIdx]['notifications'])) {
+                    $prevDb['players'][$pIdx]['notifications'] = array();
+                }
+                array_unshift($prevDb['players'][$pIdx]['notifications'], array(
+                    'id' => 'NOTIF_EXT_' . $tsMs . '_' . $pIdx,
+                    'type' => 'ROUND_EXTENDED',
+                    'time' => $nowFmt,
+                    'read' => false,
+                    'title' => '⏳ Przedłużono termin: ' . $scopeLabel,
+                    'text' => 'Nowy termin rozegrania meczów: ' . $extendedUntilDate . ' ' . $extendedUntilTime . ' — ' . $cleanReason . ' (Admin: ' . $admName . ')'
+                ));
+                if (count($prevDb['players'][$pIdx]['notifications']) > 40) {
+                    $prevDb['players'][$pIdx]['notifications'] = array_slice($prevDb['players'][$pIdx]['notifications'], 0, 40);
+                }
+                $notifiedCount++;
+            }
+        }
+
+        $prevDb['updatedAt'] = $tsMs;
+        $logItem = array(
+            'id' => 'LOG_EXT_' . $tsMs . '_' . mt_rand(10, 99),
+            'time' => $nowFmt,
+            'type' => 'ROUND_EXTENDED',
+            'text' => '⏳ Admin ' . $admName . ' przedłużył termin (' . $scopeLabel . ') do ' . $extendedUntilDate . ' ' . $extendedUntilTime . ' — Powód: ' . $cleanReason . ($notifyPlayers ? (' (powiadomiono ' . $notifiedCount . ' graczy)') : '') . '.'
+        );
+        if (!isset($prevDb['activityLog']) || !is_array($prevDb['activityLog'])) $prevDb['activityLog'] = array();
+        array_unshift($prevDb['activityLog'], $logItem);
+        if (count($prevDb['activityLog']) > 120) $prevDb['activityLog'] = array_slice($prevDb['activityLog'], 0, 120);
+        if (!isset($prevDb['logs']) || !is_array($prevDb['logs'])) $prevDb['logs'] = array();
+        array_unshift($prevDb['logs'], $logItem);
+        if (count($prevDb['logs']) > 300) $prevDb['logs'] = array_slice($prevDb['logs'], 0, 300);
+
+        $encExt = json_encode($prevDb, JSON_UNESCAPED_UNICODE);
+        $written = @file_put_contents($dbFile, $encExt, LOCK_EX);
+        if ($written !== false) @file_put_contents($backupFile, $encExt, LOCK_EX);
+        smpl_unlock_db($lockFp);
+        if ($written === false) {
+            http_response_code(500);
+            echo json_encode(array('ok' => false, 'error' => 'Brak uprawnień zapisu do bazy danych na serwerze.'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
+        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_SET_ROUND_EXTENSION | IP: " . $clientIp . " | id=" . $extId . " until=" . $extendedUntilDate . " " . $extendedUntilTime . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
+
+        echo json_encode(array(
+            'ok' => true,
+            'extension' => $extRecord,
+            'extensions' => $prevDb['weeklyConfig']['extensions'],
+            'notifiedCount' => $notifiedCount,
             'updatedAt' => $tsMs,
             'state' => $prevDb
         ), JSON_UNESCAPED_UNICODE);

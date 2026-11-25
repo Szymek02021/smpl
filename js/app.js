@@ -841,7 +841,7 @@ window.SMPL_APP = (function () {
     if (t === 'MATCH_REJECTED') {
       return `<button type="button" onclick="SMPL_APP.closeNotificationsCenterModal(); SMPL_APP.switchTab('submit');" class="px-2 py-0.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 text-rose-200 border border-rose-400/40 text-[10px] font-bold">➕ Popraw Wynik</button>`;
     }
-    if (['MATCH_SUBMITTED', 'MATCH_APPROVED', 'MATCH_EDITED', 'WALKOVER', 'MATCH_PROPOSAL', 'DISPUTE'].indexOf(t) !== -1) {
+    if (['MATCH_SUBMITTED', 'MATCH_APPROVED', 'MATCH_EDITED', 'WALKOVER', 'MATCH_PROPOSAL', 'DISPUTE', 'ROUND_EXTENDED'].indexOf(t) !== -1) {
       return `<button type="button" onclick="SMPL_APP.closeNotificationsCenterModal(); SMPL_APP.switchTab('schedule');" class="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-400/40 text-[10px] font-bold">🗓️ Zobacz Terminarz</button>`;
     }
     if (t === 'PRIZE' || t === 'TROPHY' || t === 'TOTW') {
@@ -11108,8 +11108,12 @@ window.SMPL_APP = (function () {
     const adminPrevEl = document.querySelector ? document.querySelector('[data-smpl-cd-admin-preview]') : null;
     const cinemaDlg = document.getElementById('smpl-countdown-cinema-dialog');
     const cinemaOpen = Boolean(cinemaDlg && cinemaDlg.open);
+    const hasExtCards = Boolean(document.querySelector && document.querySelector('[data-smpl-ext-card]'));
+    if (hasExtCards) {
+      tickRoundExtensionBanners();
+    }
 
-    if (!bannerEl && !gateEl && !adminPrevEl && !cinemaOpen) {
+    if (!bannerEl && !gateEl && !adminPrevEl && !cinemaOpen && !hasExtCards) {
       if (_cdTickInterval) {
         clearInterval(_cdTickInterval);
         _cdTickInterval = null;
@@ -11397,6 +11401,675 @@ window.SMPL_APP = (function () {
         .catch(function () { showToast('Nie udało się skopiować do schowka.', 'error'); });
     } else {
       showToast('📋 Tekst gotowy: Start Sezonu ' + seasonNum + ' (' + startLabel + ')!');
+    }
+  }
+
+  // =========================================================================
+  // PRZEDŁUŻANIE KOLEJKI / TYGODNIA PRZEZ DOWOLNEGO ADMINA (ŚWIĘTA / AWARIE)
+  // =========================================================================
+  let _temporalPolyfillRequested = false;
+  let _roundExtDialogClosedByBound = false;
+
+  function ensureTemporalPolyfillLazy() {
+    if (_temporalPolyfillRequested || typeof Temporal !== 'undefined' || typeof document === 'undefined') return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _temporalPolyfillRequested = true;
+    try {
+      const modScript = document.createElement('script');
+      modScript.type = 'module';
+      modScript.textContent = "if (typeof Temporal === 'undefined') { import('https://esm.sh/temporal-polyfill').then(function(m){ if (m && m.Temporal) { globalThis.Temporal = m.Temporal; } }).catch(function(){}); }";
+      document.head.appendChild(modScript);
+    } catch (e) {}
+  }
+
+  function getTodayWarsawYmd() {
+    const tz = 'Europe/Warsaw';
+    try {
+      if (typeof Temporal !== 'undefined' && Temporal.Now && typeof Temporal.Now.plainDateISO === 'function') {
+        return Temporal.Now.plainDateISO(tz).toString();
+      }
+    } catch (e) {}
+    try {
+      const dtf = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+      const formatted = dtf.format(new Date());
+      if (/^\d{4}-\d{2}-\d{2}$/.test(formatted)) return formatted;
+    } catch (e2) {}
+    const now = new Date();
+    return now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate());
+  }
+
+  function addDaysWarsawPlainDate(baseYmd, daysToAdd) {
+    const safeBase = /^\d{4}-\d{2}-\d{2}$/.test(String(baseYmd || '')) ? String(baseYmd) : getTodayWarsawYmd();
+    const dAdd = Math.round(Number(daysToAdd || 0));
+    try {
+      if (typeof Temporal !== 'undefined' && Temporal.PlainDate) {
+        const pd = Temporal.PlainDate.from(safeBase);
+        return pd.add({ days: dAdd }, { overflow: 'constrain' }).toString();
+      }
+    } catch (e) {}
+    const parts = safeBase.split('-');
+    const utcMs = Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 12, 0, 0) + dAdd * 86400000;
+    const dt = new Date(utcMs);
+    return dt.getUTCFullYear() + '-' + pad2(dt.getUTCMonth() + 1) + '-' + pad2(dt.getUTCDate());
+  }
+
+  function formatRoundExtensionDateLabel(targetDate, targetTime, timeZone) {
+    const tz = timeZone || 'Europe/Warsaw';
+    const dStrRaw = /^\d{4}-\d{2}-\d{2}$/.test(String(targetDate || '')) ? String(targetDate) : getTodayWarsawYmd();
+    const tStrRaw = /^\d{2}:\d{2}$/.test(String(targetTime || '')) ? String(targetTime) : '23:59';
+    try {
+      if (typeof Temporal !== 'undefined' && Temporal.PlainDate && Temporal.PlainTime) {
+        const pd = Temporal.PlainDate.from(dStrRaw);
+        const pt = Temporal.PlainTime.from(tStrRaw);
+        const zdt = pd.toPlainDateTime(pt).toZonedDateTime({ timeZone: tz, disambiguation: 'compatible' });
+        const out = zdt.toLocaleString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return out.charAt(0).toUpperCase() + out.slice(1);
+      }
+    } catch (e) {}
+    return formatWarsawStartLabel(dStrRaw, tStrRaw, tz);
+  }
+
+  function computeExtensionDifferentialInfo(targetDate, targetTime, timeZone) {
+    const tz = timeZone || 'Europe/Warsaw';
+    const dStrRaw = /^\d{4}-\d{2}-\d{2}$/.test(String(targetDate || '')) ? String(targetDate) : '';
+    const tStrRaw = /^\d{2}:\d{2}$/.test(String(targetTime || '')) ? String(targetTime) : '23:59';
+    if (!dStrRaw) {
+      return { isValid: false, isExpired: false, hasDstConflict: false, remainingText: '', isoInstant: '' };
+    }
+    try {
+      if (typeof Temporal !== 'undefined' && Temporal.Now && Temporal.PlainDate && Temporal.PlainTime && Temporal.ZonedDateTime) {
+        let hasDstConflict = false;
+        const zonedInput = dStrRaw + 'T' + tStrRaw + '[' + tz + ']';
+        try {
+          Temporal.ZonedDateTime.from(zonedInput, { disambiguation: 'reject' });
+        } catch (dstErr) {
+          if (dstErr instanceof RangeError) hasDstConflict = true;
+        }
+        const pd = Temporal.PlainDate.from(dStrRaw);
+        const pt = Temporal.PlainTime.from(tStrRaw);
+        const endZdt = pd.toPlainDateTime(pt).toZonedDateTime({ timeZone: tz, disambiguation: 'compatible' });
+        const nowZdt = Temporal.Now.zonedDateTimeISO(tz);
+        const dur = nowZdt.until(endZdt, { largestUnit: 'day', smallestUnit: 'minute' });
+        const normalizedTimeInput = endZdt.toPlainTime().toString({ smallestUnit: 'minute' });
+        const isoInstant = endZdt.toInstant().toString();
+        if (dur.sign < 0) {
+          return {
+            isValid: true,
+            isExpired: true,
+            hasDstConflict: hasDstConflict,
+            normalizedTime: normalizedTimeInput,
+            remainingText: '⌛ Przedłużony termin minął',
+            isoInstant: isoInstant
+          };
+        }
+        let fmtText = '';
+        try {
+          if (typeof dur.toLocaleString === 'function') {
+            fmtText = dur.toLocaleString('pl-PL', { style: 'long' });
+          } else if (typeof Intl !== 'undefined' && typeof Intl.DurationFormat === 'function') {
+            fmtText = new Intl.DurationFormat('pl-PL', { style: 'long' }).format({ days: dur.days, hours: dur.hours, minutes: dur.minutes });
+          }
+        } catch (fErr) {}
+        if (!fmtText) {
+          fmtText = dur.days + ' ' + plUnitLabel(dur.days, 'dzień', 'dni', 'dni') + ', ' + dur.hours + ' godz., ' + dur.minutes + ' min';
+        }
+        return {
+          isValid: true,
+          isExpired: false,
+          hasDstConflict: hasDstConflict,
+          normalizedTime: normalizedTimeInput,
+          remainingText: '⏳ Pozostało: ' + fmtText,
+          isoInstant: isoInstant
+        };
+      }
+    } catch (e) {}
+
+    const parts = computeCountdownParts(dStrRaw, tStrRaw, tz, 0);
+    if (parts.isLive) {
+      return {
+        isValid: true,
+        isExpired: true,
+        hasDstConflict: false,
+        normalizedTime: tStrRaw,
+        remainingText: '⌛ Przedłużony termin minął',
+        isoInstant: new Date(parts.targetEpochMs).toISOString()
+      };
+    }
+    let fallbackText = '';
+    try {
+      if (typeof Intl !== 'undefined' && typeof Intl.DurationFormat === 'function') {
+        fallbackText = new Intl.DurationFormat('pl-PL', { style: 'long' }).format({ days: parts.days, hours: parts.hours, minutes: parts.minutes });
+      }
+    } catch (e2) {}
+    if (!fallbackText) {
+      fallbackText = parts.days + ' ' + plUnitLabel(parts.days, 'dzień', 'dni', 'dni') + ', ' + parts.hours + ' godz., ' + parts.minutes + ' min';
+    }
+    return {
+      isValid: true,
+      isExpired: false,
+      hasDstConflict: false,
+      normalizedTime: tStrRaw,
+      remainingText: '⏳ Pozostało: ' + fallbackText,
+      isoInstant: new Date(parts.targetEpochMs).toISOString()
+    };
+  }
+
+  function tickRoundExtensionBanners() {
+    if (typeof document === 'undefined' || !document.querySelectorAll) return;
+    const cards = document.querySelectorAll('[data-smpl-ext-card]');
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const dStr = card.getAttribute('data-ext-date') || '';
+      const tStr = card.getAttribute('data-ext-time') || '23:59';
+      const tz = card.getAttribute('data-ext-tz') || 'Europe/Warsaw';
+      const badge = card.querySelector('[data-smpl-ext-remaining]');
+      if (!badge || !dStr) continue;
+      const diff = computeExtensionDifferentialInfo(dStr, tStr, tz);
+      if (diff.isValid && badge.textContent !== diff.remainingText) {
+        badge.textContent = diff.remainingText;
+      }
+    }
+  }
+
+  function getHolidayPresetTarget(todayYmd) {
+    const mmdd = String(todayYmd || '').slice(5);
+    const yr = Number(String(todayYmd || '').slice(0, 4)) || new Date().getFullYear();
+    // Grudzień -> automatycznie po Świętach Bożego Narodzenia / Nowym Roku
+    if (mmdd >= '12-15' && mmdd <= '12-26') {
+      return { date: yr + '-12-28', tag: 'HOLIDAYS', reason: '🎄 Święta Bożego Narodzenia — spokojnie spędźcie świąteczny czas z rodziną, termin kolejki przedłużony bez walkowerów!' };
+    }
+    if (mmdd >= '12-27' || mmdd <= '01-02') {
+      const nextYr = mmdd >= '12-27' ? (yr + 1) : yr;
+      return { date: nextYr + '-01-04', tag: 'HOLIDAYS', reason: '🎆 Przerwa Świąteczno-Noworoczna / Sylwester — spokojnego świętowania, wracamy do gry po Nowym Roku!' };
+    }
+    return {
+      date: addDaysWarsawPlainDate(todayYmd, 5),
+      tag: 'HOLIDAYS',
+      reason: '🎄 Święta / okoliczności wyjątkowe — Administracja przedłuża termin na spokojne rozegranie wszystkich dwumeczów bez walkowerów!'
+    };
+  }
+
+  function syncRoundExtDialogUi() {
+    if (typeof document === 'undefined') return;
+    const form = document.getElementById('smpl-round-ext-form');
+    if (!form) return;
+    const checkedRadio = form.querySelector('input[name="scopeType"]:checked');
+    const scopeVal = checkedRadio ? checkedRadio.value : 'WEEK';
+    const weekWrap = document.getElementById('smpl-ext-week-wrap');
+    const roundWrap = document.getElementById('smpl-ext-round-wrap');
+    if (weekWrap) weekWrap.style.display = scopeVal === 'WEEK' ? 'flex' : 'none';
+    if (roundWrap) roundWrap.style.display = scopeVal === 'ROUND' ? 'flex' : 'none';
+
+    const dateEl = document.getElementById('smpl-ext-date');
+    const timeEl = document.getElementById('smpl-ext-time');
+    const prevEl = document.getElementById('smpl-ext-live-preview');
+    if (prevEl && dateEl && timeEl) {
+      const dVal = dateEl.value;
+      const tVal = timeEl.value || '23:59';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dVal)) {
+        const diff = computeExtensionDifferentialInfo(dVal, tVal, 'Europe/Warsaw');
+        const human = formatRoundExtensionDateLabel(dVal, tVal, 'Europe/Warsaw');
+        const dstNote = diff.hasDstConflict ? ' • ⚠️ Uwaga: zmiana czasu (DST) — dopasowano automatycznie.' : '';
+        prevEl.textContent = '📅 ' + human + ' (' + diff.remainingText + ')' + dstNote;
+      } else {
+        prevEl.textContent = 'Wybierz datę i godzinę nowego terminu kolejki.';
+      }
+    }
+  }
+
+  function applyRoundExtTimePreset(presetKey) {
+    if (typeof document === 'undefined') return;
+    const dateEl = document.getElementById('smpl-ext-date');
+    const timeEl = document.getElementById('smpl-ext-time');
+    const tagEl = document.getElementById('smpl-ext-occasion-tag');
+    const reasonEl = document.getElementById('smpl-ext-reason');
+    if (!dateEl || !timeEl) return;
+    const today = getTodayWarsawYmd();
+    const anchor = /^\d{4}-\d{2}-\d{2}$/.test(dateEl.value) && dateEl.value > today ? dateEl.value : today;
+    if (presetKey === 'plus_1d') {
+      dateEl.value = addDaysWarsawPlainDate(today, 1);
+      timeEl.value = '23:59';
+    } else if (presetKey === 'plus_2d') {
+      dateEl.value = addDaysWarsawPlainDate(today, 2);
+      timeEl.value = '23:59';
+    } else if (presetKey === 'plus_3d') {
+      dateEl.value = addDaysWarsawPlainDate(today, 3);
+      timeEl.value = '23:59';
+    } else if (presetKey === 'plus_7d') {
+      dateEl.value = addDaysWarsawPlainDate(anchor, 7);
+      timeEl.value = '23:59';
+    } else if (presetKey === 'holidays') {
+      const hol = getHolidayPresetTarget(today);
+      dateEl.value = hol.date;
+      timeEl.value = '23:59';
+      if (tagEl) tagEl.value = hol.tag;
+      if (reasonEl) {
+        reasonEl.value = hol.reason;
+        reasonEl.setCustomValidity('');
+        reasonEl.setAttribute('aria-invalid', 'false');
+      }
+    }
+    dateEl.setCustomValidity('');
+    dateEl.setAttribute('aria-invalid', 'false');
+    syncRoundExtDialogUi();
+  }
+
+  function applyRoundExtReasonPreset(tagKey) {
+    if (typeof document === 'undefined') return;
+    const tagEl = document.getElementById('smpl-ext-occasion-tag');
+    const reasonEl = document.getElementById('smpl-ext-reason');
+    const presets = {
+      HOLIDAYS: '🎄 Przerwa świąteczna / okoliczności rodzinne — spokojnie spędźcie czas z bliskimi i rozegrajcie swoje dwumecze w przedłużonym terminie!',
+      WEEKEND: '🐣 Długi weekend i wyjazdy — dajemy dodatkowy czas na dogranie wszystkich spotkań bez walkowerów.',
+      TECH: '🛠️ Problemy techniczne z serwerami gry Score! Match — przedłużamy termin kolejki, aby każdy dokończył mecze.',
+      ARREARS: '⚡ Dodatkowa dogrywka na dokończenie zaległych dwumeczów przed oficjalnym zamknięciem kolejki!'
+    };
+    const key = String(tagKey || 'HOLIDAYS').toUpperCase();
+    if (tagEl) tagEl.value = presets[key] ? key : 'CUSTOM';
+    if (reasonEl && presets[key]) {
+      reasonEl.value = presets[key];
+      reasonEl.setCustomValidity('');
+      reasonEl.setAttribute('aria-invalid', 'false');
+    }
+  }
+
+  function openRoundExtensionDialog(options) {
+    if (!requireStrictAdmin('przedłużenie terminu kolejki')) return;
+    if (typeof document === 'undefined' || !window.SMPL_DB) return;
+    ensureTemporalPolyfillLazy();
+
+    const opts = options && typeof options === 'object' ? options : {};
+    const state = window.SMPL_DB.getState();
+    const esc = (v) => (window.SMPL_VIEWS && window.SMPL_VIEWS.escapeHtml ? window.SMPL_VIEWS.escapeHtml(v) : String(v || ''));
+    const allExts = typeof window.SMPL_DB.getRoundExtensions === 'function' ? window.SMPL_DB.getRoundExtensions(state) : [];
+    const editingExt = opts.editId ? allExts.find((ex) => String(ex.id) === String(opts.editId)) : null;
+
+    const rpw = Math.max(1, Number((state.weeklyConfig && state.weeklyConfig.roundsPerWeek) || 4));
+    const curWeek = Math.max(1, Number((state.weeklyConfig && state.weeklyConfig.currentWeek) || 1));
+    let maxRound = 15;
+    Object.keys(state.leagues || {}).forEach((lid) => {
+      if (state.leagues[lid] && Number(state.leagues[lid].totalRounds || 0) > maxRound) {
+        maxRound = Number(state.leagues[lid].totalRounds || 0);
+      }
+    });
+    (state.matches || []).forEach((m) => {
+      if (m && Number(m.round || 0) > maxRound) maxRound = Number(m.round || 0);
+    });
+    const totalWeeks = Math.max(1, Math.ceil(maxRound / rpw));
+    const activeLeagueIds = typeof window.SMPL_DB.getActiveLeagueIds === 'function'
+      ? window.SMPL_DB.getActiveLeagueIds(state)
+      : ['L1', 'L2'];
+
+    const initScope = editingExt ? editingExt.scopeType : (opts.scopeType || 'WEEK');
+    const initWeek = editingExt ? Number(editingExt.weekNum || curWeek) : Number(opts.weekNum || curWeek);
+    const initRound = editingExt ? Number(editingExt.roundNum || 1) : Number(opts.roundNum || ((initWeek - 1) * rpw + 1));
+    const initLeague = editingExt ? String(editingExt.leagueScope || 'ALL') : String(opts.leagueScope || 'ALL');
+    const initDate = editingExt && editingExt.extendedUntilDate
+      ? editingExt.extendedUntilDate
+      : addDaysWarsawPlainDate(getTodayWarsawYmd(), 3);
+    const initTime = editingExt && editingExt.extendedUntilTime ? editingExt.extendedUntilTime : '23:59';
+    const initTag = editingExt && editingExt.occasionTag ? editingExt.occasionTag : 'HOLIDAYS';
+    const initReason = editingExt && editingExt.reason
+      ? editingExt.reason
+      : '🎄 Święta / okoliczności wyjątkowe — dodatkowy czas na spokojne rozegranie wszystkich dwumeczów bez walkowerów!';
+
+    let dlg = document.getElementById('smpl-round-ext-dialog');
+    if (!dlg) {
+      dlg = document.createElement('dialog');
+      dlg.id = 'smpl-round-ext-dialog';
+      dlg.className = 'smpl-round-ext-dialog';
+      dlg.setAttribute('closedby', 'any');
+      dlg.setAttribute('aria-labelledby', 'smpl-round-ext-title');
+      document.body.appendChild(dlg);
+      dlg.addEventListener('close', function () {
+        dlg.returnValue = '';
+      });
+      if (typeof HTMLDialogElement !== 'undefined' && !('closedBy' in HTMLDialogElement.prototype) && !_roundExtDialogClosedByBound) {
+        _roundExtDialogClosedByBound = true;
+        let pressedOutside = false;
+        const outside = function (ev, dialogEl) {
+          const r = dialogEl.getBoundingClientRect();
+          return ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom;
+        };
+        dlg.addEventListener('pointerdown', function (ev) { pressedOutside = outside(ev, dlg); });
+        dlg.addEventListener('pointerup', function (ev) { if (pressedOutside && outside(ev, dlg) && dlg.open) dlg.close(); });
+      }
+    }
+
+    const weekOptionsHtml = [];
+    for (let w = 1; w <= totalWeeks; w++) {
+      const ws = (w - 1) * rpw + 1;
+      const we = Math.min(maxRound, w * rpw);
+      weekOptionsHtml.push(
+        `<option value="${w}" ${w === initWeek ? 'selected' : ''}>Tydz. #${w} (K${ws}–K${we})${w === curWeek ? ' • AKTYWNY' : ''}</option>`
+      );
+    }
+    const roundOptionsHtml = [];
+    for (let r = 1; r <= maxRound; r++) {
+      roundOptionsHtml.push(
+        `<option value="${r}" ${r === initRound ? 'selected' : ''}>Kolejka #${r} (Tydzień #${Math.ceil(r / rpw)})</option>`
+      );
+    }
+    const leagueOptionsHtml = [
+      `<option value="ALL" ${initLeague === 'ALL' ? 'selected' : ''}>🌍 Wszystkie aktywne ligi (${esc(activeLeagueIds.join(' + '))})</option>`
+    ].concat(
+      activeLeagueIds.map((lid) => {
+        const lName = (state.leagues && state.leagues[lid] && state.leagues[lid].name) ? state.leagues[lid].name : lid;
+        return `<option value="${esc(lid)}" ${initLeague === lid ? 'selected' : ''}>🏟️ Tylko ${esc(lName)} (${esc(lid)})</option>`;
+      })
+    );
+
+    dlg.innerHTML = `
+      <div class="p-5 sm:p-6">
+        <div class="flex items-start justify-between gap-3 pb-3.5 mb-4 border-b border-white/10">
+          <div>
+            <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-200 text-[10px] font-display font-black uppercase">
+              ⏳ NARZĘDZIE DLA WSZYSTKICH ADMINÓW • SEZON ${(state && state.season) || 56}
+            </span>
+            <h1 id="smpl-round-ext-title" class="font-display font-black text-lg sm:text-xl text-white uppercase mt-1">
+              ${editingExt ? '✏️ Edytuj Przedłużenie Terminu Kolejki' : '⏳ Przedłuż Kolejkę lub Tydzień Rozgrywkowy'}
+            </h1>
+            <p class="text-xs text-slate-300 mt-0.5">
+              W razie Świąt, wyjazdów czy awarii serwerów gry daj graczom dodatkowy czas i wyślij automatyczne powiadomienie.
+            </p>
+          </div>
+          <button type="button" id="smpl-ext-close-top" aria-label="Zamknij okno przedłużania kolejki" class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-bold text-xs">
+            ✕
+          </button>
+        </div>
+
+        <form id="smpl-round-ext-form" class="smpl-round-ext-form" method="post" action="#round-extension" aria-labelledby="smpl-round-ext-title" novalidate>
+          <input type="hidden" id="smpl-ext-occasion-tag" name="occasionTag" value="${esc(initTag)}" />
+
+          <fieldset class="smpl-ext-fieldset">
+            <legend>1. Co chcesz przedłużyć? *</legend>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+              <div class="smpl-ext-radio-row">
+                <input type="radio" id="smpl-ext-scope-week" name="scopeType" value="WEEK" ${initScope === 'WEEK' ? 'checked' : ''} />
+                <label for="smpl-ext-scope-week">📅 Tydzień (${rpw} kol.)</label>
+              </div>
+              <div class="smpl-ext-radio-row">
+                <input type="radio" id="smpl-ext-scope-round" name="scopeType" value="ROUND" ${initScope === 'ROUND' ? 'checked' : ''} />
+                <label for="smpl-ext-scope-round">⚽ Pojedyncza Kolejka</label>
+              </div>
+              <div class="smpl-ext-radio-row">
+                <input type="radio" id="smpl-ext-scope-all" name="scopeType" value="ALL_ACTIVE" ${initScope === 'ALL_ACTIVE' ? 'checked' : ''} />
+                <label for="smpl-ext-scope-all">🎄 Wszystkie bieżące</label>
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="smpl-ext-field" id="smpl-ext-week-wrap">
+              <label for="smpl-ext-week" class="smpl-ext-label">Wybierz Tydzień Rozgrywkowy <span aria-hidden="true">*</span></label>
+              <select id="smpl-ext-week" name="weekNum" class="smpl-ext-control">
+                ${weekOptionsHtml.join('')}
+              </select>
+            </div>
+
+            <div class="smpl-ext-field" id="smpl-ext-round-wrap" style="display:none;">
+              <label for="smpl-ext-round" class="smpl-ext-label">Wybierz Kolejkę <span aria-hidden="true">*</span></label>
+              <select id="smpl-ext-round" name="roundNum" class="smpl-ext-control">
+                ${roundOptionsHtml.join('')}
+              </select>
+            </div>
+
+            <div class="smpl-ext-field">
+              <label for="smpl-ext-league" class="smpl-ext-label">Które ligi obejmuje? <span aria-hidden="true">*</span></label>
+              <select id="smpl-ext-league" name="leagueScope" class="smpl-ext-control">
+                ${leagueOptionsHtml.join('')}
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="text-[11px] font-display font-bold uppercase text-amber-300 mb-1.5">
+              ⚡ Szybkie przedłużenie 1-Klik:
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="SMPL_APP.applyRoundExtTimePreset('plus_1d')" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/15 text-xs font-display font-bold">
+                +24h (+1 dzień)
+              </button>
+              <button type="button" onclick="SMPL_APP.applyRoundExtTimePreset('plus_2d')" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/15 text-xs font-display font-bold">
+                +48h (+2 dni)
+              </button>
+              <button type="button" onclick="SMPL_APP.applyRoundExtTimePreset('plus_3d')" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/15 text-xs font-display font-bold">
+                +72h (+3 dni)
+              </button>
+              <button type="button" onclick="SMPL_APP.applyRoundExtTimePreset('plus_7d')" class="px-3 py-1.5 rounded-xl bg-blue-600/25 hover:bg-blue-600/40 text-blue-200 border border-blue-400/40 text-xs font-display font-bold">
+                📅 +1 Tydzień (+7 dni)
+              </button>
+              <button type="button" onclick="SMPL_APP.applyRoundExtTimePreset('holidays')" class="px-3 py-1.5 rounded-xl bg-amber-500/25 hover:bg-amber-500/40 text-amber-200 border border-amber-400/50 text-xs font-display font-bold">
+                🎄 Święta / Sylwester
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="smpl-ext-field">
+              <label for="smpl-ext-date" class="smpl-ext-label">Nowa data końcowa (Warszawa) <span aria-hidden="true">*</span></label>
+              <input type="date" id="smpl-ext-date" name="extendedUntilDate" value="${esc(initDate)}" required aria-describedby="smpl-ext-live-preview" class="smpl-ext-control" autofocus />
+            </div>
+            <div class="smpl-ext-field">
+              <label for="smpl-ext-time" class="smpl-ext-label">Godzina zamknięcia <span aria-hidden="true">*</span></label>
+              <input type="time" id="smpl-ext-time" name="extendedUntilTime" value="${esc(initTime)}" required aria-describedby="smpl-ext-live-preview" class="smpl-ext-control" />
+            </div>
+          </div>
+
+          <div id="smpl-ext-live-preview" role="status" aria-live="polite" class="mb-3 px-3.5 py-2.5 rounded-xl bg-emerald-950/40 border border-emerald-400/35 text-xs font-bold text-emerald-200">
+            Ładowanie podglądu terminu...
+          </div>
+
+          <div class="mb-2">
+            <div class="text-[11px] font-display font-bold uppercase text-slate-300 mb-1.5">
+              💬 Gotowe szablony powodu (kliknij lub wpisz własny):
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="SMPL_APP.applyRoundExtReasonPreset('HOLIDAYS')" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-400/40 text-[11px] font-bold">
+                🎄 Święta / Rodzina
+              </button>
+              <button type="button" onclick="SMPL_APP.applyRoundExtReasonPreset('WEEKEND')" class="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/35 text-sky-200 border border-sky-400/40 text-[11px] font-bold">
+                🐣 Długi weekend / Wyjazd
+              </button>
+              <button type="button" onclick="SMPL_APP.applyRoundExtReasonPreset('TECH')" class="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 text-rose-200 border border-rose-400/40 text-[11px] font-bold">
+                🛠️ Awaria gry / serwerów
+              </button>
+              <button type="button" onclick="SMPL_APP.applyRoundExtReasonPreset('ARREARS')" class="px-2.5 py-1 rounded-lg bg-purple-500/20 hover:bg-purple-500/35 text-purple-200 border border-purple-400/40 text-[11px] font-bold">
+                ⚡ Dogrywka zaległości
+              </button>
+            </div>
+          </div>
+
+          <div class="smpl-ext-field">
+            <label for="smpl-ext-reason" class="smpl-ext-label">Powód przedłużenia (widoczny dla graczy, 3–280 znaków) <span aria-hidden="true">*</span></label>
+            <textarea id="smpl-ext-reason" name="reason" rows="2" minlength="3" maxlength="280" required aria-describedby="smpl-ext-reason-help" class="smpl-ext-control">${esc(initReason)}</textarea>
+            <span id="smpl-ext-reason-help" class="text-[11px] text-slate-400">Komunikat wyświetli się na banerze w Terminarzu, w Raporcie Messenger oraz w powiadomieniu dla graczy.</span>
+          </div>
+
+          <div class="smpl-ext-check-row">
+            <input type="checkbox" id="smpl-ext-notify" name="notifyPlayers" value="1" checked />
+            <label for="smpl-ext-notify">🔔 Wyślij od razu powiadomienie w portalu do wszystkich aktywnych graczy z wybranych lig</label>
+          </div>
+
+          <div id="smpl-ext-form-error" role="alert" aria-live="polite" class="hidden mb-3 p-3 rounded-xl bg-rose-950/75 border border-rose-400/60 text-xs font-bold text-rose-200"></div>
+
+          <div class="smpl-ext-sticky-footer flex flex-wrap items-center justify-end gap-2 border-t border-white/10">
+            ${
+              editingExt
+                ? `<button type="button" onclick="SMPL_APP.handleRemoveRoundExtension('${esc(editingExt.id)}')" class="mr-auto px-3.5 py-2.5 rounded-xl bg-rose-950/80 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/45 text-xs font-display font-bold uppercase transition">
+                     🗑️ Zakończ to przedłużenie
+                   </button>`
+                : ''
+            }
+            <button type="button" id="smpl-ext-cancel-btn" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-display font-bold uppercase">
+              Anuluj
+            </button>
+            <button type="submit" id="smpl-ext-submit-btn" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-display font-black text-xs uppercase shadow-xl">
+              ⏳ Zapisz Przedłużenie Terminu
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    const closeBtnTop = document.getElementById('smpl-ext-close-top');
+    const cancelBtn = document.getElementById('smpl-ext-cancel-btn');
+    const closeSafe = function () { if (dlg && dlg.open) dlg.close(); };
+    if (closeBtnTop) closeBtnTop.addEventListener('click', closeSafe);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeSafe);
+
+    const formEl = document.getElementById('smpl-round-ext-form');
+    const dateInput = document.getElementById('smpl-ext-date');
+    const timeInput = document.getElementById('smpl-ext-time');
+    const reasonInput = document.getElementById('smpl-ext-reason');
+    const errBox = document.getElementById('smpl-ext-form-error');
+    const submitBtn = document.getElementById('smpl-ext-submit-btn');
+
+    const showFormError = function (msg) {
+      if (!errBox) return;
+      if (msg) {
+        errBox.textContent = '⚠️ ' + msg;
+        errBox.classList.remove('hidden');
+      } else {
+        errBox.textContent = '';
+        errBox.classList.add('hidden');
+      }
+    };
+
+    const validateSingleField = function (field) {
+      if (!field) return true;
+      if (field === dateInput) {
+        const ok = /^\d{4}-\d{2}-\d{2}$/.test(String(dateInput.value || '').trim());
+        dateInput.setCustomValidity(ok ? '' : 'Wybierz poprawną datę z kalendarza (RRRR-MM-DD).');
+        dateInput.setAttribute('aria-invalid', ok ? 'false' : 'true');
+        return ok;
+      }
+      if (field === timeInput) {
+        const ok = /^\d{2}:\d{2}$/.test(String(timeInput.value || '').trim());
+        timeInput.setCustomValidity(ok ? '' : 'Wybierz godzinę zamknięcia (np. 23:59).');
+        timeInput.setAttribute('aria-invalid', ok ? 'false' : 'true');
+        return ok;
+      }
+      if (field === reasonInput) {
+        const txt = String(reasonInput.value || '').trim();
+        const ok = txt.length >= 3 && txt.length <= 280;
+        reasonInput.setCustomValidity(ok ? '' : 'Wpisz krótki powód przedłużenia (minimum 3 znaki).');
+        reasonInput.setAttribute('aria-invalid', ok ? 'false' : 'true');
+        return ok;
+      }
+      return true;
+    };
+
+    if (formEl) {
+      const radios = formEl.querySelectorAll('input[name="scopeType"]');
+      for (let ri = 0; ri < radios.length; ri++) {
+        radios[ri].addEventListener('change', syncRoundExtDialogUi);
+      }
+      [dateInput, timeInput, reasonInput].forEach(function (fld) {
+        if (!fld) return;
+        fld.addEventListener('input', function () {
+          fld.setCustomValidity('');
+          fld.setAttribute('aria-invalid', 'false');
+          showFormError('');
+          syncRoundExtDialogUi();
+        });
+        fld.addEventListener('blur', function () {
+          validateSingleField(fld);
+        });
+      });
+
+      formEl.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        const dOk = validateSingleField(dateInput);
+        const tOk = validateSingleField(timeInput);
+        const rOk = validateSingleField(reasonInput);
+        if (!dOk) {
+          showFormError(dateInput.validationMessage || 'Wybierz poprawną datę nowego terminu.');
+          dateInput.focus();
+          return;
+        }
+        if (!tOk) {
+          showFormError(timeInput.validationMessage || 'Wybierz poprawną godzinę nowego terminu.');
+          timeInput.focus();
+          return;
+        }
+        if (!rOk) {
+          showFormError(reasonInput.validationMessage || 'Wpisz powód przedłużenia (min. 3 znaki).');
+          reasonInput.focus();
+          return;
+        }
+
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+          const checkedScope = formEl.querySelector('input[name="scopeType"]:checked');
+          const weekSel = document.getElementById('smpl-ext-week');
+          const roundSel = document.getElementById('smpl-ext-round');
+          const leagueSel = document.getElementById('smpl-ext-league');
+          const tagInput = document.getElementById('smpl-ext-occasion-tag');
+          const notifyChk = document.getElementById('smpl-ext-notify');
+          const res = window.SMPL_DB.setRoundExtension(
+            {
+              scopeType: checkedScope ? checkedScope.value : 'WEEK',
+              weekNum: weekSel ? Number(weekSel.value || curWeek) : curWeek,
+              roundNum: roundSel ? Number(roundSel.value || 1) : 1,
+              leagueScope: leagueSel ? leagueSel.value : 'ALL',
+              occasionTag: tagInput ? tagInput.value : 'HOLIDAYS',
+              extendedUntilDate: dateInput.value,
+              extendedUntilTime: timeInput.value || '23:59',
+              timeZone: 'Europe/Warsaw',
+              reason: reasonInput.value.trim(),
+              notifyPlayers: Boolean(notifyChk && notifyChk.checked)
+            },
+            getCurrentAdminDisplayName()
+          );
+          closeSafe();
+          renderAll();
+          const notifInfo = res && res.notifiedCount > 0 ? (' (powiadomiono ' + res.notifiedCount + ' graczy 🔔)') : '';
+          showToast('⏳ Przedłużono termin: ' + (res && res.extension ? res.extension.scopeLabel : '') + ' do ' + dateInput.value + ' ' + (timeInput.value || '23:59') + notifInfo + '!');
+        } catch (saveErr) {
+          if (submitBtn) submitBtn.disabled = false;
+          showFormError((saveErr && saveErr.message) || 'Nie udało się zapisać przedłużenia kolejki.');
+        }
+      });
+    }
+
+    if (typeof dlg.showModal === 'function') {
+      if (!dlg.open) dlg.showModal();
+    } else {
+      dlg.setAttribute('open', 'open');
+    }
+    syncRoundExtDialogUi();
+  }
+
+  function handleRemoveRoundExtension(extId) {
+    if (!requireStrictAdmin('zakończenie przedłużenia kolejki')) return;
+    try {
+      window.SMPL_DB.removeRoundExtension(extId || 'ALL', getCurrentAdminDisplayName());
+      const dlg = document.getElementById('smpl-round-ext-dialog');
+      if (dlg && dlg.open) dlg.close();
+      renderAll();
+      showToast('⏹️ Zakończono przedłużenie terminu kolejki.');
+    } catch (err) {
+      showToast((err && err.message) || 'Błąd usuwania przedłużenia.', 'error');
+    }
+  }
+
+  function copyRoundExtensionMessenger(extId) {
+    if (!window.SMPL_DB || typeof window.SMPL_DB.getRoundExtensions !== 'function') return;
+    const state = window.SMPL_DB.getState();
+    const list = window.SMPL_DB.getRoundExtensions(state);
+    const found = extId ? list.find((ex) => String(ex.id) === String(extId)) : list[0];
+    if (!found) {
+      showToast('Brak aktywnego przedłużenia do skopiowania.', 'error');
+      return;
+    }
+    const msg = window.SMPL_DB.buildRoundExtensionMessengerText(found, state);
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(msg)
+        .then(function () { showToast('📋 Skopiowano gotowy komunikat o przedłużeniu kolejki — wklej na Messengera / FB!'); })
+        .catch(function () { showToast('Nie udało się skopiować do schowka.', 'error'); });
+    } else {
+      showToast('📋 Komunikat gotowy: ' + found.scopeLabel + ' do ' + found.extendedUntilDate + '!');
     }
   }
 
@@ -12477,6 +13150,12 @@ window.SMPL_APP = (function () {
     openCountdownCinemaModal,
     downloadCountdownPosterPng,
     copyCountdownMessengerText,
+    formatRoundExtensionDateLabel,
+    openRoundExtensionDialog,
+    applyRoundExtTimePreset,
+    applyRoundExtReasonPreset,
+    handleRemoveRoundExtension,
+    copyRoundExtensionMessenger,
     adminLoadWebhooksPanel,
     adminSaveWebhooks,
     adminTestWebhooks,

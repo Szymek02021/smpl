@@ -536,6 +536,12 @@ function buildServerLeagueSnapshot(db) {
   const weekly = db.weeklyConfig || {};
   const seasonLbl = db.season ? `Sezon ${db.season}` : 'Sezon SMPL';
   lines.push(`AKTUALNY SEZON (serwer): ${seasonLbl} | Tydzień: ${weekly.currentWeek || '?'}`);
+  if (Array.isArray(weekly.extensions) && weekly.extensions.length > 0) {
+    const extParts = weekly.extensions
+      .filter((ex) => ex && ex.enabled)
+      .map((ex) => `${ex.scopeLabel || 'Kolejka'} przedłużono do ${ex.extendedUntilDate || ''} ${ex.extendedUntilTime || '23:59'} (${ex.reason || ''})`);
+    if (extParts.length) lines.push(`AKTYWNE PRZEDŁUŻENIA KOLEJEK: ${extParts.join(' | ')}`);
+  }
   const activeLeagues = {};
   if (db.leagues && typeof db.leagues === 'object') {
     for (const [lid, lObj] of Object.entries(db.leagues)) {
@@ -2328,6 +2334,198 @@ const server = http.createServer((req, res) => {
           return sendJson(res, 200, {
             ok: true,
             seasonCountdown: prevDb.portalSettings.seasonCountdown,
+            updatedAt: tsMs,
+            state: prevDb
+          });
+        }
+
+        if (action === 'admin_set_round_extension') {
+          let payload = {};
+          try { payload = JSON.parse(body || '{}') || {}; } catch (e) { payload = {}; }
+          const prevDb = readDbJson();
+          const adminTokenInfo = validateAdminTokenHeader(req, prevDb, payload);
+          if (!adminTokenInfo) {
+            return sendJson(res, 401, {
+              ok: false,
+              code: 'ADMIN_TOKEN_EXPIRED',
+              error: 'Sesja Administratora na serwerze wygasła lub brak tokena (X-SMPL-Admin-Token). Zaloguj się ponownie hasłem Admina.'
+            });
+          }
+          if (!prevDb || !Array.isArray(prevDb.players)) {
+            return sendJson(res, 400, { ok: false, error: 'Baza danych SMPL na serwerze jest pusta lub uszkodzona.' });
+          }
+          if (!prevDb.weeklyConfig || typeof prevDb.weeklyConfig !== 'object') {
+            prevDb.weeklyConfig = { roundsPerWeek: 4, currentWeek: 1, totalWeeks: 4 };
+          }
+          if (!Array.isArray(prevDb.weeklyConfig.extensions)) {
+            prevDb.weeklyConfig.extensions = [];
+          }
+
+          const admName = String(adminTokenInfo.adminName || 'Szymon Komenda');
+          const nowFmt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+          const tsMs = Date.now();
+          const op = String(payload.op || 'set').trim().toLowerCase();
+
+          if (op === 'remove' || op === 'clear') {
+            const targetId = String(payload.id || '').trim();
+            const removedLabels = [];
+            prevDb.weeklyConfig.extensions = prevDb.weeklyConfig.extensions.filter((exItem) => {
+              if (!exItem || typeof exItem !== 'object') return false;
+              const exId = String(exItem.id || '');
+              if (targetId === 'ALL' || (targetId !== '' && exId === targetId)) {
+                removedLabels.push(String(exItem.scopeLabel || exId));
+                return false;
+              }
+              return true;
+            });
+            prevDb.updatedAt = tsMs;
+            const lblTxt = removedLabels.length ? removedLabels.join(', ') : (targetId === 'ALL' ? 'wszystkie kolejki' : targetId);
+            const logItem = {
+              id: 'LOG_EXT_CLR_' + tsMs + '_' + Math.floor(10 + Math.random() * 89),
+              time: nowFmt,
+              type: 'ROUND_EXTENSION_CLEARED',
+              text: `⏹️ Admin ${admName} zakończył przedłużenie terminu (${lblTxt}).`
+            };
+            if (!Array.isArray(prevDb.activityLog)) prevDb.activityLog = [];
+            prevDb.activityLog.unshift(logItem);
+            if (prevDb.activityLog.length > 120) prevDb.activityLog = prevDb.activityLog.slice(0, 120);
+            if (!Array.isArray(prevDb.logs)) prevDb.logs = [];
+            prevDb.logs.unshift(logItem);
+            if (prevDb.logs.length > 300) prevDb.logs = prevDb.logs.slice(0, 300);
+
+            const enc = JSON.stringify(prevDb);
+            fs.writeFileSync(DB_FILE, enc, 'utf8');
+            try { fs.writeFileSync(BACKUP_FILE, enc, 'utf8'); } catch (e) {}
+            return sendJson(res, 200, {
+              ok: true,
+              extensions: prevDb.weeklyConfig.extensions,
+              updatedAt: tsMs,
+              state: prevDb
+            });
+          }
+
+          const allowedScopes = ['WEEK', 'ROUND', 'ALL_ACTIVE'];
+          let scopeType = String(payload.scopeType || 'WEEK').trim().toUpperCase();
+          if (!allowedScopes.includes(scopeType)) scopeType = 'WEEK';
+
+          const rpw = Math.max(1, Number(prevDb.weeklyConfig.roundsPerWeek || 4));
+          const curW = Math.max(1, Number(prevDb.weeklyConfig.currentWeek || 1));
+          let weekNum = Math.round(Number(payload.weekNum !== undefined ? payload.weekNum : curW));
+          if (!Number.isFinite(weekNum) || weekNum < 1 || weekNum > 60) weekNum = curW;
+
+          let roundNum = Math.round(Number(payload.roundNum !== undefined ? payload.roundNum : ((curW - 1) * rpw + 1)));
+          if (!Number.isFinite(roundNum) || roundNum < 1 || roundNum > 60) roundNum = 1;
+
+          let leagueScope = String(payload.leagueScope || 'ALL').trim().toUpperCase();
+          if (leagueScope !== 'ALL' && !/^L\d{1,2}$/.test(leagueScope)) leagueScope = 'ALL';
+
+          const extendedUntilDate = String(payload.extendedUntilDate || '').trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(extendedUntilDate)) {
+            return sendJson(res, 400, { ok: false, error: 'Wybierz prawidłową datę nowego terminu kolejki (RRRR-MM-DD).' });
+          }
+          let extendedUntilTime = String(payload.extendedUntilTime || '23:59').trim();
+          if (!/^\d{2}:\d{2}$/.test(extendedUntilTime)) extendedUntilTime = '23:59';
+
+          let timeZone = String(payload.timeZone || 'Europe/Warsaw').trim();
+          if (!/^[A-Za-z0-9_/+\-]{2,64}$/.test(timeZone)) timeZone = 'Europe/Warsaw';
+
+          const allowedTags = ['HOLIDAYS', 'WEEKEND', 'TECH', 'ARREARS', 'CUSTOM'];
+          let occasionTag = String(payload.occasionTag || 'HOLIDAYS').trim().toUpperCase();
+          if (!allowedTags.includes(occasionTag)) occasionTag = 'CUSTOM';
+
+          const cleanReason = (String(payload.reason || '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/[\r\n]+/g, ' ')
+            .replace(/[\x00-\x1F\x7F]/g, '')
+            .trim() || 'Przedłużenie terminu kolejki ze względu na okoliczności wyjątkowe.').slice(0, 280);
+
+          const extId = scopeType === 'WEEK'
+            ? `EXT_WEEK_${weekNum}_${leagueScope}`
+            : (scopeType === 'ROUND' ? `EXT_ROUND_${roundNum}_${leagueScope}` : `EXT_ALL_ACTIVE_${leagueScope}`);
+
+          let leagueNameSuffix = 'Wszystkie ligi';
+          if (leagueScope !== 'ALL') {
+            leagueNameSuffix = (prevDb.leagues && prevDb.leagues[leagueScope] && prevDb.leagues[leagueScope].name)
+              ? String(prevDb.leagues[leagueScope].name)
+              : leagueScope;
+          }
+          let scopeLabel = '';
+          if (scopeType === 'WEEK') {
+            const rStart = (weekNum - 1) * rpw + 1;
+            const rEnd = weekNum * rpw;
+            scopeLabel = `Tydzień #${weekNum} (Kolejki K${rStart}–K${rEnd}) • ${leagueNameSuffix}`;
+          } else if (scopeType === 'ROUND') {
+            scopeLabel = `Kolejka #${roundNum} • ${leagueNameSuffix}`;
+          } else {
+            scopeLabel = `Wszystkie aktywne i zaległe kolejki • ${leagueNameSuffix}`;
+          }
+
+          const extRecord = {
+            id: extId,
+            enabled: true,
+            scopeType,
+            weekNum,
+            roundNum,
+            leagueScope,
+            scopeLabel,
+            occasionTag,
+            reason: cleanReason,
+            extendedUntilDate,
+            extendedUntilTime,
+            timeZone,
+            updatedBy: admName,
+            updatedAt: nowFmt
+          };
+
+          prevDb.weeklyConfig.extensions = [
+            extRecord,
+            ...prevDb.weeklyConfig.extensions.filter((ex) => ex && String(ex.id || '') !== extId)
+          ].slice(0, 20);
+
+          const notifyPlayers = Object.prototype.hasOwnProperty.call(payload, 'notifyPlayers') ? Boolean(payload.notifyPlayers) : true;
+          let notifiedCount = 0;
+          if (notifyPlayers) {
+            prevDb.players.forEach((pl, pIdx) => {
+              if (!pl || pl.isPlaceholder || pl.gdprDeleted || pl.active === false) return;
+              const pLid = String(pl.leagueId || '');
+              if (!pLid || pLid === 'POOL') return;
+              if (leagueScope !== 'ALL' && pLid !== leagueScope) return;
+              if (!Array.isArray(pl.notifications)) pl.notifications = [];
+              pl.notifications.unshift({
+                id: 'NOTIF_EXT_' + tsMs + '_' + pIdx,
+                type: 'ROUND_EXTENDED',
+                time: nowFmt,
+                read: false,
+                title: `⏳ Przedłużono termin: ${scopeLabel}`,
+                text: `Nowy termin rozegrania meczów: ${extendedUntilDate} ${extendedUntilTime} — ${cleanReason} (Admin: ${admName})`
+              });
+              if (pl.notifications.length > 40) pl.notifications = pl.notifications.slice(0, 40);
+              notifiedCount++;
+            });
+          }
+
+          prevDb.updatedAt = tsMs;
+          const logItem = {
+            id: 'LOG_EXT_' + tsMs + '_' + Math.floor(10 + Math.random() * 89),
+            time: nowFmt,
+            type: 'ROUND_EXTENDED',
+            text: `⏳ Admin ${admName} przedłużył termin (${scopeLabel}) do ${extendedUntilDate} ${extendedUntilTime} — Powód: ${cleanReason}${notifyPlayers ? ` (powiadomiono ${notifiedCount} graczy)` : ''}.`
+          };
+          if (!Array.isArray(prevDb.activityLog)) prevDb.activityLog = [];
+          prevDb.activityLog.unshift(logItem);
+          if (prevDb.activityLog.length > 120) prevDb.activityLog = prevDb.activityLog.slice(0, 120);
+          if (!Array.isArray(prevDb.logs)) prevDb.logs = [];
+          prevDb.logs.unshift(logItem);
+          if (prevDb.logs.length > 300) prevDb.logs = prevDb.logs.slice(0, 300);
+
+          const enc = JSON.stringify(prevDb);
+          fs.writeFileSync(DB_FILE, enc, 'utf8');
+          try { fs.writeFileSync(BACKUP_FILE, enc, 'utf8'); } catch (e) {}
+          return sendJson(res, 200, {
+            ok: true,
+            extension: extRecord,
+            extensions: prevDb.weeklyConfig.extensions,
+            notifiedCount,
             updatedAt: tsMs,
             state: prevDb
           });

@@ -2125,21 +2125,76 @@ window.SMPL_FORMS_ADMIN = (function () {
                   </div>
 
                   <div class="lg:col-span-5 flex flex-col gap-2.5">
-                    
-                    <button onclick="SMPL_APP.handleBroadcastRoundRelease()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-display font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2">
+                    <button type="button" onclick="SMPL_APP.openRoundExtensionDialog()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-amber-500 hover:from-violet-500 hover:to-amber-400 text-white font-display font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2 border border-amber-300/40">
+                      <span>⏳ Przedłuż Kolejkę / Tydzień (Święta / Wyjątkowe)</span>
+                    </button>
+                    <button type="button" onclick="SMPL_APP.handleBroadcastRoundRelease()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-display font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2">
                       <span>📢 Puść Kolejkę / Wyślij Powiadomienie PUSH do Graczy</span>
                     </button>
-                    <button onclick="SMPL_APP.openMessengerReportModal()" class="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-display font-black text-xs uppercase shadow-lg">
+                    <button type="button" onclick="SMPL_APP.openMessengerReportModal()" class="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-display font-black text-xs uppercase shadow-lg">
                       📱 Wygeneruj i Skopiuj Raport Tygodnia na Messenger / FB
                     </button>
-                    <button onclick="SMPL_APP.openNextSeasonRolloverModal()" class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black text-xs uppercase shadow-xl">
+                    <button type="button" onclick="SMPL_APP.openNextSeasonRolloverModal()" class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black text-xs uppercase shadow-xl">
                       🚀 Zakończ Sezon ${state.season || 56} i Wystartuj Sezon ${(state.season || 56) + 1} (1-Klik)
                     </button>
-                    <button onclick="SMPL_APP.handleArchiveCurrentSeason()" class="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 font-display font-black text-xs uppercase shadow-lg">
+                    <button type="button" onclick="SMPL_APP.handleArchiveCurrentSeason()" class="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 font-display font-black text-xs uppercase shadow-lg">
                       📦 Zarchiwizuj Bieżącą Tabelę (Sezon ${state.season || 56}) do Historii
                     </button>
                   </div>
                 </div>
+                ${(() => {
+                  const activeExts = (window.SMPL_DB && typeof window.SMPL_DB.getRoundExtensions === 'function')
+                    ? window.SMPL_DB.getRoundExtensions(state)
+                    : [];
+                  if (!activeExts.length) return '';
+                  return `
+                    <div class="mt-5 pt-4 border-t border-white/10 space-y-2.5">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="text-xs font-display font-black uppercase text-amber-300">
+                          ⏳ AKTYWNE PRZEDŁUŻENIA KOLEJEK / TYGODNI (${activeExts.length})
+                        </span>
+                        ${
+                          activeExts.length > 1
+                            ? `<button type="button" onclick="SMPL_APP.handleRemoveRoundExtension('ALL')" class="px-2.5 py-1 rounded-lg bg-rose-950/70 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/40 text-[10px] font-display font-bold uppercase">
+                                 ✕ Zakończ wszystkie (${activeExts.length})
+                               </button>`
+                            : ''
+                        }
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        ${activeExts
+                          .map(
+                            (ex) => `
+                              <div class="p-3.5 rounded-xl bg-slate-950/90 border border-amber-400/40 flex flex-col justify-between gap-2" data-smpl-ext-card data-ext-date="${escapeHtml(ex.extendedUntilDate || '')}" data-ext-time="${escapeHtml(ex.extendedUntilTime || '23:59')}" data-ext-tz="${escapeHtml(ex.timeZone || 'Europe/Warsaw')}">
+                                <div>
+                                  <div class="flex flex-wrap items-center justify-between gap-1.5">
+                                    <span class="font-display font-black text-xs text-white uppercase">${escapeHtml(ex.scopeLabel || '')}</span>
+                                    <span class="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-200 text-[10px] font-display font-bold" data-smpl-ext-remaining>do ${escapeHtml(ex.extendedUntilDate || '')} ${escapeHtml(ex.extendedUntilTime || '23:59')}</span>
+                                  </div>
+                                  <div class="text-[11px] text-amber-300 font-bold mt-0.5">
+                                    📅 Nowy termin: ${escapeHtml(ex.extendedUntilDate || '')} • godz. ${escapeHtml(ex.extendedUntilTime || '23:59')}
+                                  </div>
+                                  <div class="text-[11px] text-slate-300 mt-0.5">${escapeHtml(ex.reason || '')}</div>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-1.5 pt-1">
+                                  <button type="button" onclick="SMPL_APP.copyRoundExtensionMessenger('${escapeHtml(ex.id)}')" class="px-2.5 py-1 rounded-lg bg-blue-600/25 hover:bg-blue-600 text-blue-200 hover:text-white border border-blue-400/35 text-[10px] font-display font-bold uppercase">
+                                    📋 Messenger
+                                  </button>
+                                  <button type="button" onclick="SMPL_APP.openRoundExtensionDialog({ editId: '${escapeHtml(ex.id)}' })" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-slate-950 border border-amber-400/40 text-[10px] font-display font-bold uppercase">
+                                    ✏️ Zmień
+                                  </button>
+                                  <button type="button" onclick="SMPL_APP.handleRemoveRoundExtension('${escapeHtml(ex.id)}')" class="px-2.5 py-1 rounded-lg bg-rose-950/70 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/40 text-[10px] font-display font-bold uppercase">
+                                    ✕ Zakończ
+                                  </button>
+                                </div>
+                              </div>
+                            `
+                          )
+                          .join('')}
+                      </div>
+                    </div>
+                  `;
+                })()}
               </div>
 
               <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -3776,6 +3831,44 @@ window.SMPL_FORMS_ADMIN = (function () {
               </button>
             </div>
           </div>
+
+          ${(() => {
+            const ovExts = (window.SMPL_DB && typeof window.SMPL_DB.getRoundExtensions === 'function')
+              ? window.SMPL_DB.getRoundExtensions(state)
+              : [];
+            return `
+              <div class="mt-3 p-3.5 rounded-2xl bg-slate-900/90 border ${ovExts.length > 0 ? 'border-amber-400/60' : 'border-white/10'} flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-start sm:items-center gap-2.5">
+                  <span class="text-xl">⏳</span>
+                  <div>
+                    <div class="font-display font-black text-xs sm:text-sm uppercase text-white">
+                      Przedłużanie Kolejki / Tygodnia (Święta, Wyjazdy, Awaria Gry)
+                      ${ovExts.length > 0 ? `<span class="ml-1.5 px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px]">AKTYWNE: ${ovExts.length}</span>` : ''}
+                    </div>
+                    <div class="text-[11px] text-slate-300 mt-0.5">
+                      ${
+                        ovExts.length > 0
+                          ? `Aktywne przedłużenie: <strong class="text-amber-300">${escapeHtml(ovExts[0].scopeLabel || '')}</strong> do <strong>${escapeHtml(ovExts[0].extendedUntilDate || '')} ${escapeHtml(ovExts[0].extendedUntilTime || '23:59')}</strong>`
+                          : 'Każdy Admin może jednym kliknięciem wydłużyć czas na rozegranie kolejki lub tygodnia i powiadomić graczy.'
+                      }
+                    </div>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+                  ${
+                    ovExts.length > 0
+                      ? `<button type="button" onclick="SMPL_APP.copyRoundExtensionMessenger('${escapeHtml(ovExts[0].id)}')" class="px-3 py-2 rounded-xl bg-blue-600/25 hover:bg-blue-600 text-blue-200 hover:text-white border border-blue-400/40 text-xs font-display font-bold uppercase transition">
+                           📋 Kopiuj post
+                         </button>`
+                      : ''
+                  }
+                  <button type="button" onclick="SMPL_APP.openRoundExtensionDialog(${ovExts.length > 0 ? `{ editId: '${escapeHtml(ovExts[0].id)}' }` : ''})" class="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-amber-500 hover:from-violet-500 hover:to-amber-400 text-white font-display font-black text-xs uppercase shadow-lg transition">
+                    ⏳ ${ovExts.length > 0 ? 'Edytuj / Dodaj Przedłużenie' : 'Przedłuż Kolejkę (1-Klik)'}
+                  </button>
+                </div>
+              </div>
+            `;
+          })()}
         </div>
 
         <!-- STUDIO WIELKIEGO ODLICZANIA DO STARTU SEZONU 56 (OBLICZONE Z EXCELA S55 + 2 TYG. PRZERWY) -->

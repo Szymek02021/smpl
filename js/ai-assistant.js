@@ -416,10 +416,10 @@ window.SMPL_AI = (function () {
     {
       id: 'KB_SCHEDULE_ARRANGE',
       category: 'Mecze & Wyniki',
-      title: 'Terminarz, 4 kolejki tygodniowo i umawianie meczu z rywalem',
-      keywords: ['kolejka', 'terminarz', 'tydzien', 'rywal', 'umowic', 'walkower', 'messenger', 'wolny', 'los'],
-      learnedPhrases: ['jak umowic sie na mecz', 'ile kolejek w tygodniu', 'rywal nie odpisuje', 'mam wolny los'],
-      answer: 'W każdej kolejce gramy od razu pełny dwumecz (1 u siebie + 1 na wyjeździe w tej samej kolejce) — standardowo 4 kolejki na tydzień (np. Tydzień 2 to Kolejki 5–8). Kliknij **„💬 Napisz na Messengerze”** lub **„📅 Kiedy Gramy?”** przy spotkaniu, aby uzgodnić termin. Jeśli rywal nie odpowiada w terminie, zgłoś Spór VAR / W.O. w Terminarzu i **obowiązkowo załącz SS dlaczego** (screen z Messengera). Mecze przeciwko „WOLNY LOS” dają automatyczne walkowery 2:0 i 0:2 (+3 PKT za mecz).'
+      title: 'Terminarz, 4 kolejki tygodniowo, przedłużanie kolejek i umawianie meczu',
+      keywords: ['kolejka', 'terminarz', 'tydzien', 'rywal', 'umowic', 'walkower', 'messenger', 'wolny', 'los', 'przedluzenie', 'przedluzyc', 'swieta', 'termin'],
+      learnedPhrases: ['jak umowic sie na mecz', 'ile kolejek w tygodniu', 'rywal nie odpisuje', 'mam wolny los', 'czy kolejka jest przedluzona', 'przedluzenie kolejki swieta'],
+      answer: 'W każdej kolejce gramy od razu pełny dwumecz (1 u siebie + 1 na wyjeździe w tej samej kolejce) — standardowo 4 kolejki na tydzień (np. Tydzień 2 to Kolejki 5–8). W razie Świąt, wyjazdów lub awarii gry Administracja może **przedłużyć termin kolejki lub tygodnia** — aktywny baner z nowym terminem zobaczysz od razu na górze zakładki **„Terminarz”** oraz w powiadomieniach 🔔! Kliknij **„💬 Napisz na Messengerze”** lub **„📅 Kiedy Gramy?”** przy spotkaniu, aby uzgodnić termin. Jeśli rywal nie odpowiada w terminie, zgłoś Spór VAR / W.O. w Terminarzu i **obowiązkowo załącz SS dlaczego**. Mecze przeciwko „WOLNY LOS” dają automatyczne walkowery 2:0 i 0:2 (+3 PKT za mecz).'
     },
     {
       id: 'KB_SEASON_ROLLOVER',
@@ -1004,6 +1004,18 @@ window.SMPL_AI = (function () {
     var seasonNum = state.season || (state.meta && state.meta.season) || 'SMPL';
     var curWeek = (state.weeklyConfig && state.weeklyConfig.currentWeek) || (state.meta && state.meta.currentWeek) || 1;
     lines.push('SEZON: ' + String(seasonNum) + ' | Aktualna kolejka/tydzień: ' + String(curWeek));
+    if (state.weeklyConfig && Array.isArray(state.weeklyConfig.extensions) && state.weeklyConfig.extensions.length > 0) {
+      var extInfo = [];
+      for (var ei = 0; ei < state.weeklyConfig.extensions.length; ei++) {
+        var exObj = state.weeklyConfig.extensions[ei];
+        if (exObj && exObj.enabled !== false && exObj.extendedUntilDate) {
+          extInfo.push((exObj.scopeLabel || 'Kolejka') + ' do ' + exObj.extendedUntilDate + ' ' + (exObj.extendedUntilTime || '23:59') + ' (' + (exObj.reason || '') + ')');
+        }
+      }
+      if (extInfo.length > 0) {
+        lines.push('AKTYWNE PRZEDŁUŻENIA TERMINU KOLEJKI: ' + extInfo.join(' | '));
+      }
+    }
 
     var playerById = {};
     var players = Array.isArray(state.players) ? state.players : [];

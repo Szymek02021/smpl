@@ -3145,6 +3145,21 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_18',
+      version: 'V2.18',
+      date: '2026-11-25',
+      category: 'ULEPSZENIA',
+      title: 'Oficjalne Przedłużanie Kolejek i Tygodni (Święta, Wyjazdy, Okoliczności Wyjątkowe)!',
+      summary: 'Dodaliśmy oficjalny system przedłużania terminu kolejek oraz całych tygodni rozgrywkowych na wypadek Świąt, długiego weekendu, wyjazdów lub awarii serwerów gry — od razu z żywym licznikiem na banerze w Terminarzu i automatycznym powiadomieniem dla graczy!',
+      highlights: [
+        'Gdy Administracja przedłuży aktywny Tydzień Rozgrywkowy lub wybraną Kolejkę (dla wszystkich lig lub pojedynczej dywizji), na górze zakładki „Terminarz” oraz we Wskaźniku Zaległości wyświetla się wyraźny baner z nowym terminem, powodem (np. 🎄 Święta) i odliczaniem czasu pozostałego.',
+        'Wszyscy aktywni zawodnicy objęci przedłużeniem automatycznie otrzymują powiadomienie w dzwoneczku 🔔 z bezpośrednim przejściem jednym kliknięciem do Terminarza.',
+        'Przedłużone tygodnie i kolejki są dodatkowo oznaczone ikoną ⏳/🕒 na pasku filtrowania oraz automatycznie uwzględniane w cotygodniowym Raporcie na Messenger / FB i u asystentki AI Vanessy.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_17',
       version: 'V2.17',
       date: '2026-11-23',

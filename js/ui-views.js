@@ -993,21 +993,40 @@ window.SMPL_VIEWS = (function () {
         return String(a.id || '').localeCompare(String(b.id || ''));
       });
 
+    const allLeagueExtensions = (window.SMPL_DB && typeof window.SMPL_DB.getMatchingRoundExtensions === 'function')
+      ? window.SMPL_DB.getMatchingRoundExtensions(state, leagueId, null, null)
+      : [];
+    const activeWeekExtensions = (window.SMPL_DB && typeof window.SMPL_DB.getMatchingRoundExtensions === 'function')
+      ? window.SMPL_DB.getMatchingRoundExtensions(state, leagueId, null, Number(currentLeagueWeek))
+      : [];
+    const currentViewExtensions = (window.SMPL_DB && typeof window.SMPL_DB.getMatchingRoundExtensions === 'function')
+      ? window.SMPL_DB.getMatchingRoundExtensions(
+          state,
+          leagueId,
+          activeWeek ? null : (activeRound === 'ALL' ? null : Number(activeRound)),
+          activeWeek ? Number(activeWeek) : null
+        )
+      : [];
+    const visibleExtensions = currentViewExtensions.length > 0 ? currentViewExtensions : activeWeekExtensions;
+
     const weeksButtons = [];
     for (let w = 1; w <= totalWeeks; w++) {
       const wStart = (w - 1) * rpw + 1;
       const wEnd = Math.min(maxRound, w * rpw);
       const isSelectedWeek = Number(activeWeek) === w;
       const isCurrentActiveWeek = Number(currentLeagueWeek) === w;
+      const isExtendedWeek = allLeagueExtensions.some((ex) => ex.scopeType === 'ALL_ACTIVE' || (ex.scopeType === 'WEEK' && Number(ex.weekNum) === w));
       weeksButtons.push(`
-        <button onclick="SMPL_APP.setScheduleWeek(${w})" class="px-3 py-1.5 rounded-xl border text-xs font-display font-bold transition flex-shrink-0 ${
+        <button type="button" onclick="SMPL_APP.setScheduleWeek(${w})" class="px-3 py-1.5 rounded-xl border text-xs font-display font-bold transition flex-shrink-0 ${
           isSelectedWeek
             ? 'btn-league border-transparent scale-105'
+            : isExtendedWeek
+            ? 'bg-amber-500/20 text-amber-200 border-amber-400/60'
             : isCurrentActiveWeek
             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/50'
             : 'bg-slate-950/90 text-slate-300 border-white/10 hover:border-white/30'
         }">
-          📅 Tydzień ${w} (K${wStart}–K${wEnd})${isCurrentActiveWeek ? ' • AKTYWNY' : ''}
+          📅 Tydzień ${w} (K${wStart}–K${wEnd})${isCurrentActiveWeek ? ' • AKTYWNY' : ''}${isExtendedWeek ? ' ⏳' : ''}
         </button>
       `);
     }
@@ -1018,19 +1037,23 @@ window.SMPL_VIEWS = (function () {
       const hasPending = roundMatches.some((m) => m.status === 'PENDING');
       const allPlayed = roundMatches.length > 0 && roundMatches.every((m) => m.status === 'APPROVED' || m.status === 'WALKOVER');
       const isSelected = !activeWeek && Number(activeRound) === r;
+      const rWeek = Math.ceil(r / rpw);
+      const isExtendedRound = allLeagueExtensions.some(
+        (ex) => ex.scopeType === 'ALL_ACTIVE' || (ex.scopeType === 'ROUND' && Number(ex.roundNum) === r) || (ex.scopeType === 'WEEK' && Number(ex.weekNum) === rWeek)
+      );
 
       let btnClass = 'bg-slate-900/90 text-slate-300 border-white/10 hover:border-white/30';
       if (isSelected) {
         btnClass = 'btn-league border-transparent scale-105';
-      } else if (hasPending) {
+      } else if (hasPending || isExtendedRound) {
         btnClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
       } else if (allPlayed) {
         btnClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
       }
 
       roundsButtons.push(`
-        <button onclick="SMPL_APP.setScheduleRound(${r})" class="px-2.5 py-1.5 rounded-lg border text-xs font-display font-bold transition flex-shrink-0 ${btnClass}">
-          K${r}${hasPending ? ' ⏳' : allPlayed ? ' ✓' : ''}
+        <button type="button" onclick="SMPL_APP.setScheduleRound(${r})" class="px-2.5 py-1.5 rounded-lg border text-xs font-display font-bold transition flex-shrink-0 ${btnClass}">
+          K${r}${hasPending ? ' ⏳' : isExtendedRound ? ' 🕒' : allPlayed ? ' ✓' : ''}
         </button>
       `);
     }
@@ -1095,6 +1118,13 @@ window.SMPL_VIEWS = (function () {
               Wszystkie Kolejki
             </button>
             ${
+              isAdmin
+                ? `<button type="button" onclick="SMPL_APP.openRoundExtensionDialog({ leagueScope: '${escapeHtml(leagueId)}', roundNum: ${activeRound !== 'ALL' ? Number(activeRound) : defaultRoundForWeek}, weekNum: ${activeWeek ? Number(activeWeek) : Number(currentLeagueWeek)} })" class="px-3 py-2 rounded-xl text-xs font-display font-bold uppercase whitespace-nowrap bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-slate-950 border border-amber-400/50 transition" title="Przedłuż termin kolejki lub tygodnia (np. Święta, wyjazdy, awaria gry)">
+                     ⏳ Przedłuż Kolejkę
+                   </button>`
+                : ''
+            }
+            ${
               isAdmin && leagueMatches.length > 0
                 ? `<button type="button" onclick="SMPL_APP.adminClearSchedule('${leagueId}')" class="px-3 py-2 rounded-xl text-xs font-display font-bold uppercase whitespace-nowrap bg-rose-950/60 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/40 transition" title="Wyzeruj całkowicie terminarz tej ligi do nowego wygenerowania">
                      🗑️ Wyzeruj
@@ -1119,13 +1149,74 @@ window.SMPL_VIEWS = (function () {
       </div>
 
       ${
+        visibleExtensions.length > 0
+          ? `<div class="space-y-3 mb-5">
+               ${visibleExtensions
+                 .map((ext) => {
+                   const tagMap = {
+                     HOLIDAYS: { badge: '🎄 ŚWIĘTA / OKOLICZNOŚCI WYJĄTKOWE', border: 'border-amber-400/60', pill: 'bg-amber-400/20 text-amber-200 border-amber-400/40' },
+                     WEEKEND: { badge: '🐣 DŁUGI WEEKEND / WYJAZDY', border: 'border-sky-400/60', pill: 'bg-sky-400/20 text-sky-200 border-sky-400/40' },
+                     TECH: { badge: '🛠️ PRZERWA TECHNICZNA / AWARIA GRY', border: 'border-rose-400/60', pill: 'bg-rose-400/20 text-rose-200 border-rose-400/40' },
+                     ARREARS: { badge: '⚡ DOGRYWKA ZALEGŁOŚCI', border: 'border-purple-400/60', pill: 'bg-purple-400/20 text-purple-200 border-purple-400/40' },
+                     CUSTOM: { badge: '⏳ PRZEDŁUŻONY TERMIN KOLEJKI', border: 'border-amber-400/60', pill: 'bg-amber-400/20 text-amber-200 border-amber-400/40' }
+                   };
+                   const tg = tagMap[String(ext.occasionTag || 'CUSTOM').toUpperCase()] || tagMap.CUSTOM;
+                   const dtIsoAttr = escapeHtml((ext.extendedUntilDate || '') + 'T' + (ext.extendedUntilTime || '23:59') + ':00');
+                   const humanDt = (window.SMPL_APP && typeof window.SMPL_APP.formatRoundExtensionDateLabel === 'function')
+                     ? window.SMPL_APP.formatRoundExtensionDateLabel(ext.extendedUntilDate, ext.extendedUntilTime, ext.timeZone)
+                     : ((ext.extendedUntilDate || '') + ' • ' + (ext.extendedUntilTime || '23:59'));
+                   return `
+                     <div class="smpl-round-ext-banner glass-panel rounded-2xl p-4 sm:p-5 border-2 ${tg.border} bg-slate-950/90 shadow-xl" data-smpl-ext-card data-ext-date="${escapeHtml(ext.extendedUntilDate || '')}" data-ext-time="${escapeHtml(ext.extendedUntilTime || '23:59')}" data-ext-tz="${escapeHtml(ext.timeZone || 'Europe/Warsaw')}">
+                       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                         <div class="space-y-1">
+                           <div class="flex flex-wrap items-center gap-2">
+                             <span class="px-2.5 py-0.5 rounded-full border text-[10px] font-display font-black uppercase ${tg.pill}">
+                               ${tg.badge}
+                             </span>
+                             <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-[10px] font-display font-bold uppercase" data-smpl-ext-remaining>
+                               ⏳ Liczenie czasu...
+                             </span>
+                           </div>
+                           <div class="font-display font-black text-sm sm:text-base text-white uppercase">
+                             ${escapeHtml(ext.scopeLabel || '')} — nowy termin: <time datetime="${dtIsoAttr}" class="text-amber-300 underline decoration-amber-400/50">${escapeHtml(humanDt)}</time>
+                           </div>
+                           <p class="text-xs text-slate-200 leading-relaxed">
+                             💬 ${escapeHtml(ext.reason || '')}
+                             ${ext.updatedBy ? `<span class="text-slate-400 ml-1">(ustawił Admin: ${escapeHtml(ext.updatedBy)})</span>` : ''}
+                           </p>
+                         </div>
+                         ${
+                           isAdmin
+                             ? `<div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+                                  <button type="button" onclick="SMPL_APP.copyRoundExtensionMessenger('${escapeHtml(ext.id)}')" class="px-3 py-1.5 rounded-xl bg-blue-600/25 hover:bg-blue-600 text-blue-200 hover:text-white border border-blue-400/40 text-[11px] font-display font-bold uppercase transition">
+                                    📋 Kopiuj na Messenger
+                                  </button>
+                                  <button type="button" onclick="SMPL_APP.openRoundExtensionDialog({ editId: '${escapeHtml(ext.id)}' })" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-slate-950 border border-amber-400/45 text-[11px] font-display font-bold uppercase transition">
+                                    ✏️ Zmień termin
+                                  </button>
+                                  <button type="button" onclick="SMPL_APP.handleRemoveRoundExtension('${escapeHtml(ext.id)}')" class="px-3 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/40 text-[11px] font-display font-bold uppercase transition">
+                                    ✕ Zakończ
+                                  </button>
+                                </div>`
+                             : ''
+                         }
+                       </div>
+                     </div>
+                   `;
+                 })
+                 .join('')}
+             </div>`
+          : ''
+      }
+
+      ${
         isLoggedInPlayer
           ? `<div class="glass-panel rounded-2xl p-4 sm:px-5 mb-5 border ${myWeekPendingList.length > 0 ? 'border-amber-400/40' : 'border-emerald-400/40'} flex flex-wrap items-center justify-between gap-3">
                <div class="flex items-center gap-2.5">
                  <span class="text-xl">${myWeekPendingList.length > 0 ? '⏳' : '✅'}</span>
                  <div>
                    <div class="font-display font-black text-xs sm:text-sm uppercase text-white">
-                     Wskaźnik Zaległości — Tydzień #${currentLeagueWeek} (K${myWeekStart}–K${myWeekEnd})
+                     Wskaźnik Zaległości — Tydzień #${currentLeagueWeek} (K${myWeekStart}–K${myWeekEnd})${activeWeekExtensions.length > 0 ? ` <span class="text-amber-300">• TERMIN PRZEDŁUŻONY DO ${escapeHtml(activeWeekExtensions[0].extendedUntilDate)} ${escapeHtml(activeWeekExtensions[0].extendedUntilTime || '23:59')}</span>` : ''}
                    </div>
                    <div class="text-xs text-slate-300">
                      ${

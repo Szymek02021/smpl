@@ -7007,6 +7007,270 @@ state = enrichFromArchive(data.state);
     return state.portalSettings.seasonCountdown;
   }
 
+  function formatRoundExtensionScopeLabel(ext, customState) {
+    const srcState = customState || state;
+    const item = ext && typeof ext === 'object' ? ext : {};
+    const rpw = Math.max(1, Number((srcState && srcState.weeklyConfig && srcState.weeklyConfig.roundsPerWeek) || 4));
+    const curW = Math.max(1, Number((srcState && srcState.weeklyConfig && srcState.weeklyConfig.currentWeek) || 1));
+    const scopeType = String(item.scopeType || 'WEEK').toUpperCase();
+    const weekNum = Math.min(60, Math.max(1, Math.round(Number(item.weekNum || curW))));
+    const roundNum = Math.min(60, Math.max(1, Math.round(Number(item.roundNum || ((curW - 1) * rpw + 1)))));
+    const leagueScope = String(item.leagueScope || 'ALL').toUpperCase();
+    let leagueSuffix = 'Wszystkie ligi';
+    if (leagueScope !== 'ALL') {
+      leagueSuffix = (srcState && srcState.leagues && srcState.leagues[leagueScope] && srcState.leagues[leagueScope].name)
+        ? String(srcState.leagues[leagueScope].name)
+        : leagueScope;
+    }
+    if (scopeType === 'WEEK') {
+      const rStart = (weekNum - 1) * rpw + 1;
+      const rEnd = weekNum * rpw;
+      return 'Tydzień #' + weekNum + ' (Kolejki K' + rStart + '–K' + rEnd + ') • ' + leagueSuffix;
+    }
+    if (scopeType === 'ROUND') {
+      return 'Kolejka #' + roundNum + ' • ' + leagueSuffix;
+    }
+    return 'Wszystkie aktywne i zaległe kolejki • ' + leagueSuffix;
+  }
+
+  function getRoundExtensions(customState) {
+    const srcState = customState || state;
+    const rawList = (srcState && srcState.weeklyConfig && Array.isArray(srcState.weeklyConfig.extensions))
+      ? srcState.weeklyConfig.extensions
+      : [];
+    return rawList
+      .filter(function (ex) {
+        return ex && typeof ex === 'object' && ex.enabled !== false && /^\d{4}-\d{2}-\d{2}$/.test(String(ex.extendedUntilDate || ''));
+      })
+      .map(function (ex) {
+        const copy = Object.assign({}, ex);
+        copy.scopeType = String(copy.scopeType || 'WEEK').toUpperCase();
+        copy.leagueScope = String(copy.leagueScope || 'ALL').toUpperCase();
+        copy.occasionTag = String(copy.occasionTag || 'CUSTOM').toUpperCase();
+        copy.extendedUntilTime = /^\d{2}:\d{2}$/.test(String(copy.extendedUntilTime || '')) ? String(copy.extendedUntilTime) : '23:59';
+        copy.timeZone = String(copy.timeZone || 'Europe/Warsaw');
+        if (!copy.scopeLabel) {
+          copy.scopeLabel = formatRoundExtensionScopeLabel(copy, srcState);
+        }
+        return copy;
+      });
+  }
+
+  function getMatchingRoundExtensions(customState, leagueId, roundNum, weekNum) {
+    const srcState = customState || state;
+    const list = getRoundExtensions(srcState);
+    if (!list.length) return [];
+    const rpw = Math.max(1, Number((srcState && srcState.weeklyConfig && srcState.weeklyConfig.roundsPerWeek) || 4));
+    const lid = leagueId ? String(leagueId).toUpperCase() : '';
+    const rNum = roundNum && roundNum !== 'ALL' ? Number(roundNum) : 0;
+    const wNum = weekNum ? Number(weekNum) : (rNum > 0 ? Math.ceil(rNum / rpw) : 0);
+    return list.filter(function (ex) {
+      if (lid && lid !== 'ALL' && ex.leagueScope !== 'ALL' && ex.leagueScope !== lid) return false;
+      if (ex.scopeType === 'ALL_ACTIVE') return true;
+      if (ex.scopeType === 'WEEK') {
+        if (!wNum && !rNum) return true;
+        if (wNum > 0 && Number(ex.weekNum) === wNum) return true;
+        if (rNum > 0) {
+          const ws = (Number(ex.weekNum) - 1) * rpw + 1;
+          const we = Number(ex.weekNum) * rpw;
+          if (rNum >= ws && rNum <= we) return true;
+        }
+        return false;
+      }
+      if (ex.scopeType === 'ROUND') {
+        if (!wNum && !rNum) return true;
+        if (rNum > 0 && Number(ex.roundNum) === rNum) return true;
+        if (!rNum && wNum > 0) {
+          const ws2 = (wNum - 1) * rpw + 1;
+          const we2 = wNum * rpw;
+          if (Number(ex.roundNum) >= ws2 && Number(ex.roundNum) <= we2) return true;
+        }
+        return false;
+      }
+      return true;
+    });
+  }
+
+  function buildRoundExtensionMessengerText(ext, customState) {
+    const srcState = customState || state;
+    const item = ext && typeof ext === 'object' ? ext : {};
+    const seasonNum = (srcState && srcState.season) || 56;
+    const tagIcons = {
+      HOLIDAYS: '🎄 ŚWIĘTA / OKOLICZNOŚCI WYJĄTKOWE',
+      WEEKEND: '🐣 DŁUGI WEEKEND / WYJAZDY',
+      TECH: '🛠️ PRZERWA TECHNICZNA / SERWERY',
+      ARREARS: '⚡ DOGRYWKA ZALEGŁOŚCI',
+      CUSTOM: '⏳ PRZEDŁUŻENIE TERMINU KOLEJKI'
+    };
+    const tagHdr = tagIcons[String(item.occasionTag || 'CUSTOM').toUpperCase()] || tagIcons.CUSTOM;
+    const scopeLbl = item.scopeLabel || formatRoundExtensionScopeLabel(item, srcState);
+    return [
+      '📢 KOMUNIKAT ADMINISTRACJI SMPL (SEZON ' + seasonNum + ') — ' + tagHdr,
+      '⏳ Zakres: ' + scopeLbl,
+      '📅 Nowy ostateczny termin: ' + (item.extendedUntilDate || '') + ' • godz. ' + (item.extendedUntilTime || '23:59'),
+      '💬 Powód: ' + (item.reason || 'Dodatkowy czas na rozegranie spotkań.'),
+      '🤝 Umówcie się spokojnie z rywalami w zakładce Terminarz („Kiedy Gramy?”) i wrzućcie oba screeny wyników!'
+    ].join('\n');
+  }
+
+  function setRoundExtension(payload, adminName = 'Szymon Komenda') {
+    assertAdminAuthenticated();
+    const inp = payload && typeof payload === 'object' ? payload : {};
+    if (!state.weeklyConfig || typeof state.weeklyConfig !== 'object') {
+      state.weeklyConfig = { roundsPerWeek: 4, currentWeek: 1, totalWeeks: 4, extensions: [] };
+    }
+    const prevExtensions = Array.isArray(state.weeklyConfig.extensions)
+      ? JSON.parse(JSON.stringify(state.weeklyConfig.extensions))
+      : [];
+
+    const allowedScopes = ['WEEK', 'ROUND', 'ALL_ACTIVE'];
+    let scopeType = String(inp.scopeType || 'WEEK').trim().toUpperCase();
+    if (allowedScopes.indexOf(scopeType) === -1) scopeType = 'WEEK';
+
+    const rpw = Math.max(1, Number(state.weeklyConfig.roundsPerWeek || 4));
+    const curW = Math.max(1, Number(state.weeklyConfig.currentWeek || 1));
+    let weekNum = Math.round(Number(inp.weekNum !== undefined ? inp.weekNum : curW));
+    if (!Number.isFinite(weekNum) || weekNum < 1 || weekNum > 60) weekNum = curW;
+
+    let roundNum = Math.round(Number(inp.roundNum !== undefined ? inp.roundNum : ((curW - 1) * rpw + 1)));
+    if (!Number.isFinite(roundNum) || roundNum < 1 || roundNum > 60) roundNum = 1;
+
+    let leagueScope = String(inp.leagueScope || 'ALL').trim().toUpperCase();
+    if (leagueScope !== 'ALL' && !/^L\d{1,2}$/.test(leagueScope)) leagueScope = 'ALL';
+
+    const extendedUntilDate = String(inp.extendedUntilDate || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(extendedUntilDate)) {
+      throw new Error('Wybierz prawidłową datę nowego terminu kolejki (RRRR-MM-DD).');
+    }
+    const extendedUntilTime = /^\d{2}:\d{2}$/.test(String(inp.extendedUntilTime || '').trim())
+      ? String(inp.extendedUntilTime).trim()
+      : '23:59';
+    const timeZone = String(inp.timeZone || 'Europe/Warsaw').trim() || 'Europe/Warsaw';
+    const allowedTags = ['HOLIDAYS', 'WEEKEND', 'TECH', 'ARREARS', 'CUSTOM'];
+    let occasionTag = String(inp.occasionTag || 'HOLIDAYS').trim().toUpperCase();
+    if (allowedTags.indexOf(occasionTag) === -1) occasionTag = 'CUSTOM';
+
+    const cleanReason = (String(inp.reason || '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/[\r\n]+/g, ' ')
+      .trim() || 'Przedłużenie terminu kolejki ze względu na okoliczności wyjątkowe.').slice(0, 280);
+
+    const extId = scopeType === 'WEEK'
+      ? ('EXT_WEEK_' + weekNum + '_' + leagueScope)
+      : (scopeType === 'ROUND' ? ('EXT_ROUND_' + roundNum + '_' + leagueScope) : ('EXT_ALL_ACTIVE_' + leagueScope));
+
+    const extRecord = {
+      id: extId,
+      enabled: true,
+      scopeType: scopeType,
+      weekNum: weekNum,
+      roundNum: roundNum,
+      leagueScope: leagueScope,
+      occasionTag: occasionTag,
+      reason: cleanReason,
+      extendedUntilDate: extendedUntilDate,
+      extendedUntilTime: extendedUntilTime,
+      timeZone: timeZone,
+      updatedBy: adminName,
+      updatedAt: nowFormatted()
+    };
+    extRecord.scopeLabel = formatRoundExtensionScopeLabel(extRecord, state);
+
+    const existingFiltered = (state.weeklyConfig.extensions || []).filter(function (ex) {
+      return ex && String(ex.id || '') !== extId;
+    });
+    state.weeklyConfig.extensions = [extRecord].concat(existingFiltered).slice(0, 20);
+
+    const notifyPlayers = inp.notifyPlayers !== undefined ? Boolean(inp.notifyPlayers) : true;
+    let notifiedCount = 0;
+    const nowStr = nowFormatted();
+    const tsMs = Date.now();
+    if (notifyPlayers && Array.isArray(state.players)) {
+      state.players.forEach(function (pl, idx) {
+        if (!pl || pl.isPlaceholder || pl.gdprDeleted || pl.active === false) return;
+        const pLid = String(pl.leagueId || '');
+        if (!pLid || pLid === 'POOL') return;
+        if (leagueScope !== 'ALL' && pLid !== leagueScope) return;
+        if (!Array.isArray(pl.notifications)) pl.notifications = [];
+        pl.notifications.unshift({
+          id: 'NOTIF_EXT_' + tsMs + '_' + idx,
+          type: 'ROUND_EXTENDED',
+          time: nowStr,
+          read: false,
+          title: '⏳ Przedłużono termin: ' + extRecord.scopeLabel,
+          text: 'Nowy termin rozegrania meczów: ' + extendedUntilDate + ' ' + extendedUntilTime + ' — ' + cleanReason + ' (Admin: ' + adminName + ')'
+        });
+        if (pl.notifications.length > 40) pl.notifications = pl.notifications.slice(0, 40);
+        notifiedCount += 1;
+      });
+    }
+
+    addLog(
+      'ROUND_EXTENDED',
+      '⏳ Admin ' + adminName + ' przedłużył termin (' + extRecord.scopeLabel + ') do ' + extendedUntilDate + ' ' + extendedUntilTime + ' — Powód: ' + cleanReason + (notifyPlayers ? (' (powiadomiono ' + notifiedCount + ' graczy)') : '') + '.'
+    );
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {}
+
+    sendAtomicAdminAction(
+      'admin_set_round_extension',
+      Object.assign({ op: 'set', notifyPlayers: notifyPlayers }, extRecord),
+      function () {
+        if (state && state.weeklyConfig) {
+          state.weeklyConfig.extensions = prevExtensions;
+        }
+      },
+      { extension: extRecord, extensions: state.weeklyConfig.extensions, notifiedCount: notifiedCount },
+      function (err) {
+        if (err) {
+          syncToBackend();
+        }
+      }
+    );
+    return { extension: extRecord, notifiedCount: notifiedCount };
+  }
+
+  function removeRoundExtension(extensionId, adminName = 'Szymon Komenda') {
+    assertAdminAuthenticated();
+    if (!state.weeklyConfig || !Array.isArray(state.weeklyConfig.extensions)) {
+      return [];
+    }
+    const targetId = String(extensionId || '').trim();
+    const prevExtensions = JSON.parse(JSON.stringify(state.weeklyConfig.extensions));
+    const removedLabels = [];
+    state.weeklyConfig.extensions = state.weeklyConfig.extensions.filter(function (ex) {
+      if (!ex) return false;
+      if (targetId === 'ALL' || (targetId && String(ex.id || '') === targetId)) {
+        removedLabels.push(String(ex.scopeLabel || ex.id || ''));
+        return false;
+      }
+      return true;
+    });
+    const lblTxt = removedLabels.length ? removedLabels.join(', ') : (targetId === 'ALL' ? 'wszystkie kolejki' : targetId);
+    addLog('ROUND_EXTENSION_CLEARED', '⏹️ Admin ' + adminName + ' zakończył przedłużenie terminu (' + lblTxt + ').');
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {}
+
+    sendAtomicAdminAction(
+      'admin_set_round_extension',
+      { op: 'remove', id: targetId || 'ALL' },
+      function () {
+        if (state && state.weeklyConfig) {
+          state.weeklyConfig.extensions = prevExtensions;
+        }
+      },
+      { extensions: state.weeklyConfig.extensions },
+      function (err) {
+        if (err) {
+          syncToBackend();
+        }
+      }
+    );
+    return state.weeklyConfig.extensions;
+  }
+
   function normalizeUpdateVersionClient(raw) {
     if (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.normalizeUpdateVersion === 'function') {
       return window.SMPL_STUDIO.normalizeUpdateVersion(raw);
@@ -8778,6 +9042,7 @@ state = enrichFromArchive(data.state);
     state.seasonName = `Sezon ${targetSeason} — Czysty Start (Puste Tabele do Samodzielnego Obsadzenia)`;
     if (state.weeklyConfig) {
       state.weeklyConfig.currentWeek = 1;
+      state.weeklyConfig.extensions = [];
     }
     if (state.leagues) {
       Object.keys(state.leagues).forEach((lid) => {
@@ -9025,6 +9290,7 @@ state = enrichFromArchive(data.state);
     state.seasonName = `Sezon ${targetSeason} — Oficjalny Start Rozgrywek (Czysta Tabela 0:0)`;
     if (state.weeklyConfig) {
       state.weeklyConfig.currentWeek = 1;
+      state.weeklyConfig.extensions = [];
     }
     (state.players || []).forEach((p) => {
       p.penaltyPoints = 0;
@@ -11806,6 +12072,12 @@ state = enrichFromArchive(data.state);
     restoreServerSnapshot,
     verifyMatchScreenshotAI,
     setCurrentWeek,
+    getRoundExtensions,
+    getMatchingRoundExtensions,
+    formatRoundExtensionScopeLabel,
+    buildRoundExtensionMessengerText,
+    setRoundExtension,
+    removeRoundExtension,
     deletePlayerAccountGDPR,
     updatePlayer,
     deductPlayerPoints,

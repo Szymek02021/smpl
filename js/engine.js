@@ -1222,11 +1222,29 @@ window.SMPL_ENGINE = (function () {
       (m) => m.leagueId === leagueId && m.round >= range.startRound && m.round <= range.endRound
     );
     const weekPlayed = weekMatches.filter((m) => m.status === 'APPROVED' || m.status === 'WALKOVER').length;
+    const rawExts = (state && state.weeklyConfig && Array.isArray(state.weeklyConfig.extensions))
+      ? state.weeklyConfig.extensions
+      : [];
+    const activeExt = rawExts.find((ex) => {
+      if (!ex || ex.enabled === false) return false;
+      const lScope = String(ex.leagueScope || 'ALL').toUpperCase();
+      if (lScope !== 'ALL' && lScope !== String(leagueId || '').toUpperCase()) return false;
+      const sType = String(ex.scopeType || 'WEEK').toUpperCase();
+      if (sType === 'ALL_ACTIVE') return true;
+      if (sType === 'WEEK') return Number(ex.weekNum) === Number(w);
+      if (sType === 'ROUND') return Number(ex.roundNum) >= range.startRound && Number(ex.roundNum) <= range.endRound;
+      return false;
+    });
 
     const lines = [
       '🏆 RAPORT LIGOWY SCORE MATCH LIGA — ' + lObj.name.toUpperCase() + ' (SEZON ' + (state.season || 56) + ') 🏆',
       '📅 Tydzień Rozgrywkowy #' + w + ' (Kolejki ' + range.startRound + '–' + range.endRound + ' • gramy 4 kolejki na tydzień)',
-      '📊 Postęp tygodnia: ' + weekPlayed + ' / ' + weekMatches.length + ' rozegranych spotkań',
+      '📊 Postęp tygodnia: ' + weekPlayed + ' / ' + weekMatches.length + ' rozegranych spotkań'
+    ];
+    if (activeExt) {
+      lines.push('⏳ UWAGA — PRZEDŁUŻONY TERMIN: do ' + (activeExt.extendedUntilDate || '') + ' godz. ' + (activeExt.extendedUntilTime || '23:59') + ' (' + (activeExt.reason || 'okoliczności wyjątkowe') + ')');
+    }
+    lines.push(
       '----------------------------------------',
       '🥇 1. ' + (p1 ? p1.name + ' — ' + p1.PKT + ' pkt (Bilans ' + p1.BZ + ':' + p1.BS + ')' : 'Brak'),
       '🥈 2. ' + (p2 ? p2.name + ' — ' + p2.PKT + ' pkt (Bilans ' + p2.BZ + ':' + p2.BS + ')' : 'Brak'),
@@ -1237,7 +1255,7 @@ window.SMPL_ENGINE = (function () {
       '🚨 Strefa Spadkowa: ' + relPlayers.map((r) => r.position + '. ' + r.name + ' (' + r.PKT + ' pkt)').join(', '),
       '----------------------------------------',
       '🔔 Przypomnienie: Gospodarz (lewa strona w terminarzu) zaprasza Gościa! Wyniki wraz ze screenem wrzucamy bezpośrednio w portalu Score Match Liga.'
-    ];
+    );
 
     return lines.join('\n');
   }
