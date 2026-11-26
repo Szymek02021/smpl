@@ -1082,21 +1082,31 @@ window.SMPL_VIEWS = (function () {
         )
       : [];
 
+    const activeDeadlineInfo = (window.SMPL_DB && typeof window.SMPL_DB.getActiveDeadlineInfo === 'function')
+      ? window.SMPL_DB.getActiveDeadlineInfo(state, leagueId, activeRound !== 'ALL' ? Number(activeRound) : defaultRoundForWeek)
+      : { deadlineDate: 'Czwartek', deadlineTime: '23:59', isExtended: false, isPassed: false };
+
     return `
       <!-- Panel sterowania terminarzem (System 4 Kolejki na Tydzień) -->
       <div class="matchday-showcase-banner rounded-3xl p-5 sm:p-6 mb-6">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
           <div>
-            <div class="inline-flex items-center gap-2 mb-1">
+            <div class="flex flex-wrap items-center gap-2 mb-1.5" data-smpl-ext-card data-ext-date="${escapeHtml(activeDeadlineInfo.deadlineDate || '')}" data-ext-time="${escapeHtml(activeDeadlineInfo.deadlineTime || '23:59')}" data-ext-tz="Europe/Warsaw">
               <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-display font-bold uppercase">
                 ⏱️ SYSTEM ROZGRYWEK: 4 KOLEJKI NA TYDZIEŃ (AKTYWNY TYDZIEŃ #${currentLeagueWeek})
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/45 text-amber-200 text-[10px] font-display font-black uppercase">
+                ⏰ KONIEC KOLEJKI: ${activeDeadlineInfo.isExtended ? `PRZEDŁUŻONO DO ${escapeHtml(activeDeadlineInfo.deadlineDate)} ${escapeHtml(activeDeadlineInfo.deadlineTime)}` : `ZAWSZE CZWARTEK 23:59 (${escapeHtml(activeDeadlineInfo.deadlineDate)})`}
+              </span>
+              <span class="px-2 py-0.5 rounded-full bg-slate-900/90 border border-white/15 text-slate-200 text-[10px] font-display font-bold" data-smpl-ext-remaining>
+                ⏳ Termin: ${escapeHtml(activeDeadlineInfo.deadlineDate)} ${escapeHtml(activeDeadlineInfo.deadlineTime)}
               </span>
             </div>
             <h2 class="font-display font-black text-lg sm:text-xl text-white uppercase tracking-wide">
               Terminarz i Wyniki — ${escapeHtml(state.leagues[leagueId].name)} (Kolejki 1–${maxRound})
             </h2>
             <p class="text-xs text-slate-400 mt-0.5">
-              <strong>Zasada SMPL:</strong> W każdej kolejce gramy od razu <strong class="text-emerald-300">pełny dwumecz (1 u siebie + 1 na wyjeździe w tej samej kolejce)</strong> do <strong class="text-white">max 2 bramek</strong> — wysyłacie oba wyniki + oba SS! Mecze z <strong class="text-emerald-400">WOLNYM LOSEM</strong> automatycznie liczą się jako <strong class="text-emerald-400">2:0 i 0:2 (+3 PKT za mecz)</strong>.
+              <strong>Zasada SMPL:</strong> W każdej kolejce gramy od razu <strong class="text-emerald-300">pełny dwumecz (1 u siebie + 1 na wyjeździe w tej samej kolejce)</strong> do <strong class="text-white">max 2 bramek</strong>. Kolejka kończy się <strong class="text-amber-300">zawsze w czwartek o 23:59</strong> (Admin może puścić następną wcześniej), a <strong class="text-rose-300">mecze nierozegrane trafiają do Adminów</strong> w celu podjęcia działań!
             </p>
           </div>
           <div class="smpl-schedule-toolbar grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-nowrap items-stretch gap-2 flex-shrink-0">
@@ -1119,7 +1129,10 @@ window.SMPL_VIEWS = (function () {
             </button>
             ${
               isAdmin
-                ? `<button type="button" onclick="SMPL_APP.openRoundExtensionDialog({ leagueScope: '${escapeHtml(leagueId)}', roundNum: ${activeRound !== 'ALL' ? Number(activeRound) : defaultRoundForWeek}, weekNum: ${activeWeek ? Number(activeWeek) : Number(currentLeagueWeek)} })" class="px-3 py-2 rounded-xl text-xs font-display font-bold uppercase whitespace-nowrap bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-slate-950 border border-amber-400/50 transition" title="Przedłuż termin kolejki lub tygodnia (np. Święta, wyjazdy, awaria gry)">
+                ? `<button type="button" onclick="SMPL_APP.openReleaseRoundDialog()" class="px-3 py-2 rounded-xl text-xs font-display font-bold uppercase whitespace-nowrap bg-emerald-500/20 hover:bg-emerald-500 text-emerald-200 hover:text-slate-950 border border-emerald-400/50 transition" title="Puść nową kolejkę lub tydzień (także wcześniej przed czwartkiem 23:59)">
+                     🚀 Puść Kolejkę
+                   </button>
+                   <button type="button" onclick="SMPL_APP.openRoundExtensionDialog({ leagueScope: '${escapeHtml(leagueId)}', roundNum: ${activeRound !== 'ALL' ? Number(activeRound) : defaultRoundForWeek}, weekNum: ${activeWeek ? Number(activeWeek) : Number(currentLeagueWeek)} })" class="px-3 py-2 rounded-xl text-xs font-display font-bold uppercase whitespace-nowrap bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-slate-950 border border-amber-400/50 transition" title="Przedłuż termin kolejki lub tygodnia (np. Święta, wyjazdy, awaria gry)">
                      ⏳ Przedłuż Kolejkę
                    </button>`
                 : ''
@@ -1293,6 +1306,10 @@ window.SMPL_VIEWS = (function () {
                         ? `<span class="px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-400/35 text-blue-200 font-display font-bold text-[10px] uppercase">🏠 1/2 Mecz</span>`
                         : '');
 
+                  const isOverdueForAdmin = m.status === 'SCHEDULED' && !isByeMatch &&
+                    window.SMPL_DB && typeof window.SMPL_DB.isMatchUnplayedForAdminAction === 'function' &&
+                    window.SMPL_DB.isMatchUnplayedForAdminAction(m, state);
+
                   let statusBadge = '';
                   if (m.status === 'APPROVED') {
                     statusBadge = `<span class="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">✅ Rozegrany</span>`;
@@ -1302,6 +1319,8 @@ window.SMPL_VIEWS = (function () {
                     statusBadge = isByeMatch
                       ? `<span class="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/35 text-[11px] font-bold">✅ Walkower WOLNY LOS</span>`
                       : `<span class="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-bold">⚠️ Walkower (WO)</span>`;
+                  } else if (isOverdueForAdmin) {
+                    statusBadge = `<span class="px-2.5 py-1 rounded-full bg-rose-500/25 text-rose-200 border border-rose-400/60 text-[11px] font-black animate-pulse">🚨 Po terminie — u Adminów</span>`;
                   } else {
                     statusBadge = `<span class="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-white/10 text-[11px] font-semibold">📅 Nierozegrany</span>`;
                   }
@@ -1350,6 +1369,13 @@ window.SMPL_VIEWS = (function () {
                           ${
                             !home.isBye && !away.isBye && (isAdmin || (isLoggedInPlayer && (m.homeId === session.activePlayerId || m.awayId === session.activePlayerId)))
                               ? `<button type="button" onclick="SMPL_APP.openMatchDisputeModal('${m.id}')" class="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 text-rose-200 border border-rose-500/40 text-[11px] font-bold transition">🚩 Spór / VAR 48h</button>`
+                              : ''
+                          }
+                          ${
+                            isAdmin && isOverdueForAdmin
+                              ? `<button type="button" onclick="SMPL_APP.switchTab('admin'); SMPL_APP.setAdminSubTab('moderation');" class="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-display font-black uppercase shadow">
+                                   ⚖️ Podejmij działanie
+                                 </button>`
                               : ''
                           }
                           ${
@@ -3611,7 +3637,7 @@ window.SMPL_VIEWS = (function () {
           <div class="p-4 rounded-2xl bg-slate-950/90 border border-white/10">
             <div class="font-display font-black text-sm text-amber-300 uppercase mb-1.5">§1. ⏱️ Tempo, Max 2 Bramki &amp; Dwumecz</div>
             <p class="text-slate-300 leading-relaxed">
-              W lidze gramy do <strong class="text-white">max 2 bramek</strong> w meczu (wyniki <strong class="text-white">0–2</strong>, bez 2:2). Każda para rozgrywa <strong class="text-emerald-300">dwumecz: 1 mecz u siebie + 1 na wyjeździe</strong>. Tygodniowo gramy ok. <strong>4 kolejki</strong> do <strong>niedzieli 23:59</strong> (aktywne ligi: ${activeLeagueLabelsRules}). Urlop zgłoszony wcześniej pozwala na krótkie przełożenie terminu.
+              W lidze gramy do <strong class="text-white">max 2 bramek</strong> w meczu (wyniki <strong class="text-white">0–2</strong>, bez 2:2). Każda para rozgrywa <strong class="text-emerald-300">dwumecz: 1 mecz u siebie + 1 na wyjeździe</strong>. Kolejka kończy się <strong class="text-amber-300">zawsze w czwartek o 23:59</strong> (ok. 4 kolejki na tydzień, aktywne ligi: ${activeLeagueLabelsRules}; Admin ma możliwość wcześniejszego puszczenia następnej kolejki lub przedłużenia terminu). Po zamknięciu kolejki wszystkie nierozegrane mecze trafiają bezpośrednio do Adminów w celu podjęcia działań.
             </p>
           </div>
 
@@ -3867,7 +3893,7 @@ window.SMPL_VIEWS = (function () {
         <div class="space-y-3 text-xs text-slate-300 leading-relaxed">
           <div class="p-3.5 rounded-2xl bg-slate-950/90 border border-emerald-500/30 space-y-1.5">
             <div class="font-display font-bold text-emerald-300 uppercase">🎮 1. Zasady dla Graczy (Fair Play)</div>
-            <p>• <strong>Tempo:</strong> 4 kolejki tygodniowo (termin do niedzieli 23:59). Gospodarz (lewa strona pary) zaprasza Gościa wyłącznie przez Messenger.</p>
+            <p>• <strong>Tempo i koniec kolejki:</strong> 4 kolejki tygodniowo — <strong>kolejka kończy się zawsze w czwartek o 23:59</strong> (Administracja może puścić kolejną wcześniej lub przedłużyć termin w razie Świąt). Mecze nierozegrane po zamknięciu kolejki trafiają automatycznie do Adminów w celu podjęcia działań. Gospodarz (lewa strona pary) zaprasza Gościa przez Messenger.</p>
             <p>• <strong>Ochrona aktywnego gracza (48h):</strong> Gdy rywal milczy 48h na 2–3 konkretne propozycje lub nie stawi się po 15 min — zgłoś Spór VAR / W.O. w Terminarzu i obowiązkowo załącz SS dlaczego (walkower <strong>2:0 WO</strong> na Twoją korzyść).</p>
             <p>• <strong>Wyniki i Kary:</strong> Screen końcowy w zakładce Wynik; tajemnica składów; 4-stopniowy taryfikator kar z obowiązkiem podania powodu i <strong>7 dni na odwołanie</strong> przez Messenger do Głównego Administratora.</p>
           </div>

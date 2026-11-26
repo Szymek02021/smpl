@@ -1238,7 +1238,7 @@ window.SMPL_ENGINE = (function () {
 
     const lines = [
       '🏆 RAPORT LIGOWY SCORE MATCH LIGA — ' + lObj.name.toUpperCase() + ' (SEZON ' + (state.season || 56) + ') 🏆',
-      '📅 Tydzień Rozgrywkowy #' + w + ' (Kolejki ' + range.startRound + '–' + range.endRound + ' • gramy 4 kolejki na tydzień)',
+      '📅 Tydzień Rozgrywkowy #' + w + ' (Kolejki ' + range.startRound + '–' + range.endRound + ' • koniec kolejki: zawsze Czwartek 23:59)',
       '📊 Postęp tygodnia: ' + weekPlayed + ' / ' + weekMatches.length + ' rozegranych spotkań'
     ];
     if (activeExt) {

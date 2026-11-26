@@ -3145,6 +3145,21 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_19',
+      version: 'V2.19',
+      date: '2026-11-26',
+      category: 'ULEPSZENIA',
+      title: 'Zasada Czwartku 23:59, Wcześniejsze Puszczanie Kolejek i Automatyczny Nadzór Nierozegranych Meczów!',
+      summary: 'Ujednoliciliśmy w całym portalu i Regulaminie oficjalny koniec kolejki (zawsze Czwartek o 23:59), dodaliśmy możliwość wcześniejszego wystartowania następnej kolejki przez Administrację oraz automatyczne kierowanie nierozegranych meczów pod decyzję Adminów!',
+      highlights: [
+        'Każda kolejka oraz tydzień rozgrywkowy kończą się domyślnie w Czwartek o 23:59 czasu polskiego — pasek w Terminarzu pokazuje dokładną datę czwartkowego zamknięcia oraz żywe odliczanie czasu pozostałego.',
+        'Gdy gracze szybciej rozegrają swoje mecze, Administracja może oficjalnie puścić kolejną kolejkę wcześniej — wszyscy aktywni zawodnicy od razu otrzymują powiadomienie 🔔 w portalu.',
+        'Po zakończeniu kolejki (po czwartku 23:59 lub po wcześniejszym puszczeniu kolejnej rundy) wszystkie nierozegrane mecze automatycznie trafiają do Skrzynki Działań Adminów razem z historią propozycji „Kiedy Gramy?” oraz zgłoszeniami VAR.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_18',
       version: 'V2.18',
       date: '2026-11-25',

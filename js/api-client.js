@@ -7271,6 +7271,490 @@ state = enrichFromArchive(data.state);
     return state.weeklyConfig.extensions;
   }
 
+  function resolveWarsawEpochMsClient(ymdStr, hmStr) {
+    const tz = 'Europe/Warsaw';
+    const dRaw = /^\d{4}-\d{2}-\d{2}$/.test(String(ymdStr || '')) ? String(ymdStr) : '2026-11-26';
+    const tRaw = /^\d{2}:\d{2}$/.test(String(hmStr || '')) ? String(hmStr) : '23:59';
+    try {
+      if (typeof Temporal !== 'undefined' && Temporal.PlainDate && Temporal.PlainTime) {
+        const zdt = Temporal.PlainDate.from(dRaw)
+          .toPlainDateTime(Temporal.PlainTime.from(tRaw))
+          .toZonedDateTime({ timeZone: tz, disambiguation: 'compatible' });
+        return Number(zdt.epochMilliseconds);
+      }
+    } catch (e) {}
+    const dp = dRaw.split('-');
+    const tp = tRaw.split(':');
+    const y = Number(dp[0]);
+    const m = Number(dp[1]);
+    const d = Number(dp[2]);
+    const hh = Number(tp[0]);
+    const mm = Number(tp[1]);
+    const utcGuess = Date.UTC(y, m - 1, d, hh, mm, 59);
+    try {
+      const fmt = new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      const parts = fmt.formatToParts(new Date(utcGuess));
+      const map = {};
+      parts.forEach(function (pt) { map[pt.type] = pt.value; });
+      const zonedAsUtc = Date.UTC(
+        Number(map.year || y),
+        Number(map.month || m) - 1,
+        Number(map.day || d),
+        Number(map.hour === '24' ? 0 : (map.hour || hh)),
+        Number(map.minute || mm),
+        59
+      );
+      const offsetMs = zonedAsUtc - utcGuess;
+      return utcGuess - offsetMs;
+    } catch (e2) {}
+    return utcGuess - 3600000;
+  }
+
+  function getWarsawTodayYmdClient() {
+    const tz = 'Europe/Warsaw';
+    try {
+      if (typeof Temporal !== 'undefined' && Temporal.Now && typeof Temporal.Now.plainDateISO === 'function') {
+        return Temporal.Now.plainDateISO(tz).toString();
+      }
+    } catch (e) {}
+    try {
+      const s = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    } catch (e2) {}
+    const n = new Date();
+    const mm = String(n.getMonth() + 1).padStart(2, '0');
+    const dd = String(n.getDate()).padStart(2, '0');
+    return n.getFullYear() + '-' + mm + '-' + dd;
+  }
+
+  function getNextThursdayDeadlineYmd(baseYmd, forceFollowingThursday) {
+    const startYmd = /^\d{4}-\d{2}-\d{2}$/.test(String(baseYmd || '')) ? String(baseYmd) : getWarsawTodayYmdClient();
+    try {
+      if (typeof Temporal !== 'undefined' && Temporal.PlainDate) {
+        const pd = Temporal.PlainDate.from(startYmd);
+        const dow = Number(pd.dayOfWeek); // 1=Mon..4=Thu..7=Sun
+        let addD = (4 - dow + 7) % 7;
+        if (forceFollowingThursday && addD <= 1) {
+          addD += 7;
+        }
+        return pd.add({ days: addD }, { overflow: 'constrain' }).toString();
+      }
+    } catch (e) {}
+    const sp = startYmd.split('-');
+    const baseUtc = Date.UTC(Number(sp[0]), Number(sp[1]) - 1, Number(sp[2]), 12, 0, 0);
+    const dt0 = new Date(baseUtc);
+    const jsDay = dt0.getUTCDay(); // 0=Sun..4=Thu..6=Sat
+    const isoDow = jsDay === 0 ? 7 : jsDay;
+    let addDays = (4 - isoDow + 7) % 7;
+    if (forceFollowingThursday && addDays <= 1) {
+      addDays += 7;
+    }
+    const dtThu = new Date(baseUtc + addDays * 86400000);
+    return dtThu.getUTCFullYear() + '-' + String(dtThu.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dtThu.getUTCDate()).padStart(2, '0');
+  }
+
+  function getActiveDeadlineInfo(customState, leagueId, roundNum) {
+    const srcState = customState || state;
+    const wc = (srcState && srcState.weeklyConfig && typeof srcState.weeklyConfig === 'object') ? srcState.weeklyConfig : {};
+    const curW = Math.max(1, Number(wc.currentWeek || 1));
+    const baseDate = /^\d{4}-\d{2}-\d{2}$/.test(String(wc.deadlineDate || ''))
+      ? String(wc.deadlineDate)
+      : getNextThursdayDeadlineYmd(getWarsawTodayYmdClient(), false);
+    const baseTime = /^\d{2}:\d{2}$/.test(String(wc.deadlineTime || '')) ? String(wc.deadlineTime) : '23:59';
+    const baseMs = resolveWarsawEpochMsClient(baseDate, baseTime);
+
+    const matchingExts = getMatchingRoundExtensions(srcState, leagueId || null, roundNum || null, roundNum ? null : curW);
+    let bestExt = null;
+    let bestExtMs = 0;
+    matchingExts.forEach(function (ex) {
+      const exMs = resolveWarsawEpochMsClient(ex.extendedUntilDate, ex.extendedUntilTime || '23:59');
+      if (exMs > bestExtMs) {
+        bestExtMs = exMs;
+        bestExt = ex;
+      }
+    });
+
+    if (bestExt && bestExtMs > baseMs) {
+      return {
+        deadlineDate: bestExt.extendedUntilDate,
+        deadlineTime: bestExt.extendedUntilTime || '23:59',
+        deadlineEpochMs: bestExtMs,
+        isExtended: true,
+        isPassed: Date.now() > bestExtMs,
+        ruleLabel: 'Przedłużony termin (standardowo: Czwartek 23:59)',
+        extension: bestExt
+      };
+    }
+
+    return {
+      deadlineDate: baseDate,
+      deadlineTime: baseTime,
+      deadlineEpochMs: baseMs,
+      isExtended: false,
+      isPassed: Date.now() > baseMs,
+      ruleLabel: 'Zawsze w Czwartek o 23:59',
+      extension: null
+    };
+  }
+
+  function isMatchUnplayedForAdminAction(match, customState) {
+    if (!match || match.status !== 'SCHEDULED' || match.isByeWalkover) return false;
+    const srcState = customState || state;
+    if (!srcState) return false;
+    const playersList = Array.isArray(srcState.players) ? srcState.players : [];
+    const hp = playersList.find(function (p) { return p && p.id === match.homeId; });
+    const ap = playersList.find(function (p) { return p && p.id === match.awayId; });
+    if (isByeSlotPlayer(hp) || isByeSlotPlayer(ap)) return false;
+
+    const rNum = Math.max(1, Number(match.round || 1));
+    const lid = String(match.leagueId || 'L1').toUpperCase();
+
+    // Jeżeli kolejka/tydzień tego meczu ma AKTYWNE przedłużenie, które jeszcze NIE minęło — gracze mają jeszcze czas!
+    const matchExts = getMatchingRoundExtensions(srcState, lid, rNum, null);
+    for (let i = 0; i < matchExts.length; i++) {
+      const ex = matchExts[i];
+      const exMs = resolveWarsawEpochMsClient(ex.extendedUntilDate, ex.extendedUntilTime || '23:59');
+      if (Date.now() <= exMs) return false;
+    }
+
+    const wc = (srcState.weeklyConfig && typeof srcState.weeklyConfig === 'object') ? srcState.weeklyConfig : {};
+    const rpw = Math.max(1, Number(wc.roundsPerWeek || 4));
+    const curW = Math.max(1, Number(wc.currentWeek || 1));
+    const closedUpTo = Math.max(0, Number(wc.closedRoundsUpTo || 0));
+    const curWeekStart = (curW - 1) * rpw + 1;
+    const curWeekEnd = curW * rpw;
+
+    // 1) Kolejka została już zamknięta przez Admina (np. puścił następną wcześniej) lub należy do przeszłego tygodnia
+    if (rNum <= closedUpTo || rNum < curWeekStart) {
+      return true;
+    }
+    // 2) Kolejka należy do bieżącego tygodnia, a minął już czwartek 23:59 (lub wygasło przedłużenie)
+    if (rNum <= curWeekEnd) {
+      const dlInfo = getActiveDeadlineInfo(srcState, lid, rNum);
+      if (dlInfo.isPassed) return true;
+    }
+    return false;
+  }
+
+  function getUnplayedMatchesForAdminAction(customState, leagueIdFilter) {
+    const srcState = customState || state;
+    if (!srcState || !Array.isArray(srcState.matches)) {
+      return { matches: [], ties: [] };
+    }
+    const lidFilter = leagueIdFilter && String(leagueIdFilter).toUpperCase() !== 'ALL'
+      ? String(leagueIdFilter).toUpperCase()
+      : '';
+    const playersMap = {};
+    (srcState.players || []).forEach(function (p) {
+      if (p && p.id) playersMap[p.id] = p;
+    });
+    const allProps = (srcState.competitions && Array.isArray(srcState.competitions.matchProposals))
+      ? srcState.competitions.matchProposals
+      : [];
+    const allDisps = (srcState.competitions && Array.isArray(srcState.competitions.matchDisputes))
+      ? srcState.competitions.matchDisputes
+      : [];
+
+    const overdueMatches = srcState.matches.filter(function (m) {
+      if (!m) return false;
+      if (lidFilter && String(m.leagueId || '').toUpperCase() !== lidFilter) return false;
+      return isMatchUnplayedForAdminAction(m, srcState);
+    });
+
+    const tieMap = {};
+    const tieOrder = [];
+    overdueMatches.forEach(function (m) {
+      const pairSorted = [String(m.homeId || ''), String(m.awayId || '')].sort();
+      const tieKey = String(m.leagueId || 'L1') + '__R' + Number(m.round || 1) + '__' + pairSorted.join('__');
+      if (!tieMap[tieKey]) {
+        const pA = playersMap[m.homeId] || { id: m.homeId, name: m.homeId || 'Gracz 1', nick: 'gracz1', avatar: '' };
+        const pB = playersMap[m.awayId] || { id: m.awayId, name: m.awayId || 'Gracz 2', nick: 'gracz2', avatar: '' };
+        // Sprawdź oba mecze tej pary w tej kolejce (nawet jeśli 1 z 2 był już zagrany)
+        const allPairLegs = srcState.matches.filter(function (x) {
+          return x && x.leagueId === m.leagueId && Number(x.round) === Number(m.round) &&
+            ((x.homeId === pA.id && x.awayId === pB.id) || (x.homeId === pB.id && x.awayId === pA.id));
+        });
+        const pairMatchIds = allPairLegs.map(function (x) { return x.id; });
+        const relatedProps = allProps.filter(function (pr) {
+          if (!pr) return false;
+          if (pr.matchId && pairMatchIds.indexOf(pr.matchId) !== -1) return true;
+          const prA = pr.proposerPlayerId || pr.proposerId || '';
+          const prB = pr.targetPlayerId || pr.opponentId || '';
+          return Number(pr.round) === Number(m.round) &&
+            String(pr.leagueId || '') === String(m.leagueId || '') &&
+            ((prA === pA.id && prB === pB.id) || (prA === pB.id && prB === pA.id));
+        });
+        const relatedDisps = allDisps.filter(function (ds) {
+          if (!ds) return false;
+          if (ds.matchId && pairMatchIds.indexOf(ds.matchId) !== -1) return true;
+          const dsA = ds.reporterPlayerId || ds.reporterId || '';
+          const dsB = ds.opponentPlayerId || ds.opponentId || '';
+          return Number(ds.round) === Number(m.round) &&
+            String(ds.leagueId || '') === String(m.leagueId || '') &&
+            ((dsA === pA.id && dsB === pB.id) || (dsA === pB.id && dsB === pA.id));
+        });
+        tieMap[tieKey] = {
+          tieKey: tieKey,
+          leagueId: m.leagueId,
+          round: Number(m.round || 1),
+          playerA: pA,
+          playerB: pB,
+          allLegs: allPairLegs,
+          unplayedMatches: [],
+          latestProposal: relatedProps[0] || null,
+          latestDispute: relatedDisps[0] || null
+        };
+        tieOrder.push(tieMap[tieKey]);
+      }
+      tieMap[tieKey].unplayedMatches.push(m);
+    });
+
+    tieOrder.sort(function (a, b) {
+      if (a.leagueId !== b.leagueId) return String(a.leagueId).localeCompare(String(b.leagueId));
+      return a.round - b.round;
+    });
+
+    return {
+      matches: overdueMatches,
+      ties: tieOrder
+    };
+  }
+
+  function releaseRoundByAdmin(payload, adminName = 'Szymon Komenda') {
+    assertAdminAuthenticated();
+    const inp = payload && typeof payload === 'object' ? payload : {};
+    if (!state.weeklyConfig || typeof state.weeklyConfig !== 'object') {
+      state.weeklyConfig = { roundsPerWeek: 4, currentWeek: 1, totalWeeks: 4 };
+    }
+    const prevWeeklySnapshot = JSON.parse(JSON.stringify(state.weeklyConfig));
+    const rpw = Math.max(1, Number(state.weeklyConfig.roundsPerWeek || 4));
+    const maxRound = getMaxLeagueRoundsForWeeks();
+    const totalWeeks = Math.max(1, Math.ceil(maxRound / rpw));
+    const prevW = Math.max(1, Number(state.weeklyConfig.currentWeek || 1));
+
+    const targetWeek = Math.min(totalWeeks, Math.max(1, Math.round(Number(inp.weekNum !== undefined ? inp.weekNum : prevW))));
+    const targetRound = Math.min(maxRound, Math.max(1, Math.round(Number(inp.roundNum !== undefined ? inp.roundNum : ((targetWeek - 1) * rpw + 1)))));
+    const closeUpToRound = inp.closeUpToRound !== undefined
+      ? Math.max(0, Math.min(maxRound, Math.round(Number(inp.closeUpToRound || 0))))
+      : Math.max(0, (targetWeek - 1) * rpw);
+    const prevClosed = Math.max(0, Number(state.weeklyConfig.closedRoundsUpTo || 0));
+    const newClosedUpTo = Math.max(prevClosed, closeUpToRound);
+    const isEarlyRelease = Boolean(inp.isEarlyRelease);
+
+    const deadlineDate = /^\d{4}-\d{2}-\d{2}$/.test(String(inp.deadlineDate || '').trim())
+      ? String(inp.deadlineDate).trim()
+      : getNextThursdayDeadlineYmd(getWarsawTodayYmdClient(), isEarlyRelease);
+    const deadlineTime = /^\d{2}:\d{2}$/.test(String(inp.deadlineTime || '').trim())
+      ? String(inp.deadlineTime).trim()
+      : '23:59';
+
+    state.weeklyConfig.totalWeeks = totalWeeks;
+    state.weeklyConfig.currentWeek = targetWeek;
+    state.weeklyConfig.currentRoundReleased = targetRound;
+    state.weeklyConfig.closedRoundsUpTo = newClosedUpTo;
+    state.weeklyConfig.deadlineDay = 'THURSDAY';
+    state.weeklyConfig.deadlineDate = deadlineDate;
+    state.weeklyConfig.deadlineTime = deadlineTime;
+    state.weeklyConfig.timeZone = 'Europe/Warsaw';
+    state.weeklyConfig.lastReleasedBy = adminName;
+    state.weeklyConfig.lastReleasedAt = nowFormatted();
+
+    const playersById = {};
+    (state.players || []).forEach(function (pl) { if (pl && pl.id) playersById[pl.id] = pl; });
+    let escalatedCount = 0;
+    const nowStr = nowFormatted();
+    if (newClosedUpTo > 0 && Array.isArray(state.matches)) {
+      state.matches.forEach(function (m) {
+        if (!m || m.status !== 'SCHEDULED' || m.isByeWalkover) return;
+        const rnd = Number(m.round || 0);
+        if (rnd < 1 || rnd > newClosedUpTo) return;
+        if (isByeSlotPlayer(playersById[m.homeId]) || isByeSlotPlayer(playersById[m.awayId])) return;
+        m.escalatedToAdminAt = nowStr;
+        escalatedCount += 1;
+      });
+    }
+
+    const rStartW = (targetWeek - 1) * rpw + 1;
+    const rEndW = Math.min(maxRound, targetWeek * rpw);
+    const notifyPlayers = inp.notifyPlayers !== undefined ? Boolean(inp.notifyPlayers) : true;
+    let notifiedCount = 0;
+    const tsMs = Date.now();
+    if (notifyPlayers && Array.isArray(state.players)) {
+      state.players.forEach(function (pl, idx) {
+        if (!pl || isByeSlotPlayer(pl) || pl.gdprDeleted || pl.active === false) return;
+        if (!pl.leagueId || pl.leagueId === 'POOL') return;
+        if (!Array.isArray(pl.notifications)) pl.notifications = [];
+        pl.notifications.unshift({
+          id: 'NOTIF_REL_' + tsMs + '_' + idx,
+          type: 'ROUND_RELEASED',
+          time: nowStr,
+          read: false,
+          title: '⚽ Rusza Tydzień #' + targetWeek + ' (Kolejki K' + rStartW + '–K' + rEndW + ')!',
+          text: (isEarlyRelease ? 'Administracja puściła nową kolejkę wcześniej! ' : 'Wystartowała nowa kolejka! ') + 'Termin rozegrania meczów: Czwartek ' + deadlineDate + ' godz. ' + deadlineTime + '.'
+        });
+        if (pl.notifications.length > 40) pl.notifications = pl.notifications.slice(0, 40);
+        notifiedCount += 1;
+      });
+    }
+
+    if (window.SMPL_NOTIF && typeof window.SMPL_NOTIF.notifyRoundReleased === 'function') {
+      try { window.SMPL_NOTIF.notifyRoundReleased(targetRound, targetWeek); } catch (e) {}
+    }
+
+    const escTxt = escalatedCount > 0
+      ? (' • 🚨 Przekazano ' + escalatedCount + ' nierozegranych meczów z K1–K' + newClosedUpTo + ' do decyzji Adminów')
+      : '';
+    addLog(
+      'ROUND_RELEASED',
+      '🚀 Admin ' + adminName + ' puścił ' + (isEarlyRelease ? 'WCZEŚNIEJ ' : '') + 'Tydzień #' + targetWeek + ' (Kolejki K' + rStartW + '–K' + rEndW + ' • koniec: Czwartek ' + deadlineDate + ' ' + deadlineTime + ')' + escTxt + '.'
+    );
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+
+    sendAtomicAdminAction(
+      'admin_release_round',
+      {
+        weekNum: targetWeek,
+        roundNum: targetRound,
+        closeUpToRound: newClosedUpTo,
+        deadlineDate: deadlineDate,
+        deadlineTime: deadlineTime,
+        isEarlyRelease: isEarlyRelease,
+        notifyPlayers: notifyPlayers
+      },
+      function () {
+        if (state) state.weeklyConfig = prevWeeklySnapshot;
+      },
+      { weeklyConfig: state.weeklyConfig, unplayedEscalatedCount: escalatedCount, notifiedCount: notifiedCount },
+      function (err) {
+        if (err) syncToBackend();
+      }
+    );
+
+    return {
+      weeklyConfig: state.weeklyConfig,
+      unplayedEscalatedCount: escalatedCount,
+      notifiedCount: notifiedCount
+    };
+  }
+
+  function resolveUnplayedByAdmin(payload, adminName = 'Szymon Komenda') {
+    assertAdminAuthenticated();
+    const inp = payload && typeof payload === 'object' ? payload : {};
+    const matchIds = (Array.isArray(inp.matchIds) ? inp.matchIds : [])
+      .map(function (x) { return String(x || '').trim(); })
+      .filter(Boolean);
+    if (!matchIds.length) {
+      throw new Error('Wskaż przynajmniej jeden nierozegrany mecz do rozstrzygnięcia.');
+    }
+    const decision = String(inp.decision || 'BOTH_LOSE').trim().toUpperCase();
+    const winnerPlayerId = String(inp.winnerPlayerId || '').trim();
+    const cleanReason = (String(inp.reason || '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/[\r\n]+/g, ' ')
+      .trim() || 'Brak rozegrania meczu do końca kolejki (Czwartek 23:59) — decyzja Administracji SMPL.').slice(0, 260);
+
+    const prevMatchesSnap = JSON.parse(JSON.stringify(state.matches || []));
+    const idSet = {};
+    matchIds.forEach(function (id) { idSet[id] = true; });
+    const playersById = {};
+    (state.players || []).forEach(function (p) { if (p && p.id) playersById[p.id] = p; });
+
+    const nowStr = nowFormatted();
+    const tsMs = Date.now();
+    let resolvedCount = 0;
+    const summaries = [];
+
+    (state.matches || []).forEach(function (m, mi) {
+      if (!m || !idSet[String(m.id || '')]) return;
+      if (m.status === 'APPROVED' || (m.status === 'WALKOVER' && m.isByeWalkover)) return;
+      let hs = 0;
+      let as = 0;
+      if (decision === 'PLAYER_WIN' && winnerPlayerId) {
+        if (winnerPlayerId === m.homeId) { hs = 2; as = 0; }
+        else if (winnerPlayerId === m.awayId) { hs = 0; as = 2; }
+      } else if (decision === 'HOME_WIN') {
+        hs = 2; as = 0;
+      } else if (decision === 'AWAY_WIN') {
+        hs = 0; as = 2;
+      } else {
+        hs = 0; as = 0;
+      }
+      m.homeScore = hs;
+      m.awayScore = as;
+      m.status = 'WALKOVER';
+      m.isBothLoseWalkover = (hs === 0 && as === 0);
+      m.comment = cleanReason;
+      m.submittedBy = adminName + ' (Decyzja Po Terminie)';
+      m.submittedAt = nowStr;
+      m.approvedBy = adminName;
+      m.approvedAt = nowStr;
+      resolvedCount += 1;
+
+      const hp = playersById[m.homeId];
+      const ap = playersById[m.awayId];
+      const hName = hp ? hp.name : m.homeId;
+      const aName = ap ? ap.name : m.awayId;
+      summaries.push('K' + m.round + ' ' + hName + ' ' + hs + ':' + as + ' WO ' + aName);
+
+      [m.homeId, m.awayId].forEach(function (pid) {
+        if (!pid) return;
+        pushPlayerNotification(pid, {
+          idPrefix: 'NOTIF_RES_' + mi,
+          type: 'WALKOVER',
+          icon: '⚖️',
+          title: '⚖️ Decyzja Admina w Kolejce #' + m.round + ' (' + hs + ':' + as + ' WO)',
+          text: hName + ' ' + hs + ':' + as + ' WO ' + aName + ' — ' + cleanReason + ' (Admin: ' + adminName + ')'
+        });
+      });
+    });
+
+    if (state.competitions && Array.isArray(state.competitions.matchDisputes)) {
+      state.competitions.matchDisputes.forEach(function (ds) {
+        if (!ds) return;
+        const dSt = String(ds.status || 'PENDING').toUpperCase();
+        if (idSet[String(ds.matchId || '')] && (dSt === 'OPEN' || dSt === 'PENDING')) {
+          ds.status = 'RESOLVED';
+          ds.resolvedBy = adminName;
+          ds.resolvedAt = nowStr;
+          ds.adminNote = cleanReason;
+        }
+      });
+    }
+
+    addLog(
+      'WALKOVER',
+      '⚖️ Admin ' + adminName + ' podjął decyzję ws. nierozegranych meczów po terminie (' + summaries.slice(0, 4).join(' | ') + ') — ' + cleanReason
+    );
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+
+    sendAtomicAdminAction(
+      'admin_resolve_unplayed',
+      {
+        matchIds: matchIds,
+        decision: decision,
+        winnerPlayerId: winnerPlayerId,
+        reason: cleanReason
+      },
+      function () {
+        if (state) state.matches = prevMatchesSnap;
+      },
+      { resolvedCount: resolvedCount },
+      function (err) {
+        if (err) syncToBackend();
+      }
+    );
+
+    return { resolvedCount: resolvedCount, summaries: summaries };
+  }
+
   function normalizeUpdateVersionClient(raw) {
     if (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.normalizeUpdateVersion === 'function') {
       return window.SMPL_STUDIO.normalizeUpdateVersion(raw);
@@ -9042,6 +9526,7 @@ state = enrichFromArchive(data.state);
     state.seasonName = `Sezon ${targetSeason} — Czysty Start (Puste Tabele do Samodzielnego Obsadzenia)`;
     if (state.weeklyConfig) {
       state.weeklyConfig.currentWeek = 1;
+      state.weeklyConfig.closedRoundsUpTo = 0;
       state.weeklyConfig.extensions = [];
     }
     if (state.leagues) {
@@ -9290,6 +9775,7 @@ state = enrichFromArchive(data.state);
     state.seasonName = `Sezon ${targetSeason} — Oficjalny Start Rozgrywek (Czysta Tabela 0:0)`;
     if (state.weeklyConfig) {
       state.weeklyConfig.currentWeek = 1;
+      state.weeklyConfig.closedRoundsUpTo = 0;
       state.weeklyConfig.extensions = [];
     }
     (state.players || []).forEach((p) => {
@@ -12078,6 +12564,12 @@ state = enrichFromArchive(data.state);
     buildRoundExtensionMessengerText,
     setRoundExtension,
     removeRoundExtension,
+    getNextThursdayDeadlineYmd,
+    getActiveDeadlineInfo,
+    isMatchUnplayedForAdminAction,
+    getUnplayedMatchesForAdminAction,
+    releaseRoundByAdmin,
+    resolveUnplayedByAdmin,
     deletePlayerAccountGDPR,
     updatePlayer,
     deductPlayerPoints,

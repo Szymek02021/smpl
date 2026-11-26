@@ -535,7 +535,9 @@ function buildServerLeagueSnapshot(db) {
   const lines = [];
   const weekly = db.weeklyConfig || {};
   const seasonLbl = db.season ? `Sezon ${db.season}` : 'Sezon SMPL';
-  lines.push(`AKTUALNY SEZON (serwer): ${seasonLbl} | Tydzień: ${weekly.currentWeek || '?'}`);
+  const dlDateSnap = weekly.deadlineDate || 'Czwartek';
+  const dlTimeSnap = weekly.deadlineTime || '23:59';
+  lines.push(`AKTUALNY SEZON (serwer): ${seasonLbl} | Tydzień: ${weekly.currentWeek || '?'} | Koniec kolejki: zawsze Czwartek 23:59 (bieżący termin: ${dlDateSnap} ${dlTimeSnap})`);
   if (Array.isArray(weekly.extensions) && weekly.extensions.length > 0) {
     const extParts = weekly.extensions
       .filter((ex) => ex && ex.enabled)
@@ -1005,7 +1007,7 @@ function dispatchWebPushDiffLocal(prevDb, newDb, excludeActorPlayerId = '') {
         const nt = String(nn.type || 'INFO').toUpperCase();
         const tab = (nt === 'SHOP_GIFT' || nt === 'SHOP_QUEST') ? 'competitions'
           : (nt === 'MATCH_REJECTED' ? 'submit'
-          : (['MATCH_SUBMITTED', 'MATCH_APPROVED', 'MATCH_EDITED', 'WALKOVER', 'MATCH_PROPOSAL', 'DISPUTE'].includes(nt) ? 'schedule' : 'profile'));
+          : (['MATCH_SUBMITTED', 'MATCH_APPROVED', 'MATCH_EDITED', 'WALKOVER', 'MATCH_PROPOSAL', 'DISPUTE', 'ROUND_EXTENDED', 'ROUND_RELEASED'].includes(nt) ? 'schedule' : 'profile'));
         const ic = nn.icon && String(nn.title || '').indexOf(nn.icon) !== 0 ? (nn.icon + ' ') : '';
         const payload = { title: (ic + (nn.title || 'Powiadomienie SMPL')).slice(0, 120), body: String(nn.text || '').slice(0, 180), tag: 'smpl-n-' + nn.id, tab, url: './index.html#' + tab };
         Object.keys(byPlayer[pid]).forEach((hKey) => {
@@ -2526,6 +2528,274 @@ const server = http.createServer((req, res) => {
             extension: extRecord,
             extensions: prevDb.weeklyConfig.extensions,
             notifiedCount,
+            updatedAt: tsMs,
+            state: prevDb
+          });
+        }
+
+        if (action === 'admin_release_round') {
+          let payload = {};
+          try { payload = JSON.parse(body || '{}') || {}; } catch (e) { payload = {}; }
+          const prevDb = readDbJson();
+          const adminTokenInfo = validateAdminTokenHeader(req, prevDb, payload);
+          if (!adminTokenInfo) {
+            return sendJson(res, 401, {
+              ok: false,
+              code: 'ADMIN_TOKEN_EXPIRED',
+              error: 'Sesja Administratora na serwerze wygasła lub brak tokena (X-SMPL-Admin-Token). Zaloguj się ponownie hasłem Admina.'
+            });
+          }
+          if (!prevDb || !Array.isArray(prevDb.players)) {
+            return sendJson(res, 400, { ok: false, error: 'Baza danych SMPL na serwerze jest pusta lub uszkodzona.' });
+          }
+          if (!prevDb.weeklyConfig || typeof prevDb.weeklyConfig !== 'object') {
+            prevDb.weeklyConfig = { roundsPerWeek: 4, currentWeek: 1, totalWeeks: 4 };
+          }
+          const rpw = Math.max(1, Number(prevDb.weeklyConfig.roundsPerWeek || 4));
+          let maxRound = 15;
+          Object.values(prevDb.leagues || {}).forEach((lObj) => {
+            if (lObj && Number(lObj.totalRounds || 0) > maxRound) maxRound = Number(lObj.totalRounds);
+          });
+          (prevDb.matches || []).forEach((mItem) => {
+            if (mItem && Number(mItem.round || 0) > maxRound) maxRound = Number(mItem.round);
+          });
+          const totalWeeks = Math.max(1, Math.ceil(maxRound / rpw));
+          const prevWeek = Math.max(1, Number(prevDb.weeklyConfig.currentWeek || 1));
+          let targetWeek = Math.round(Number(payload.weekNum !== undefined ? payload.weekNum : prevWeek));
+          if (!Number.isFinite(targetWeek) || targetWeek < 1) targetWeek = 1;
+          if (targetWeek > totalWeeks) targetWeek = totalWeeks;
+
+          let targetRound = Math.round(Number(payload.roundNum !== undefined ? payload.roundNum : ((targetWeek - 1) * rpw + 1)));
+          if (!Number.isFinite(targetRound) || targetRound < 1) targetRound = 1;
+          if (targetRound > maxRound) targetRound = maxRound;
+
+          const closeUpToRound = payload.closeUpToRound !== undefined
+            ? Math.max(0, Math.min(maxRound, Math.round(Number(payload.closeUpToRound || 0))))
+            : Math.max(0, (targetWeek - 1) * rpw);
+          const prevClosed = Math.max(0, Number(prevDb.weeklyConfig.closedRoundsUpTo || 0));
+          const newClosedUpTo = Math.max(prevClosed, closeUpToRound);
+
+          let deadlineDate = String(payload.deadlineDate || '').trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(deadlineDate)) {
+            const nowD = new Date();
+            const dow = nowD.getDay() === 0 ? 7 : nowD.getDay(); // 1=Mon..4=Thu..7=Sun
+            let daysToThu = (4 - dow + 7) % 7;
+            if (daysToThu === 0 && nowD.getHours() >= 20) daysToThu = 7;
+            const thuD = new Date(nowD.getTime() + daysToThu * 86400000);
+            deadlineDate = thuD.toISOString().slice(0, 10);
+          }
+          const deadlineTime = /^\d{2}:\d{2}$/.test(String(payload.deadlineTime || '').trim())
+            ? String(payload.deadlineTime).trim()
+            : '23:59';
+
+          const admName = String(adminTokenInfo.adminName || 'Szymon Komenda');
+          const nowFmt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+          const tsMs = Date.now();
+          const isEarlyRelease = Boolean(payload.isEarlyRelease);
+
+          prevDb.weeklyConfig.totalWeeks = totalWeeks;
+          prevDb.weeklyConfig.currentWeek = targetWeek;
+          prevDb.weeklyConfig.currentRoundReleased = targetRound;
+          prevDb.weeklyConfig.closedRoundsUpTo = newClosedUpTo;
+          prevDb.weeklyConfig.deadlineDay = 'THURSDAY';
+          prevDb.weeklyConfig.deadlineDate = deadlineDate;
+          prevDb.weeklyConfig.deadlineTime = deadlineTime;
+          prevDb.weeklyConfig.timeZone = 'Europe/Warsaw';
+          prevDb.weeklyConfig.lastReleasedBy = admName;
+          prevDb.weeklyConfig.lastReleasedAt = nowFmt;
+
+          const playersById = {};
+          prevDb.players.forEach((plObj) => { if (plObj && plObj.id) playersById[String(plObj.id)] = plObj; });
+          let unplayedEscalatedCount = 0;
+          if (newClosedUpTo > 0 && Array.isArray(prevDb.matches)) {
+            prevDb.matches.forEach((mObj) => {
+              if (!mObj || mObj.status !== 'SCHEDULED' || mObj.isByeWalkover) return;
+              const rndM = Number(mObj.round || 0);
+              if (rndM < 1 || rndM > newClosedUpTo) return;
+              const hp = playersById[String(mObj.homeId || '')];
+              const ap = playersById[String(mObj.awayId || '')];
+              if ((hp && hp.isPlaceholder) || (ap && ap.isPlaceholder)) return;
+              mObj.escalatedToAdminAt = nowFmt;
+              unplayedEscalatedCount++;
+            });
+          }
+
+          const rStartW = (targetWeek - 1) * rpw + 1;
+          const rEndW = Math.min(maxRound, targetWeek * rpw);
+          const notifyPlayers = Object.prototype.hasOwnProperty.call(payload, 'notifyPlayers') ? Boolean(payload.notifyPlayers) : true;
+          let notifiedCount = 0;
+          if (notifyPlayers) {
+            prevDb.players.forEach((pl, pIdx) => {
+              if (!pl || pl.isPlaceholder || pl.gdprDeleted || pl.active === false) return;
+              const pLid = String(pl.leagueId || '');
+              if (!pLid || pLid === 'POOL') return;
+              if (!Array.isArray(pl.notifications)) pl.notifications = [];
+              pl.notifications.unshift({
+                id: 'NOTIF_REL_' + tsMs + '_' + pIdx,
+                type: 'ROUND_RELEASED',
+                time: nowFmt,
+                read: false,
+                title: `⚽ Rusza Tydzień #${targetWeek} (Kolejki K${rStartW}–K${rEndW})!`,
+                text: `${isEarlyRelease ? 'Administracja puściła nową kolejkę wcześniej! ' : 'Wystartowała nowa kolejka! '}Termin rozegrania meczów: Czwartek ${deadlineDate} godz. ${deadlineTime}.`
+              });
+              if (pl.notifications.length > 40) pl.notifications = pl.notifications.slice(0, 40);
+              notifiedCount++;
+            });
+          }
+
+          prevDb.updatedAt = tsMs;
+          const escTxt = unplayedEscalatedCount > 0
+            ? ` • 🚨 Przekazano ${unplayedEscalatedCount} nierozegranych meczów z K1–K${newClosedUpTo} do decyzji Adminów`
+            : '';
+          const logItem = {
+            id: 'LOG_REL_' + tsMs + '_' + Math.floor(10 + Math.random() * 89),
+            time: nowFmt,
+            type: 'ROUND_RELEASED',
+            text: `🚀 Admin ${admName} puścił ${isEarlyRelease ? 'WCZEŚNIEJ ' : ''}Tydzień #${targetWeek} (Kolejki K${rStartW}–K${rEndW} • koniec: Czwartek ${deadlineDate} ${deadlineTime})${escTxt}.`
+          };
+          if (!Array.isArray(prevDb.activityLog)) prevDb.activityLog = [];
+          prevDb.activityLog.unshift(logItem);
+          if (prevDb.activityLog.length > 120) prevDb.activityLog = prevDb.activityLog.slice(0, 120);
+          if (!Array.isArray(prevDb.logs)) prevDb.logs = [];
+          prevDb.logs.unshift(logItem);
+          if (prevDb.logs.length > 300) prevDb.logs = prevDb.logs.slice(0, 300);
+
+          const enc = JSON.stringify(prevDb);
+          fs.writeFileSync(DB_FILE, enc, 'utf8');
+          try { fs.writeFileSync(BACKUP_FILE, enc, 'utf8'); } catch (e) {}
+          return sendJson(res, 200, {
+            ok: true,
+            weeklyConfig: prevDb.weeklyConfig,
+            unplayedEscalatedCount,
+            notifiedCount,
+            updatedAt: tsMs,
+            state: prevDb
+          });
+        }
+
+        if (action === 'admin_resolve_unplayed') {
+          let payload = {};
+          try { payload = JSON.parse(body || '{}') || {}; } catch (e) { payload = {}; }
+          const prevDb = readDbJson();
+          const adminTokenInfo = validateAdminTokenHeader(req, prevDb, payload);
+          if (!adminTokenInfo) {
+            return sendJson(res, 401, {
+              ok: false,
+              code: 'ADMIN_TOKEN_EXPIRED',
+              error: 'Sesja Administratora na serwerze wygasła lub brak tokena (X-SMPL-Admin-Token). Zaloguj się ponownie hasłem Admina.'
+            });
+          }
+          if (!prevDb || !Array.isArray(prevDb.matches)) {
+            return sendJson(res, 400, { ok: false, error: 'Baza meczów na serwerze jest pusta lub uszkodzona.' });
+          }
+          const matchIdSet = new Set(
+            (Array.isArray(payload.matchIds) ? payload.matchIds : [])
+              .map((v) => String(v || '').trim())
+              .filter(Boolean)
+          );
+          if (matchIdSet.size === 0) {
+            return sendJson(res, 400, { ok: false, error: 'Wskaż przynajmniej jeden nierozegrany mecz do rozstrzygnięcia.' });
+          }
+
+          const decision = String(payload.decision || 'BOTH_LOSE').trim().toUpperCase();
+          const winnerPlayerId = String(payload.winnerPlayerId || '').trim();
+          const cleanReason = (String(payload.reason || '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/[\r\n]+/g, ' ')
+            .replace(/[\x00-\x1F\x7F]/g, '')
+            .trim() || 'Brak rozegrania meczu do końca kolejki (Czwartek 23:59) — decyzja Administracji SMPL.').slice(0, 260);
+
+          const admName = String(adminTokenInfo.adminName || 'Szymon Komenda');
+          const nowFmt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+          const tsMs = Date.now();
+
+          const playerById = {};
+          (prevDb.players || []).forEach((p) => { if (p && p.id) playerById[String(p.id)] = p; });
+
+          let resolvedCount = 0;
+          const resolvedSummaries = [];
+          prevDb.matches.forEach((mObj, mi) => {
+            if (!mObj || !mObj.id || !matchIdSet.has(String(mObj.id))) return;
+            if (mObj.status === 'APPROVED' || (mObj.status === 'WALKOVER' && mObj.isByeWalkover)) return;
+            const hId = String(mObj.homeId || '');
+            const aId = String(mObj.awayId || '');
+            let hs = 0;
+            let as = 0;
+            if (decision === 'PLAYER_WIN' && winnerPlayerId) {
+              if (winnerPlayerId === hId) { hs = 2; as = 0; }
+              else if (winnerPlayerId === aId) { hs = 0; as = 2; }
+            } else if (decision === 'HOME_WIN') {
+              hs = 2; as = 0;
+            } else if (decision === 'AWAY_WIN') {
+              hs = 0; as = 2;
+            } else {
+              hs = 0; as = 0;
+            }
+            mObj.homeScore = hs;
+            mObj.awayScore = as;
+            mObj.status = 'WALKOVER';
+            mObj.isBothLoseWalkover = (hs === 0 && as === 0);
+            mObj.comment = cleanReason;
+            mObj.submittedBy = `${admName} (Decyzja Po Terminie)`;
+            mObj.submittedAt = nowFmt;
+            mObj.approvedBy = admName;
+            mObj.approvedAt = nowFmt;
+            resolvedCount++;
+
+            const hName = playerById[hId] ? playerById[hId].name : hId;
+            const aName = playerById[aId] ? playerById[aId].name : aId;
+            const rndNum = Number(mObj.round || 0);
+            resolvedSummaries.push(`K${rndNum} ${hName} ${hs}:${as} WO ${aName}`);
+
+            [hId, aId].forEach((notifyPid) => {
+              const pTarget = playerById[notifyPid];
+              if (!pTarget || pTarget.isPlaceholder || pTarget.gdprDeleted) return;
+              if (!Array.isArray(pTarget.notifications)) pTarget.notifications = [];
+              pTarget.notifications.unshift({
+                id: `NOTIF_RES_${tsMs}_${mi}_${notifyPid}`,
+                type: 'WALKOVER',
+                time: nowFmt,
+                read: false,
+                title: `⚖️ Decyzja Admina w Kolejce #${rndNum} (${hs}:${as} WO)`,
+                text: `${hName} ${hs}:${as} WO ${aName} — ${cleanReason} (Admin: ${admName})`
+              });
+              if (pTarget.notifications.length > 40) pTarget.notifications = pTarget.notifications.slice(0, 40);
+            });
+          });
+
+          if (prevDb.competitions && Array.isArray(prevDb.competitions.matchDisputes)) {
+            prevDb.competitions.matchDisputes.forEach((disp) => {
+              if (!disp || !disp.matchId) return;
+              const dSt = String(disp.status || 'PENDING').toUpperCase();
+              if (matchIdSet.has(String(disp.matchId)) && (dSt === 'OPEN' || dSt === 'PENDING')) {
+                disp.status = 'RESOLVED';
+                disp.resolvedBy = admName;
+                disp.resolvedAt = nowFmt;
+                disp.adminNote = cleanReason;
+              }
+            });
+          }
+
+          prevDb.updatedAt = tsMs;
+          const logItem = {
+            id: 'LOG_UNP_' + tsMs + '_' + Math.floor(10 + Math.random() * 89),
+            time: nowFmt,
+            type: 'WALKOVER',
+            text: `⚖️ Admin ${admName} podjął decyzję ws. nierozegranych meczów po terminie (${resolvedSummaries.slice(0, 4).join(' | ')}) — ${cleanReason}`
+          };
+          if (!Array.isArray(prevDb.activityLog)) prevDb.activityLog = [];
+          prevDb.activityLog.unshift(logItem);
+          if (prevDb.activityLog.length > 120) prevDb.activityLog = prevDb.activityLog.slice(0, 120);
+          if (!Array.isArray(prevDb.logs)) prevDb.logs = [];
+          prevDb.logs.unshift(logItem);
+          if (prevDb.logs.length > 300) prevDb.logs = prevDb.logs.slice(0, 300);
+
+          const enc = JSON.stringify(prevDb);
+          fs.writeFileSync(DB_FILE, enc, 'utf8');
+          try { fs.writeFileSync(BACKUP_FILE, enc, 'utf8'); } catch (e) {}
+          return sendJson(res, 200, {
+            ok: true,
+            resolvedCount,
             updatedAt: tsMs,
             state: prevDb
           });

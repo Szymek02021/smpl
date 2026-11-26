@@ -3136,10 +3136,33 @@ dialog.smpl-round-ext-dialog::backdrop {
   outline-offset: 2px;
 }
 
-.smpl-round-ext-form .smpl-ext-control:user-invalid,
-.smpl-round-ext-form .smpl-ext-control[aria-invalid="true"] {
+.smpl-round-ext-form .smpl-ext-control:is(:user-invalid, .user-invalid-fallback, [aria-invalid="true"]) {
   border-color: #fb7185;
   background: rgba(127, 29, 29, 0.24);
+}
+
+.smpl-round-ext-form .smpl-field-error {
+  display: none;
+  color: #fda4af;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-top: 0.2rem;
+}
+
+.smpl-round-ext-form .smpl-ext-control:is(:user-invalid, .user-invalid-fallback, [aria-invalid="true"]) ~ .smpl-field-error {
+  display: block;
+}
+
+.visually-hidden:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
 }
 
 .smpl-round-ext-form fieldset.smpl-ext-fieldset {

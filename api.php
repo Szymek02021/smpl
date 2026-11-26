@@ -1801,7 +1801,7 @@ function smpl_dispatch_web_push_diff($dataDir, $prevDb, $newDb, $excludeActorPla
                 $tab = 'profile';
                 if ($nType === 'SHOP_GIFT' || $nType === 'SHOP_QUEST') $tab = 'competitions';
                 elseif ($nType === 'MATCH_REJECTED') $tab = 'submit';
-                elseif (in_array($nType, array('MATCH_SUBMITTED', 'MATCH_APPROVED', 'MATCH_EDITED', 'WALKOVER', 'MATCH_PROPOSAL', 'DISPUTE'), true)) $tab = 'schedule';
+                elseif (in_array($nType, array('MATCH_SUBMITTED', 'MATCH_APPROVED', 'MATCH_EDITED', 'WALKOVER', 'MATCH_PROPOSAL', 'DISPUTE', 'ROUND_EXTENDED', 'ROUND_RELEASED'), true)) $tab = 'schedule';
                 $iconPref = !empty($nn['icon']) && strpos((string)(isset($nn['title']) ? $nn['title'] : ''), (string)$nn['icon']) !== 0 ? ((string)$nn['icon'] . ' ') : '';
                 $payload = array(
                     'title' => mb_substr($iconPref . (string)(isset($nn['title']) ? $nn['title'] : 'Powiadomienie SMPL'), 0, 120, 'UTF-8'),
@@ -2070,7 +2070,9 @@ function smpl_build_server_league_snapshot($db) {
     $weekly = isset($db['weeklyConfig']) && is_array($db['weeklyConfig']) ? $db['weeklyConfig'] : array();
     $season = isset($db['season']) ? ('Sezon ' . (string)$db['season']) : 'Sezon SMPL';
     $week = isset($weekly['currentWeek']) ? (string)$weekly['currentWeek'] : '?';
-    $lines[] = "AKTUALNY SEZON (serwer): {$season} | Tydzień rozgrywkowy: {$week}";
+    $dlDateSnap = isset($weekly['deadlineDate']) && $weekly['deadlineDate'] ? (string)$weekly['deadlineDate'] : 'Czwartek';
+    $dlTimeSnap = isset($weekly['deadlineTime']) && $weekly['deadlineTime'] ? (string)$weekly['deadlineTime'] : '23:59';
+    $lines[] = "AKTUALNY SEZON (serwer): {$season} | Tydzień rozgrywkowy: {$week} | Koniec kolejki: zawsze Czwartek 23:59 (bieżący termin: {$dlDateSnap} {$dlTimeSnap})";
     if (isset($weekly['extensions']) && is_array($weekly['extensions']) && count($weekly['extensions']) > 0) {
         $extSummaries = array();
         foreach ($weekly['extensions'] as $ex) {
@@ -4484,6 +4486,361 @@ if ($method === 'POST') {
             'extension' => $extRecord,
             'extensions' => $prevDb['weeklyConfig']['extensions'],
             'notifiedCount' => $notifiedCount,
+            'updatedAt' => $tsMs,
+            'state' => $prevDb
+        ), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // Akcja 2d-release-round: Atomowe puszczenie nowej kolejki / tygodnia (również WCZEŚNIEJ przed Czwartkiem 23:59) + przekazanie nierozegranych meczów z zamkniętej kolejki do Adminów (?action=admin_release_round)
+    if ($action === 'admin_release_round') {
+        $lockFp = smpl_lock_db($dataDir);
+        $prevDb = smpl_read_db($dbFile, $backupFile);
+        $adminTokenInfo = smpl_validate_admin_token($tokenFile, $prevDb);
+        if ($adminTokenInfo === null) {
+            smpl_unlock_db($lockFp);
+            http_response_code(401);
+            echo json_encode(array(
+                'ok' => false,
+                'code' => 'ADMIN_TOKEN_EXPIRED',
+                'error' => 'Sesja Administratora na serwerze wygasła lub brak tokena (X-SMPL-Admin-Token). Zaloguj się ponownie hasłem Admina.'
+            ), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if (!is_array($prevDb) || !isset($prevDb['players']) || !is_array($prevDb['players'])) {
+            smpl_unlock_db($lockFp);
+            http_response_code(400);
+            echo json_encode(array('ok' => false, 'error' => 'Baza danych SMPL na serwerze jest pusta lub uszkodzona.'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $body = @json_decode((string)$input, true);
+        if (!is_array($body)) $body = array();
+        if (!isset($prevDb['weeklyConfig']) || !is_array($prevDb['weeklyConfig'])) {
+            $prevDb['weeklyConfig'] = array('roundsPerWeek' => 4, 'currentWeek' => 1, 'totalWeeks' => 4);
+        }
+
+        $rpw = isset($prevDb['weeklyConfig']['roundsPerWeek']) ? max(1, (int)$prevDb['weeklyConfig']['roundsPerWeek']) : 4;
+        $maxRound = 15;
+        if (isset($prevDb['leagues']) && is_array($prevDb['leagues'])) {
+            foreach ($prevDb['leagues'] as $lObj) {
+                if (is_array($lObj) && isset($lObj['totalRounds']) && (int)$lObj['totalRounds'] > $maxRound) {
+                    $maxRound = (int)$lObj['totalRounds'];
+                }
+            }
+        }
+        if (isset($prevDb['matches']) && is_array($prevDb['matches'])) {
+            foreach ($prevDb['matches'] as $mItem) {
+                if (is_array($mItem) && isset($mItem['round']) && (int)$mItem['round'] > $maxRound) {
+                    $maxRound = (int)$mItem['round'];
+                }
+            }
+        }
+        $totalWeeks = max(1, (int)ceil($maxRound / $rpw));
+        $prevWeek = isset($prevDb['weeklyConfig']['currentWeek']) ? max(1, (int)$prevDb['weeklyConfig']['currentWeek']) : 1;
+
+        $targetWeek = isset($body['weekNum']) ? (int)$body['weekNum'] : $prevWeek;
+        if ($targetWeek < 1) $targetWeek = 1;
+        if ($targetWeek > $totalWeeks) $targetWeek = $totalWeeks;
+
+        $targetRound = isset($body['roundNum']) ? (int)$body['roundNum'] : (($targetWeek - 1) * $rpw + 1);
+        if ($targetRound < 1) $targetRound = 1;
+        if ($targetRound > $maxRound) $targetRound = $maxRound;
+
+        $closeUpToRound = isset($body['closeUpToRound'])
+            ? max(0, min($maxRound, (int)$body['closeUpToRound']))
+            : max(0, ($targetWeek - 1) * $rpw);
+        $prevClosed = isset($prevDb['weeklyConfig']['closedRoundsUpTo']) ? (int)$prevDb['weeklyConfig']['closedRoundsUpTo'] : 0;
+        $newClosedUpTo = max($prevClosed, $closeUpToRound);
+
+        $deadlineDate = isset($body['deadlineDate']) ? trim((string)$body['deadlineDate']) : '';
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $deadlineDate)) {
+            $tzObj = new DateTimeZone('Europe/Warsaw');
+            $dtNow = new DateTime('now', $tzObj);
+            $dow = (int)$dtNow->format('N'); // 1=Mon..4=Thu..7=Sun
+            $daysToThu = (4 - $dow + 7) % 7;
+            if ($daysToThu === 0 && (int)$dtNow->format('G') >= 20) {
+                $daysToThu = 7;
+            }
+            if ($daysToThu > 0) {
+                $dtNow->modify('+' . $daysToThu . ' days');
+            }
+            $deadlineDate = $dtNow->format('Y-m-d');
+        }
+        $deadlineTime = isset($body['deadlineTime']) && preg_match('/^\d{2}:\d{2}$/', trim((string)$body['deadlineTime']))
+            ? trim((string)$body['deadlineTime'])
+            : '23:59';
+
+        $admName = isset($adminTokenInfo['adminName']) && $adminTokenInfo['adminName'] ? (string)$adminTokenInfo['adminName'] : 'Szymon Komenda';
+        $nowFmt = date('Y-m-d H:i');
+        $tsMs = (int)(microtime(true) * 1000);
+        $isEarlyRelease = !empty($body['isEarlyRelease']);
+
+        $prevDb['weeklyConfig']['totalWeeks'] = $totalWeeks;
+        $prevDb['weeklyConfig']['currentWeek'] = $targetWeek;
+        $prevDb['weeklyConfig']['currentRoundReleased'] = $targetRound;
+        $prevDb['weeklyConfig']['closedRoundsUpTo'] = $newClosedUpTo;
+        $prevDb['weeklyConfig']['deadlineDay'] = 'THURSDAY';
+        $prevDb['weeklyConfig']['deadlineDate'] = $deadlineDate;
+        $prevDb['weeklyConfig']['deadlineTime'] = $deadlineTime;
+        $prevDb['weeklyConfig']['timeZone'] = 'Europe/Warsaw';
+        $prevDb['weeklyConfig']['lastReleasedBy'] = $admName;
+        $prevDb['weeklyConfig']['lastReleasedAt'] = $nowFmt;
+
+        // Policz ile nierozegranych meczów z zamkniętych kolejek (<= newClosedUpTo) trafia do Adminów
+        $playersById = array();
+        foreach ($prevDb['players'] as $plObj) {
+            if (is_array($plObj) && isset($plObj['id'])) {
+                $playersById[(string)$plObj['id']] = $plObj;
+            }
+        }
+        $unplayedEscalatedCount = 0;
+        if ($newClosedUpTo > 0 && isset($prevDb['matches']) && is_array($prevDb['matches'])) {
+            foreach ($prevDb['matches'] as $mIdx => $mObj) {
+                if (!is_array($mObj)) continue;
+                $stM = isset($mObj['status']) ? (string)$mObj['status'] : '';
+                $rndM = isset($mObj['round']) ? (int)$mObj['round'] : 0;
+                if ($stM !== 'SCHEDULED' || $rndM < 1 || $rndM > $newClosedUpTo || !empty($mObj['isByeWalkover'])) continue;
+                $hp = isset($mObj['homeId']) && isset($playersById[(string)$mObj['homeId']]) ? $playersById[(string)$mObj['homeId']] : null;
+                $ap = isset($mObj['awayId']) && isset($playersById[(string)$mObj['awayId']]) ? $playersById[(string)$mObj['awayId']] : null;
+                if (($hp && !empty($hp['isPlaceholder'])) || ($ap && !empty($ap['isPlaceholder']))) continue;
+                $prevDb['matches'][$mIdx]['escalatedToAdminAt'] = $nowFmt;
+                $unplayedEscalatedCount++;
+            }
+        }
+
+        $rStartW = ($targetWeek - 1) * $rpw + 1;
+        $rEndW = min($maxRound, $targetWeek * $rpw);
+        $notifyPlayers = array_key_exists('notifyPlayers', $body) ? !empty($body['notifyPlayers']) : true;
+        $notifiedCount = 0;
+        if ($notifyPlayers) {
+            foreach ($prevDb['players'] as $pIdx => $pl) {
+                if (!is_array($pl) || !empty($pl['isPlaceholder']) || !empty($pl['gdprDeleted'])) continue;
+                if (isset($pl['active']) && $pl['active'] === false) continue;
+                $pLid = isset($pl['leagueId']) ? (string)$pl['leagueId'] : '';
+                if ($pLid === '' || $pLid === 'POOL') continue;
+                if (!isset($prevDb['players'][$pIdx]['notifications']) || !is_array($prevDb['players'][$pIdx]['notifications'])) {
+                    $prevDb['players'][$pIdx]['notifications'] = array();
+                }
+                array_unshift($prevDb['players'][$pIdx]['notifications'], array(
+                    'id' => 'NOTIF_REL_' . $tsMs . '_' . $pIdx,
+                    'type' => 'ROUND_RELEASED',
+                    'time' => $nowFmt,
+                    'read' => false,
+                    'title' => '⚽ Rusza Tydzień #' . $targetWeek . ' (Kolejki K' . $rStartW . '–K' . $rEndW . ')!',
+                    'text' => ($isEarlyRelease ? 'Administracja puściła nową kolejkę wcześniej! ' : 'Wystartowała nowa kolejka! ') . 'Termin rozegrania meczów: Czwartek ' . $deadlineDate . ' godz. ' . $deadlineTime . '.'
+                ));
+                if (count($prevDb['players'][$pIdx]['notifications']) > 40) {
+                    $prevDb['players'][$pIdx]['notifications'] = array_slice($prevDb['players'][$pIdx]['notifications'], 0, 40);
+                }
+                $notifiedCount++;
+            }
+        }
+
+        $prevDb['updatedAt'] = $tsMs;
+        $escTxt = $unplayedEscalatedCount > 0
+            ? (' • 🚨 Przekazano ' . $unplayedEscalatedCount . ' nierozegranych meczów z K1–K' . $newClosedUpTo . ' do decyzji Adminów')
+            : '';
+        $logItem = array(
+            'id' => 'LOG_REL_' . $tsMs . '_' . mt_rand(10, 99),
+            'time' => $nowFmt,
+            'type' => 'ROUND_RELEASED',
+            'text' => '🚀 Admin ' . $admName . ' puścił ' . ($isEarlyRelease ? 'WCZEŚNIEJ ' : '') . 'Tydzień #' . $targetWeek . ' (Kolejki K' . $rStartW . '–K' . $rEndW . ' • koniec: Czwartek ' . $deadlineDate . ' ' . $deadlineTime . ')' . $escTxt . '.'
+        );
+        if (!isset($prevDb['activityLog']) || !is_array($prevDb['activityLog'])) $prevDb['activityLog'] = array();
+        array_unshift($prevDb['activityLog'], $logItem);
+        if (count($prevDb['activityLog']) > 120) $prevDb['activityLog'] = array_slice($prevDb['activityLog'], 0, 120);
+        if (!isset($prevDb['logs']) || !is_array($prevDb['logs'])) $prevDb['logs'] = array();
+        array_unshift($prevDb['logs'], $logItem);
+        if (count($prevDb['logs']) > 300) $prevDb['logs'] = array_slice($prevDb['logs'], 0, 300);
+
+        $encRel = json_encode($prevDb, JSON_UNESCAPED_UNICODE);
+        $written = @file_put_contents($dbFile, $encRel, LOCK_EX);
+        if ($written !== false) @file_put_contents($backupFile, $encRel, LOCK_EX);
+        smpl_unlock_db($lockFp);
+        if ($written === false) {
+            http_response_code(500);
+            echo json_encode(array('ok' => false, 'error' => 'Brak uprawnień zapisu do bazy danych na serwerze.'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
+        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_RELEASE_ROUND | IP: " . $clientIp . " | week=" . $targetWeek . " closedUpTo=" . $newClosedUpTo . " escalated=" . $unplayedEscalatedCount . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
+
+        echo json_encode(array(
+            'ok' => true,
+            'weeklyConfig' => $prevDb['weeklyConfig'],
+            'unplayedEscalatedCount' => $unplayedEscalatedCount,
+            'notifiedCount' => $notifiedCount,
+            'updatedAt' => $tsMs,
+            'state' => $prevDb
+        ), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // Akcja 2d-resolve-unplayed: Atomowe podjęcie działania przez Admina wobec nierozegranych meczów po końcu kolejki (?action=admin_resolve_unplayed)
+    if ($action === 'admin_resolve_unplayed') {
+        $lockFp = smpl_lock_db($dataDir);
+        $prevDb = smpl_read_db($dbFile, $backupFile);
+        $adminTokenInfo = smpl_validate_admin_token($tokenFile, $prevDb);
+        if ($adminTokenInfo === null) {
+            smpl_unlock_db($lockFp);
+            http_response_code(401);
+            echo json_encode(array(
+                'ok' => false,
+                'code' => 'ADMIN_TOKEN_EXPIRED',
+                'error' => 'Sesja Administratora na serwerze wygasła lub brak tokena (X-SMPL-Admin-Token). Zaloguj się ponownie hasłem Admina.'
+            ), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if (!is_array($prevDb) || !isset($prevDb['matches']) || !is_array($prevDb['matches'])) {
+            smpl_unlock_db($lockFp);
+            http_response_code(400);
+            echo json_encode(array('ok' => false, 'error' => 'Baza meczów na serwerze jest pusta lub uszkodzona.'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $body = @json_decode((string)$input, true);
+        if (!is_array($body)) $body = array();
+        $matchIdsRaw = isset($body['matchIds']) && is_array($body['matchIds']) ? $body['matchIds'] : array();
+        $matchIdMap = array();
+        foreach ($matchIdsRaw as $midVal) {
+            $mTrim = trim((string)$midVal);
+            if ($mTrim !== '') $matchIdMap[$mTrim] = true;
+        }
+        if (empty($matchIdMap)) {
+            smpl_unlock_db($lockFp);
+            http_response_code(400);
+            echo json_encode(array('ok' => false, 'error' => 'Wskaż przynajmniej jeden nierozegrany mecz do rozstrzygnięcia.'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $decision = isset($body['decision']) ? strtoupper(trim((string)$body['decision'])) : 'BOTH_LOSE';
+        $winnerPlayerId = isset($body['winnerPlayerId']) ? trim((string)$body['winnerPlayerId']) : '';
+        $rawReason = isset($body['reason']) ? (string)$body['reason'] : '';
+        $cleanReason = str_replace(array("\r\n", "\r", "\n"), ' ', strip_tags($rawReason));
+        $cleanReason = preg_replace('/[\x00-\x1F\x7F]/u', '', $cleanReason);
+        $cleanReason = trim((string)$cleanReason);
+        if ($cleanReason === '') {
+            $cleanReason = 'Brak rozegrania meczu do końca kolejki (Czwartek 23:59) — decyzja Administracji SMPL.';
+        }
+        $cleanReason = function_exists('mb_substr') ? mb_substr($cleanReason, 0, 260, 'UTF-8') : substr($cleanReason, 0, 260);
+
+        $admName = isset($adminTokenInfo['adminName']) && $adminTokenInfo['adminName'] ? (string)$adminTokenInfo['adminName'] : 'Szymon Komenda';
+        $nowFmt = date('Y-m-d H:i');
+        $tsMs = (int)(microtime(true) * 1000);
+
+        $playerIdxById = array();
+        foreach ($prevDb['players'] as $pi => $pObj) {
+            if (is_array($pObj) && isset($pObj['id'])) {
+                $playerIdxById[(string)$pObj['id']] = $pi;
+            }
+        }
+
+        $resolvedCount = 0;
+        $resolvedSummaries = array();
+        foreach ($prevDb['matches'] as $mi => $mObj) {
+            if (!is_array($mObj) || !isset($mObj['id'])) continue;
+            $mid = (string)$mObj['id'];
+            if (!isset($matchIdMap[$mid])) continue;
+            $curSt = isset($mObj['status']) ? (string)$mObj['status'] : 'SCHEDULED';
+            if ($curSt === 'APPROVED' || ($curSt === 'WALKOVER' && !empty($mObj['isByeWalkover']))) continue;
+
+            $hId = isset($mObj['homeId']) ? (string)$mObj['homeId'] : '';
+            $aId = isset($mObj['awayId']) ? (string)$mObj['awayId'] : '';
+            $hs = 0;
+            $as = 0;
+            if ($decision === 'PLAYER_WIN' && $winnerPlayerId !== '') {
+                if ($winnerPlayerId === $hId) { $hs = 2; $as = 0; }
+                elseif ($winnerPlayerId === $aId) { $hs = 0; $as = 2; }
+            } elseif ($decision === 'HOME_WIN') {
+                $hs = 2; $as = 0;
+            } elseif ($decision === 'AWAY_WIN') {
+                $hs = 0; $as = 2;
+            } else {
+                $hs = 0; $as = 0;
+            }
+
+            $prevDb['matches'][$mi]['homeScore'] = $hs;
+            $prevDb['matches'][$mi]['awayScore'] = $as;
+            $prevDb['matches'][$mi]['status'] = 'WALKOVER';
+            $prevDb['matches'][$mi]['isBothLoseWalkover'] = ($hs === 0 && $as === 0);
+            $prevDb['matches'][$mi]['comment'] = $cleanReason;
+            $prevDb['matches'][$mi]['submittedBy'] = $admName . ' (Decyzja Po Terminie)';
+            $prevDb['matches'][$mi]['submittedAt'] = $nowFmt;
+            $prevDb['matches'][$mi]['approvedBy'] = $admName;
+            $prevDb['matches'][$mi]['approvedAt'] = $nowFmt;
+            $resolvedCount++;
+
+            $hName = isset($playerIdxById[$hId]) ? (string)$prevDb['players'][$playerIdxById[$hId]]['name'] : $hId;
+            $aName = isset($playerIdxById[$aId]) ? (string)$prevDb['players'][$playerIdxById[$aId]]['name'] : $aId;
+            $rndNum = isset($mObj['round']) ? (int)$mObj['round'] : 0;
+            $resolvedSummaries[] = 'K' . $rndNum . ' ' . $hName . ' ' . $hs . ':' . $as . ' WO ' . $aName;
+
+            foreach (array($hId, $aId) as $notifyPid) {
+                if ($notifyPid === '' || !isset($playerIdxById[$notifyPid])) continue;
+                $pTargetIdx = $playerIdxById[$notifyPid];
+                $pTarget = $prevDb['players'][$pTargetIdx];
+                if (!empty($pTarget['isPlaceholder']) || !empty($pTarget['gdprDeleted'])) continue;
+                if (!isset($prevDb['players'][$pTargetIdx]['notifications']) || !is_array($prevDb['players'][$pTargetIdx]['notifications'])) {
+                    $prevDb['players'][$pTargetIdx]['notifications'] = array();
+                }
+                array_unshift($prevDb['players'][$pTargetIdx]['notifications'], array(
+                    'id' => 'NOTIF_RES_' . $tsMs . '_' . $mi . '_' . $pTargetIdx,
+                    'type' => 'WALKOVER',
+                    'time' => $nowFmt,
+                    'read' => false,
+                    'title' => '⚖️ Decyzja Admina w Kolejce #' . $rndNum . ' (' . $hs . ':' . $as . ' WO)',
+                    'text' => $hName . ' ' . $hs . ':' . $as . ' WO ' . $aName . ' — ' . $cleanReason . ' (Admin: ' . $admName . ')'
+                ));
+                if (count($prevDb['players'][$pTargetIdx]['notifications']) > 40) {
+                    $prevDb['players'][$pTargetIdx]['notifications'] = array_slice($prevDb['players'][$pTargetIdx]['notifications'], 0, 40);
+                }
+            }
+        }
+
+        // Zamknij powiązane otwarte spory VAR dla rozstrzygniętych meczów
+        if (isset($prevDb['competitions']['matchDisputes']) && is_array($prevDb['competitions']['matchDisputes'])) {
+            foreach ($prevDb['competitions']['matchDisputes'] as $di => $disp) {
+                if (!is_array($disp) || !isset($disp['matchId'])) continue;
+                $dSt = isset($disp['status']) ? strtoupper((string)$disp['status']) : 'PENDING';
+                if (isset($matchIdMap[(string)$disp['matchId']]) && ($dSt === 'OPEN' || $dSt === 'PENDING')) {
+                    $prevDb['competitions']['matchDisputes'][$di]['status'] = 'RESOLVED';
+                    $prevDb['competitions']['matchDisputes'][$di]['resolvedBy'] = $admName;
+                    $prevDb['competitions']['matchDisputes'][$di]['resolvedAt'] = $nowFmt;
+                    $prevDb['competitions']['matchDisputes'][$di]['adminNote'] = $cleanReason;
+                }
+            }
+        }
+
+        $prevDb['updatedAt'] = $tsMs;
+        $logItem = array(
+            'id' => 'LOG_UNP_' . $tsMs . '_' . mt_rand(10, 99),
+            'time' => $nowFmt,
+            'type' => 'WALKOVER',
+            'text' => '⚖️ Admin ' . $admName . ' podjął decyzję ws. nierozegranych meczów po terminie (' . implode(' | ', array_slice($resolvedSummaries, 0, 4)) . ') — ' . $cleanReason
+        );
+        if (!isset($prevDb['activityLog']) || !is_array($prevDb['activityLog'])) $prevDb['activityLog'] = array();
+        array_unshift($prevDb['activityLog'], $logItem);
+        if (count($prevDb['activityLog']) > 120) $prevDb['activityLog'] = array_slice($prevDb['activityLog'], 0, 120);
+        if (!isset($prevDb['logs']) || !is_array($prevDb['logs'])) $prevDb['logs'] = array();
+        array_unshift($prevDb['logs'], $logItem);
+        if (count($prevDb['logs']) > 300) $prevDb['logs'] = array_slice($prevDb['logs'], 0, 300);
+
+        $encRes = json_encode($prevDb, JSON_UNESCAPED_UNICODE);
+        $written = @file_put_contents($dbFile, $encRes, LOCK_EX);
+        if ($written !== false) @file_put_contents($backupFile, $encRes, LOCK_EX);
+        smpl_unlock_db($lockFp);
+        if ($written === false) {
+            http_response_code(500);
+            echo json_encode(array('ok' => false, 'error' => 'Brak uprawnień zapisu do bazy danych na serwerze.'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
+        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_RESOLVE_UNPLAYED | IP: " . $clientIp . " | resolved=" . $resolvedCount . " decision=" . $decision . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
+
+        echo json_encode(array(
+            'ok' => true,
+            'resolvedCount' => $resolvedCount,
             'updatedAt' => $tsMs,
             'state' => $prevDb
         ), JSON_UNESCAPED_UNICODE);

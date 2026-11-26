@@ -1385,6 +1385,10 @@ window.SMPL_FORMS_ADMIN = (function () {
     });
 
     const pendingMatches = state.matches.filter((m) => m.status === 'PENDING');
+    const overdueActionInfo = (window.SMPL_DB && typeof window.SMPL_DB.getUnplayedMatchesForAdminAction === 'function')
+      ? window.SMPL_DB.getUnplayedMatchesForAdminAction(state, 'ALL')
+      : { matches: [], ties: [] };
+    const overdueUnplayedCount = overdueActionInfo.matches.length;
     const pendingRegs = (state.registrations || []).filter((r) => r.status === 'PENDING');
     const approvedPoolRegs = (state.registrations || []).filter((r) => r && r.status === 'APPROVED_POOL');
     const nonAdminPlayers = isMasterOwner
@@ -1443,6 +1447,11 @@ window.SMPL_FORMS_ADMIN = (function () {
       }`;
 
     const urgentItems = [];
+    if (overdueUnplayedCount > 0) {
+      urgentItems.push(
+        `<button type="button" onclick="SMPL_APP.setAdminSubTab('moderation')" class="px-2.5 py-1 rounded-lg bg-rose-500/25 hover:bg-rose-500/40 text-rose-200 border border-rose-400/60 text-[11px] font-display font-black animate-pulse transition">🚨 ${overdueUnplayedCount} nierozegranych po terminie (podejmij działanie) →</button>`
+      );
+    }
     if (pendingMatches.length > 0) {
       urgentItems.push(
         `<button type="button" onclick="SMPL_APP.setAdminSubTab('moderation')" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-400/50 text-[11px] font-display font-bold transition">⏳ ${pendingMatches.length} meczów do weryfikacji →</button>`
@@ -1538,7 +1547,7 @@ window.SMPL_FORMS_ADMIN = (function () {
             </button>
             <button type="button" onclick="SMPL_APP.setAdminSubTab('moderation')" class="${tabBtnClass('moderation')}">
               <span>✅ Wyniki</span>
-              <span class="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black">${pendingMatches.length}</span>
+              <span class="px-1.5 py-0.2 rounded-full ${overdueUnplayedCount > 0 ? 'bg-rose-500 text-white animate-pulse' : 'bg-amber-500 text-slate-950'} font-black">${pendingMatches.length + overdueUnplayedCount}</span>
             </button>
             <button type="button" onclick="SMPL_APP.setAdminSubTab('recruitment')" class="${tabBtnClass('recruitment')}">
               <span>👥 Kadra &amp; Zapisy</span>
@@ -1546,6 +1555,7 @@ window.SMPL_FORMS_ADMIN = (function () {
             </button>
             <button type="button" onclick="SMPL_APP.setAdminSubTab('schedule')" class="${tabBtnClass('schedule')}">
               <span>🗓️ Terminarz &amp; Kolejki</span>
+              ${overdueUnplayedCount > 0 ? `<span class="px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-black">${overdueUnplayedCount}</span>` : ''}
             </button>
             <button type="button" onclick="SMPL_APP.setAdminSubTab('tribunal')" class="${tabBtnClass('tribunal')}">
               <span>⚖️ Trybunał &amp; VAR</span>
@@ -2064,6 +2074,10 @@ window.SMPL_FORMS_ADMIN = (function () {
                      </div>`
               }
             </div>
+
+            <div class="mt-6">
+              ${renderAdminUnplayedActionQueue(state, playersMap)}
+            </div>
           `
           : ''
       }
@@ -2083,14 +2097,19 @@ window.SMPL_FORMS_ADMIN = (function () {
               <div class="glass-panel rounded-2xl p-5 sm:p-6 border-2 border-amber-400/40">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
                   <div class="lg:col-span-7">
-                    <span class="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-display font-bold text-[10px] uppercase">
-                      ⏱️ ZARZĄDZANIE TEMPEM LIGI (4 KOLEJKI NA TYDZIEŃ)
-                    </span>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-display font-bold text-[10px] uppercase">
+                        ⏱️ ZARZĄDZANIE TEMPEM LIGI (4 KOLEJKI NA TYDZIEŃ)
+                      </span>
+                      <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-display font-bold text-[10px] uppercase">
+                        ⏰ KONIEC KOLEJKI: ZAWSZE CZWARTEK 23:59
+                      </span>
+                    </div>
                     <h3 class="font-display font-black text-lg text-white uppercase mt-1">
                       Aktywny Tydzień Rozgrywkowy: Tydzień #${(state.weeklyConfig && state.weeklyConfig.currentWeek) || 2}
                     </h3>
                     <p class="text-xs text-slate-300 mt-0.5 mb-3">
-                      Przełącz aktywny tydzień (każdy tydzień to 4 kolejki) lub wygeneruj gotowy raport na grupę FB / Messenger jednym kliknięciem:
+                      Kolejka kończy się <strong>zawsze w czwartek o 23:59</strong>, ale każdy Admin może <strong>puścić następną kolejkę wcześniej</strong>! Wszystkie nierozegrane mecze po zamknięciu kolejki trafiają automatycznie poniżej do decyzji Adminów:
                     </p>
                     <div class="flex flex-wrap items-center gap-1.5">
                       ${(() => {
@@ -2125,11 +2144,11 @@ window.SMPL_FORMS_ADMIN = (function () {
                   </div>
 
                   <div class="lg:col-span-5 flex flex-col gap-2.5">
+                    <button type="button" onclick="SMPL_APP.openReleaseRoundDialog()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-display font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2">
+                      <span>🚀 Puść Kolejkę / Zamknij Obecną Wcześniej (Koniec: Czwartek 23:59)</span>
+                    </button>
                     <button type="button" onclick="SMPL_APP.openRoundExtensionDialog()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-amber-500 hover:from-violet-500 hover:to-amber-400 text-white font-display font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2 border border-amber-300/40">
                       <span>⏳ Przedłuż Kolejkę / Tydzień (Święta / Wyjątkowe)</span>
-                    </button>
-                    <button type="button" onclick="SMPL_APP.handleBroadcastRoundRelease()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-display font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2">
-                      <span>📢 Puść Kolejkę / Wyślij Powiadomienie PUSH do Graczy</span>
                     </button>
                     <button type="button" onclick="SMPL_APP.openMessengerReportModal()" class="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-display font-black text-xs uppercase shadow-lg">
                       📱 Wygeneruj i Skopiuj Raport Tygodnia na Messenger / FB
@@ -2196,6 +2215,8 @@ window.SMPL_FORMS_ADMIN = (function () {
                   `;
                 })()}
               </div>
+
+              ${renderAdminUnplayedActionQueue(state, playersMap)}
 
               <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div class="lg:col-span-6 glass-panel rounded-2xl p-5 sm:p-6 border border-white/10">
@@ -2269,8 +2290,8 @@ window.SMPL_FORMS_ADMIN = (function () {
 
                   <div class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
                     ${state.matches
-                      .filter((m) => m.leagueId === activeLeagueId && m.round <= 8)
-                      .slice(0, 20)
+                      .filter((m) => m && m.leagueId === activeLeagueId && !m.isByeWalkover)
+                      .slice(0, 32)
                       .map((m) => {
                         const hp = playersMap[m.homeId];
                         const ap = playersMap[m.awayId];
@@ -2293,13 +2314,16 @@ window.SMPL_FORMS_ADMIN = (function () {
                               </div>
                             </div>
                             <div class="flex items-center gap-1.5">
-                              <button onclick="SMPL_APP.adminQuickWalkover('${m.id}', 'HOME_WIN')" class="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 border border-emerald-500/40 font-bold">
+                              <button type="button" onclick="SMPL_APP.handleResolveUnplayedTie('${escapeHtml(m.id)}', 'HOME_WIN', '', '')" class="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 border border-emerald-500/40 font-bold">
                                 2:0 WO
                               </button>
-                              <button onclick="SMPL_APP.adminQuickWalkover('${m.id}', 'AWAY_WIN')" class="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/35 text-rose-300 border border-rose-500/40 font-bold">
+                              <button type="button" onclick="SMPL_APP.handleResolveUnplayedTie('${escapeHtml(m.id)}', 'AWAY_WIN', '', '')" class="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/35 text-rose-300 border border-rose-500/40 font-bold">
                                 0:2 WO
                               </button>
-                              <button onclick="SMPL_APP.openAdminEditMatchModal('${m.id}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white border border-white/15 font-semibold">
+                              <button type="button" onclick="SMPL_APP.handleResolveUnplayedTie('${escapeHtml(m.id)}', 'BOTH_LOSE', '', '')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/15 font-bold" title="Obustronny walkower 0:0 WO (0 pkt)">
+                                0:0 WO
+                              </button>
+                              <button type="button" onclick="SMPL_APP.openAdminEditMatchModal('${m.id}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white border border-white/15 font-semibold">
                                 ✏️ Wynik
                               </button>
                             </div>
@@ -3375,7 +3399,7 @@ window.SMPL_FORMS_ADMIN = (function () {
 
               <div>
                 <label class="block text-[11px] font-display uppercase text-slate-300 font-bold mb-1">Własne wytyczne dla Vanessy (opcjonalnie)</label>
-                <textarea id="ai-gemini-persona" rows="2" placeholder="Np. Przypominaj o wysyłaniu screenów do niedzieli 22:00 i pisz luźnym sportowym stylem..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-pink-400"></textarea>
+                <textarea id="ai-gemini-persona" rows="2" placeholder="Np. Przypominaj o wysyłaniu screenów do czwartku 23:59 i pisz luźnym sportowym stylem..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-pink-400"></textarea>
               </div>
 
               <div class="flex flex-wrap items-center gap-2.5 pt-1">
@@ -3720,6 +3744,165 @@ window.SMPL_FORMS_ADMIN = (function () {
     `;
   }
 
+  function renderAdminUnplayedActionQueue(state, playersMap) {
+    const info = (window.SMPL_DB && typeof window.SMPL_DB.getUnplayedMatchesForAdminAction === 'function')
+      ? window.SMPL_DB.getUnplayedMatchesForAdminAction(state, 'ALL')
+      : { matches: [], ties: [] };
+    const ties = info.ties || [];
+    const totalMatches = info.matches.length;
+    const dlInfo = (window.SMPL_DB && typeof window.SMPL_DB.getActiveDeadlineInfo === 'function')
+      ? window.SMPL_DB.getActiveDeadlineInfo(state, null, null)
+      : { deadlineDate: 'Czwartek', deadlineTime: '23:59', isExtended: false };
+
+    return `
+      <div class="glass-panel rounded-2xl p-5 sm:p-6 border-2 ${totalMatches > 0 ? 'border-rose-500/60 bg-rose-950/15' : 'border-emerald-400/35 bg-slate-950/85'}">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-white/10">
+          <div>
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              <span class="px-2.5 py-0.5 rounded-full ${totalMatches > 0 ? 'bg-rose-500/25 text-rose-200 border border-rose-400/50 animate-pulse' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'} text-[10px] font-display font-black uppercase">
+                ${totalMatches > 0 ? `🚨 ${totalMatches} MECZÓW (${ties.length} PAR) DO DECYZJI ADMINÓW` : '✅ BRAK ZALEGŁYCH MECZÓW PO TERMINIE'}
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/35 text-amber-200 text-[10px] font-display font-bold uppercase">
+                ⏰ ZASADA SMPL: KONIEC KOLEJKI ZAWSZE W CZWARTEK 23:59 (AKTUALNY: ${escapeHtml(dlInfo.deadlineDate)} ${escapeHtml(dlInfo.deadlineTime)})
+              </span>
+            </div>
+            <h3 class="font-display font-black text-base sm:text-lg text-white uppercase">
+              ⚖️ Mecze Nierozegrane Po Końcu Kolejki — Skrzynka Działań Adminów
+            </h3>
+            <p class="text-xs text-slate-300 mt-0.5">
+              Gdy wybije <strong>Czwartek 23:59</strong> (lub gdy Admin <strong>puści następną kolejkę wcześniej</strong>), wszystkie nierozegrane spotkania trafiają tutaj, aby Administracja podjęła decyzję (walkower jednostronny, obustronny 0:0 WO lub dogrywka).
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            ${
+              totalMatches > 1
+                ? `<button type="button" onclick="SMPL_APP.handleResolveAllUnplayedBothLose()" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-display font-black text-xs uppercase shadow-lg transition">
+                     ⛔ Obustronny 0:0 WO dla wszystkich (${totalMatches})
+                   </button>`
+                : ''
+            }
+            <button type="button" onclick="SMPL_APP.openReleaseRoundDialog()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-display font-black text-xs uppercase shadow-lg transition">
+              🚀 Puść Kolejkę / Wcześniej
+            </button>
+          </div>
+        </div>
+
+        ${
+          ties.length === 0
+            ? `<div class="px-4 py-3 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                 <div class="font-display font-bold text-emerald-200">✅ Brak nierozegranych meczów z zakończonych kolejek — wszystkie aktywne pary mieszczą się w terminie!</div>
+                 <details class="text-slate-300">
+                   <summary class="cursor-pointer font-bold text-amber-200 hover:text-amber-100 select-none">ℹ️ Zasady przekazywania meczów Adminom</summary>
+                   <p class="mt-2 p-2.5 rounded-xl bg-slate-900/90 border border-white/10 text-[11px] text-slate-300 leading-relaxed max-w-2xl">
+                     Każda kolejka kończy się domyślnie w <strong>Czwartek o 23:59 (Warszawa)</strong>. Jeśli Admin puści nową kolejkę wcześniej lub minie czwartek 23:59 (i nie ma aktywnego przedłużenia ⏳), wszystkie nierozegrane mecze <code>SCHEDULED</code> automatycznie trafią do tej skrzynki z dowodami „Kiedy Gramy?” i sporami VAR.
+                   </p>
+                 </details>
+               </div>`
+            : `<div class="grid grid-cols-1 xl:grid-cols-2 gap-3.5">
+                 ${ties
+                   .map((tie) => {
+                     const lgName = (state.leagues && state.leagues[tie.leagueId] && (state.leagues[tie.leagueId].shortName || state.leagues[tie.leagueId].name)) || tie.leagueId;
+                     const unplayedIdsCsv = tie.unplayedMatches.map((x) => x.id).join(',');
+                     const pA = tie.playerA;
+                     const pB = tie.playerB;
+                     const pr = tie.latestProposal;
+                     const ds = tie.latestDispute;
+                     const playedInPair = tie.allLegs.filter((x) => x.status === 'APPROVED' || x.status === 'WALKOVER');
+                     const noteInputId = 'unplayed-note-' + String(tie.tieKey).replace(/[^A-Za-z0-9_-]/g, '_');
+                     const ptsLabel = tie.unplayedMatches.length === 2 ? '+6 pkt (dwumecz)' : '+3 pkt (1 mecz)';
+                     return `
+                       <div class="p-4 rounded-2xl bg-slate-950/90 border border-rose-400/40 flex flex-col justify-between gap-3">
+                         <div class="space-y-2">
+                           <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                             <div class="flex flex-wrap items-center gap-1.5">
+                               <span class="px-2 py-0.5 rounded bg-rose-500/25 text-rose-200 border border-rose-400/50 font-display font-black uppercase">
+                                 ${escapeHtml(lgName)} • KOLEJKA #${tie.round}
+                               </span>
+                               <span class="px-2 py-0.5 rounded bg-white/10 text-slate-200 font-bold">
+                                 Nierozegrano: ${tie.unplayedMatches.length}/${tie.allLegs.length} meczów
+                               </span>
+                             </div>
+                             ${
+                               playedInPair.length > 0
+                                 ? `<span class="text-emerald-300 font-bold">1. mecz rozegrany: ${playedInPair[0].homeScore}:${playedInPair[0].awayScore}</span>`
+                                 : ''
+                             }
+                           </div>
+
+                           <div class="flex items-center justify-between gap-2 py-1">
+                             <div class="flex items-center gap-2 min-w-0">
+                               ${pA.avatar ? `<img src="${pA.avatar}" alt="" class="w-8 h-8 rounded-full object-cover border border-blue-400/40 flex-shrink-0"/>` : ''}
+                               <div class="min-w-0">
+                                 <div class="font-display font-bold text-white text-xs sm:text-sm truncate">${escapeHtml(pA.name)}</div>
+                                 <div class="text-[10px] text-slate-400">@${escapeHtml(pA.nick || '')}</div>
+                               </div>
+                             </div>
+                             <span class="px-2 py-0.5 rounded bg-slate-900 border border-white/15 font-display font-black text-[11px] text-rose-300">VS</span>
+                             <div class="flex items-center gap-2 min-w-0 text-right justify-end">
+                               <div class="min-w-0">
+                                 <div class="font-display font-bold text-white text-xs sm:text-sm truncate">${escapeHtml(pB.name)}</div>
+                                 <div class="text-[10px] text-slate-400">@${escapeHtml(pB.nick || '')}</div>
+                               </div>
+                               ${pB.avatar ? `<img src="${pB.avatar}" alt="" class="w-8 h-8 rounded-full object-cover border border-emerald-400/40 flex-shrink-0"/>` : ''}
+                             </div>
+                           </div>
+
+                           <div class="p-2.5 rounded-xl bg-slate-900/85 border border-white/10 text-[11px] space-y-1">
+                             <div class="${pr ? 'text-emerald-300' : 'text-slate-400'}">
+                               ${
+                                 pr
+                                   ? `📅 <strong>Kiedy Gramy?:</strong> ${escapeHtml(pr.proposerName || '')} proponował terminy (${escapeHtml((pr.proposedSlots || []).join(', '))}) — status: <strong>${escapeHtml(pr.status || 'PROPOSED')}</strong>`
+                                   : '⚠️ <strong>Kiedy Gramy?:</strong> Żaden z graczy nie wysłał propozycji terminu w portalu.'
+                               }
+                             </div>
+                             ${
+                               ds
+                                 ? `<div class="text-rose-200 flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-white/10">
+                                      <span>⚖️ <strong>Zgłoszony Spór VAR (${escapeHtml(ds.reporterName || '')}):</strong> ${escapeHtml(ds.reason || '')}</span>
+                                      ${
+                                        ds.evidenceScreenshot
+                                          ? `<button type="button" onclick="SMPL_APP.openDisputeScreenshotModal('${escapeHtml(ds.id)}')" class="px-2 py-0.5 rounded bg-blue-600/30 hover:bg-blue-600 text-blue-200 hover:text-white text-[10px] font-bold">📸 Zobacz SS</button>`
+                                          : ''
+                                      }
+                                    </div>`
+                                 : ''
+                             }
+                           </div>
+
+                           <div>
+                             <input id="${noteInputId}" type="text" maxlength="240" value="Brak rozegrania meczu do końca kolejki (Czwartek 23:59) — decyzja Administracji SMPL." aria-label="Powód decyzji Admina" class="w-full px-3 py-1.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-slate-200 focus:outline-none focus:border-amber-400" />
+                           </div>
+                         </div>
+
+                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                           <button type="button" onclick="SMPL_APP.handleResolveUnplayedTie('${escapeHtml(unplayedIdsCsv)}', 'PLAYER_WIN', '${escapeHtml(pA.id)}', '${noteInputId}')" class="py-2 px-2.5 rounded-xl bg-emerald-600/25 hover:bg-emerald-600 text-emerald-200 hover:text-white border border-emerald-400/45 text-[11px] font-display font-bold uppercase transition truncate">
+                             🏆 WO: ${escapeHtml(pA.name)} (${ptsLabel})
+                           </button>
+                           <button type="button" onclick="SMPL_APP.handleResolveUnplayedTie('${escapeHtml(unplayedIdsCsv)}', 'PLAYER_WIN', '${escapeHtml(pB.id)}', '${noteInputId}')" class="py-2 px-2.5 rounded-xl bg-blue-600/25 hover:bg-blue-600 text-blue-200 hover:text-white border border-blue-400/45 text-[11px] font-display font-bold uppercase transition truncate">
+                             🏆 WO: ${escapeHtml(pB.name)} (${ptsLabel})
+                           </button>
+                           <button type="button" onclick="SMPL_APP.handleResolveUnplayedTie('${escapeHtml(unplayedIdsCsv)}', 'BOTH_LOSE', '', '${noteInputId}')" class="py-2 px-2.5 rounded-xl bg-rose-950/80 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/45 text-[11px] font-display font-bold uppercase transition">
+                             ⛔ Obustronny 0:0 WO (0 pkt)
+                           </button>
+                           <div class="flex items-center gap-1.5">
+                             <button type="button" onclick="SMPL_APP.openRoundExtensionDialog({ scopeType: 'ROUND', roundNum: ${tie.round}, leagueScope: '${escapeHtml(tie.leagueId)}' })" class="flex-1 py-2 px-2 rounded-xl bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-slate-950 border border-amber-400/45 text-[11px] font-display font-bold uppercase transition">
+                               ⏳ Przedłuż K${tie.round}
+                             </button>
+                             <button type="button" onclick="SMPL_APP.openAdminEditMatchModal('${escapeHtml(tie.unplayedMatches[0].id)}')" class="py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/15 text-[11px] font-bold">
+                               ✏️ Wynik
+                             </button>
+                           </div>
+                         </div>
+                       </div>
+                     `;
+                   })
+                   .join('')}
+               </div>`
+        }
+      </div>
+    `;
+  }
+
   function renderOverviewSubTab(state, activeLeagueId, session, pendingMatches, pendingRegs, pendingPwdReqs, activeAdminLeagues) {
     const winAdm =
       window.SMPL_DB && typeof window.SMPL_DB.getSeasonJoinWindowInfo === 'function'
@@ -3786,19 +3969,36 @@ window.SMPL_FORMS_ADMIN = (function () {
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div class="rounded-2xl p-4 bg-slate-900/90 border ${pendingMatches.length > 0 ? 'border-amber-400/60' : 'border-white/10'} flex flex-col justify-between gap-3">
-              <div>
-                <div class="text-[11px] font-display font-bold uppercase text-slate-400">KROK 1 • MECZE</div>
-                <div class="font-display font-black text-base text-white mt-0.5">
-                  ${pendingMatches.length > 0 ? `⏳ ${pendingMatches.length} wyników czeka na kliknięcie` : '✅ Brak wyników w kolejce'}
-                </div>
-                <div class="text-[11px] text-slate-400 mt-1">
-                  ${pendingMatches.length > 0 ? 'Kliknij i zatwierdź jednym guzikiem (albo sprawdź ekran).' : 'Wszystkie zgłoszone wyniki są już zatwierdzone.'}
-                </div>
-              </div>
-              <button type="button" onclick="SMPL_APP.setAdminSubTab('moderation')" class="w-full py-2.5 px-3 rounded-xl ${pendingMatches.length > 0 ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-800 text-slate-200 font-bold'} font-display text-xs uppercase transition">
-                ${pendingMatches.length > 0 ? `✅ Otwórz Kolejkę (${pendingMatches.length})` : '✅ Podgląd Wyników'}
-              </button>
+            <div class="rounded-2xl p-4 bg-slate-900/90 border ${(pendingMatches.length > 0 || (window.SMPL_DB && window.SMPL_DB.getUnplayedMatchesForAdminAction && window.SMPL_DB.getUnplayedMatchesForAdminAction(state, 'ALL').matches.length > 0)) ? 'border-amber-400/60' : 'border-white/10'} flex flex-col justify-between gap-3">
+              ${(() => {
+                const ovUnp = (window.SMPL_DB && typeof window.SMPL_DB.getUnplayedMatchesForAdminAction === 'function')
+                  ? window.SMPL_DB.getUnplayedMatchesForAdminAction(state, 'ALL').matches.length
+                  : 0;
+                return `
+                  <div>
+                    <div class="text-[11px] font-display font-bold uppercase text-slate-400">KROK 1 • MECZE &amp; PO TERMINIE (CZW. 23:59)</div>
+                    <div class="font-display font-black text-base text-white mt-0.5">
+                      ${
+                        pendingMatches.length + ovUnp > 0
+                          ? `⏳ ${pendingMatches.length} wyników • 🚨 ${ovUnp} po terminie`
+                          : '✅ Brak wyników i zaległości w kolejce'
+                      }
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-1">
+                      ${
+                        ovUnp > 0
+                          ? `Po zamknięciu kolejki zostało ${ovUnp} nierozegranych meczów — kliknij, aby podjąć decyzję (WO / dogrywka).`
+                          : pendingMatches.length > 0
+                          ? 'Kliknij i zatwierdź zgłoszone wyniki ze screenami.'
+                          : 'Wszystkie zgłoszone i zamknięte kolejki są rozliczone.'
+                      }
+                    </div>
+                  </div>
+                  <button type="button" onclick="SMPL_APP.setAdminSubTab('moderation')" class="w-full py-2.5 px-3 rounded-xl ${ovUnp > 0 ? 'bg-rose-600 text-white font-black' : pendingMatches.length > 0 ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-800 text-slate-200 font-bold'} font-display text-xs uppercase transition">
+                    ${pendingMatches.length + ovUnp > 0 ? `⚖️ Otwórz Kolejkę i Zaległości (${pendingMatches.length + ovUnp})` : '✅ Podgląd Wyników'}
+                  </button>
+                `;
+              })()}
             </div>
 
             <div class="rounded-2xl p-4 bg-slate-900/90 border ${pendingRegs.length + pendingPwdReqs.length > 0 ? 'border-emerald-400/60' : 'border-white/10'} flex flex-col justify-between gap-3">
@@ -3862,6 +4062,9 @@ window.SMPL_FORMS_ADMIN = (function () {
                          </button>`
                       : ''
                   }
+                  <button type="button" onclick="SMPL_APP.openReleaseRoundDialog()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-display font-black text-xs uppercase shadow-lg transition">
+                    🚀 Puść Kolejkę / Wcześniej
+                  </button>
                   <button type="button" onclick="SMPL_APP.openRoundExtensionDialog(${ovExts.length > 0 ? `{ editId: '${escapeHtml(ovExts[0].id)}' }` : ''})" class="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-amber-500 hover:from-violet-500 hover:to-amber-400 text-white font-display font-black text-xs uppercase shadow-lg transition">
                     ⏳ ${ovExts.length > 0 ? 'Edytuj / Dodaj Przedłużenie' : 'Przedłuż Kolejkę (1-Klik)'}
                   </button>
@@ -5679,7 +5882,8 @@ window.SMPL_FORMS_ADMIN = (function () {
                      <h4 class="font-display font-black text-lg text-emerald-300 uppercase">🛡️ Zarządzanie Klanami Score! Match (${clansList.length})</h4>
                      <p class="text-xs text-slate-300 mt-0.5">Dodawaj nowe klany, zmieniaj nazwy, tagi, kolory, wgrywaj logo lub usuwaj nieaktywne klany.</p>
                    </div>
-                   <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                      <div class="lg:col-span-5 p-4 rounded-2xl bg-slate-950/90 border border-white/10 space-y-3">
                        <input id="master-clan-id" type="hidden" value=""/>
                        <div class="flex items-center gap-3">

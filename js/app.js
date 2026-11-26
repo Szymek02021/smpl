@@ -841,7 +841,7 @@ window.SMPL_APP = (function () {
     if (t === 'MATCH_REJECTED') {
       return `<button type="button" onclick="SMPL_APP.closeNotificationsCenterModal(); SMPL_APP.switchTab('submit');" class="px-2 py-0.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 text-rose-200 border border-rose-400/40 text-[10px] font-bold">➕ Popraw Wynik</button>`;
     }
-    if (['MATCH_SUBMITTED', 'MATCH_APPROVED', 'MATCH_EDITED', 'WALKOVER', 'MATCH_PROPOSAL', 'DISPUTE', 'ROUND_EXTENDED'].indexOf(t) !== -1) {
+    if (['MATCH_SUBMITTED', 'MATCH_APPROVED', 'MATCH_EDITED', 'WALKOVER', 'MATCH_PROPOSAL', 'DISPUTE', 'ROUND_EXTENDED', 'ROUND_RELEASED'].indexOf(t) !== -1) {
       return `<button type="button" onclick="SMPL_APP.closeNotificationsCenterModal(); SMPL_APP.switchTab('schedule');" class="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-400/40 text-[10px] font-bold">🗓️ Zobacz Terminarz</button>`;
     }
     if (t === 'PRIZE' || t === 'TROPHY' || t === 'TOTW') {
@@ -854,7 +854,7 @@ window.SMPL_APP = (function () {
     const list = targetPlayer && Array.isArray(targetPlayer.notifications) ? targetPlayer.notifications : [];
     const unreadCnt = list.filter((n) => n && n.read !== true).length;
     const admTotal = adminCounts
-      ? (adminCounts.pendingMatches + adminCounts.pendingRegs + adminCounts.pendingPass + adminCounts.pendingAdmins)
+      ? (adminCounts.pendingMatches + adminCounts.pendingRegs + adminCounts.pendingPass + adminCounts.pendingAdmins + (adminCounts.overdueUnplayed || 0))
       : 0;
     const iosDiag = window.SMPL_NOTIF && typeof window.SMPL_NOTIF.getIosPushDiagnostic === 'function'
       ? window.SMPL_NOTIF.getIosPushDiagnostic()
@@ -920,7 +920,7 @@ window.SMPL_APP = (function () {
               !isPublic && admTotal > 0
                 ? `<div class="p-3 rounded-2xl bg-amber-500/15 border border-amber-400/45 flex flex-wrap items-center justify-between gap-2 text-xs">
                      <div class="text-amber-100">
-                       🛡️ <strong>Kolejka Admina:</strong> ${adminCounts.pendingMatches} meczów • ${adminCounts.pendingRegs} zapisów • ${adminCounts.pendingPass} haseł • ${adminCounts.pendingAdmins} adminów
+                       🛡️ <strong>Kolejka Admina:</strong> ${adminCounts.pendingMatches} meczów • ${adminCounts.overdueUnplayed || 0} po terminie • ${adminCounts.pendingRegs} zapisów • ${adminCounts.pendingPass} haseł • ${adminCounts.pendingAdmins} adminów
                      </div>
                      <button type="button" onclick="SMPL_APP.closeNotificationsCenterModal(); SMPL_APP.switchTab('admin');" class="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 font-display font-black text-[10px] uppercase">Panel Admina →</button>
                    </div>`
@@ -995,6 +995,9 @@ window.SMPL_APP = (function () {
     const pendingRegsCount = (state.registrations || []).filter((r) => r.status === 'PENDING').length;
     const pendingPassCount = (state.passwordRequests || []).filter((p) => p.status === 'PENDING').length;
     const pendingAdminsCount = (state.admins || []).filter((a) => a.status === 'PENDING').length;
+    const overdueUnplayedCount = (window.SMPL_DB && typeof window.SMPL_DB.getUnplayedMatchesForAdminAction === 'function')
+      ? window.SMPL_DB.getUnplayedMatchesForAdminAction(state, 'ALL').matches.length
+      : 0;
 
     const exactPlayer = session.activePlayerId
       ? (state.players.find((p) => p.id === session.activePlayerId) || null)
@@ -1041,7 +1044,7 @@ window.SMPL_APP = (function () {
 
     const isStrictAdm = Boolean(window.SMPL_DB && window.SMPL_DB.isStrictAdminSession(session));
     const isMaster = isStrictAdm && session.adminRole === 'MASTER_ADMIN';
-    const totalAdminAlerts = pendingAdminsCount + pendingMatchesCount + pendingRegsCount + pendingPassCount;
+    const totalAdminAlerts = pendingAdminsCount + pendingMatchesCount + pendingRegsCount + pendingPassCount + overdueUnplayedCount;
     const myAdminPlTop = isStrictAdm && window.SMPL_DB && typeof window.SMPL_DB.findPlayerForAdmin === 'function'
       ? window.SMPL_DB.findPlayerForAdmin(session.adminId, state)
       : null;
@@ -1312,7 +1315,8 @@ window.SMPL_APP = (function () {
               pendingMatches: pendingMatchesCount,
               pendingRegs: pendingRegsCount,
               pendingPass: pendingPassCount,
-              pendingAdmins: pendingAdminsCount
+              pendingAdmins: pendingAdminsCount,
+              overdueUnplayed: overdueUnplayedCount
             }
           : null;
         notifRoot.innerHTML = buildNotificationsCenterHtml(
@@ -1504,12 +1508,16 @@ window.SMPL_APP = (function () {
     const pendingRegsCount = (state.registrations || []).filter((r) => r.status === 'PENDING').length;
     const pendingPassCount = (state.passwordRequests || []).filter((p) => p.status === 'PENDING').length;
     const pendingAdminsCount = (state.admins || []).filter((a) => a.status === 'PENDING').length;
+    const overdueUnplayedCount = (window.SMPL_DB && typeof window.SMPL_DB.getUnplayedMatchesForAdminAction === 'function')
+      ? window.SMPL_DB.getUnplayedMatchesForAdminAction(state, 'ALL').matches.length
+      : 0;
     const pendingDisputesCount = ((state.competitions && Array.isArray(state.competitions.matchDisputes)) ? state.competitions.matchDisputes : []).filter((d) => d && d.status === 'PENDING').length;
     const adminTotalBadge =
       pendingMatchesCount +
       pendingRegsCount +
       pendingPassCount +
       pendingDisputesCount +
+      overdueUnplayedCount +
       (session.linkMode === 'MASTER' ? pendingAdminsCount : 0);
 
     const isStrictAdm = Boolean(window.SMPL_DB && window.SMPL_DB.isStrictAdminSession(session));
@@ -8092,31 +8100,7 @@ window.SMPL_APP = (function () {
   // =========================================================================
 
   function handleBroadcastRoundRelease() {
-    if (!requireStrictAdmin('ogłoszenie kolejki')) return;
-    const state = window.SMPL_DB.getState();
-    const curWeek = (state.weeklyConfig && state.weeklyConfig.currentWeek) || 1;
-    const curRound = (curWeek - 1) * 4 + 1;
-
-    const roundInput = prompt(
-      `Podaj numer kolejki, którą chcesz oficjalnie wystartować (np. ${curRound}):`,
-      curRound
-    );
-    if (!roundInput) return;
-
-    const r = parseInt(roundInput, 10);
-    if (isNaN(r) || r < 1 || r > 30) {
-      showToast('Nieprawid\u0142owy numer kolejki (wybierz 1-30).', 'error');
-      return;
-    }
-    const w = Math.ceil(r / 4);
-
-    try {
-      window.SMPL_DB.broadcastRoundRelease(r, w);
-      showToast(`📢 Kolejka #${r} (Tydzień #${w}) została puszczona! Wysłano powiadomienie PUSH do graczy.`, 'success');
-      renderAll();
-    } catch (err) {
-      showToast(err.message || 'Błąd puszczania kolejki.', 'error');
-    }
+    openReleaseRoundDialog();
   }
 
   function handleApplyTribunalVerdict(incidentId, playerId) {
@@ -12073,6 +12057,588 @@ window.SMPL_APP = (function () {
     }
   }
 
+  // =========================================================================
+  // PUSZCZANIE KOLEJKI (WCZEŚNIEJ LUB O CZASIE — ZAWSZE CZWARTEK 23:59)
+  // ORAZ ROZSTRZYGANIE NIEROZEGRANYCH MECZÓW PRZEZ ADMINÓW (v76)
+  // =========================================================================
+
+  let _releaseRoundDialogClosedByBound = false;
+  let _a11yErrorAnnouncerEl = null;
+  let _a11yErrorAnnounceTimer = null;
+  let _a11yAnnouncedField = null;
+
+  function ensureAccessibleErrorAnnouncer() {
+    if (typeof document === 'undefined' || !document.body) return null;
+    if (_a11yErrorAnnouncerEl && _a11yErrorAnnouncerEl.parentNode) return _a11yErrorAnnouncerEl;
+    let ex = document.getElementById('smpl-a11y-error-announcer');
+    if (!ex) {
+      ex = document.createElement('div');
+      ex.id = 'smpl-a11y-error-announcer';
+      ex.setAttribute('aria-live', 'polite');
+      ex.className = 'visually-hidden';
+      document.body.appendChild(ex);
+    }
+    _a11yErrorAnnouncerEl = ex;
+    return ex;
+  }
+
+  function linkFieldErrorAria(el, shown) {
+    if (!el || !el.getAttribute) return;
+    const errorId = el.getAttribute('data-error') || '';
+    if (!errorId) return;
+    const raw = String(el.getAttribute('aria-describedby') || '');
+    const ids = raw.split(/\s+/).filter(function (id) { return Boolean(id && id !== errorId); });
+    if (shown) ids.push(errorId);
+    if (ids.length) el.setAttribute('aria-describedby', ids.join(' '));
+    else el.removeAttribute('aria-describedby');
+  }
+
+  function announceFieldErrorPolite(el) {
+    if (!el || typeof document === 'undefined') return;
+    const errId = el.getAttribute('data-error') || '';
+    const errNode = errId ? document.getElementById(errId) : null;
+    const announcer = ensureAccessibleErrorAnnouncer();
+    if (!errNode || !announcer) return;
+    let labelPrefix = '';
+    if (el.labels && el.labels[0]) {
+      labelPrefix = String(el.labels[0].textContent || '').replace(/\s+/g, ' ').replace(/\*\s*$/, '').trim();
+      if (labelPrefix) labelPrefix += ': ';
+    }
+    const errTxt = String(errNode.textContent || '').replace(/\s+/g, ' ').trim();
+    if (_a11yErrorAnnounceTimer) clearTimeout(_a11yErrorAnnounceTimer);
+    announcer.textContent = '';
+    _a11yAnnouncedField = el;
+    _a11yErrorAnnounceTimer = setTimeout(function () {
+      announcer.textContent = labelPrefix + errTxt;
+    }, 500);
+  }
+
+  function setAccessibleFieldValidity(el, isValid, customMsg, shouldAnnounce) {
+    if (!el) return true;
+    if (typeof el.setCustomValidity === 'function') {
+      el.setCustomValidity(isValid ? '' : String(customMsg || 'Nieprawidłowa wartość pola.'));
+    }
+    el.setAttribute('aria-invalid', isValid ? 'false' : 'true');
+    if (el.classList) {
+      el.classList.toggle('user-invalid-fallback', !isValid);
+    }
+    linkFieldErrorAria(el, !isValid);
+    const errId = el.getAttribute ? (el.getAttribute('data-error') || '') : '';
+    const errNode = (errId && typeof document !== 'undefined') ? document.getElementById(errId) : null;
+    if (errNode && !isValid && customMsg) {
+      errNode.textContent = String(customMsg);
+    }
+    if (!isValid && shouldAnnounce) {
+      announceFieldErrorPolite(el);
+    } else if (isValid && _a11yAnnouncedField === el) {
+      if (_a11yErrorAnnounceTimer) clearTimeout(_a11yErrorAnnounceTimer);
+      if (_a11yErrorAnnouncerEl) _a11yErrorAnnouncerEl.textContent = '';
+    }
+    return isValid;
+  }
+
+  function isYmdThursday(ymd) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ymd || ''))) return false;
+    const sp = String(ymd).split('-');
+    const dt = new Date(Date.UTC(Number(sp[0]), Number(sp[1]) - 1, Number(sp[2]), 12, 0, 0));
+    return dt.getUTCDay() === 4;
+  }
+
+  function syncReleaseRoundDialogUi() {
+    if (typeof document === 'undefined' || !window.SMPL_DB) return;
+    const form = document.getElementById('smpl-release-round-form');
+    if (!form) return;
+    const state = window.SMPL_DB.getState();
+    const wc = (state && state.weeklyConfig && typeof state.weeklyConfig === 'object') ? state.weeklyConfig : {};
+    const rpw = Math.max(1, Number(wc.roundsPerWeek || 4));
+    const curWeek = Math.max(1, Number(wc.currentWeek || 1));
+    let maxRound = 15;
+    Object.keys((state && state.leagues) || {}).forEach(function (lid) {
+      if (state.leagues[lid] && Number(state.leagues[lid].totalRounds || 0) > maxRound) {
+        maxRound = Number(state.leagues[lid].totalRounds || 0);
+      }
+    });
+    ((state && state.matches) || []).forEach(function (m) {
+      if (m && Number(m.round || 0) > maxRound) maxRound = Number(m.round || 0);
+    });
+    const totalWeeks = Math.max(1, Math.ceil(maxRound / rpw));
+
+    const checkedModeEl = form.querySelector('input[name="releaseMode"]:checked');
+    const mode = checkedModeEl ? checkedModeEl.value : 'NEXT_WEEK';
+    const weekWrap = document.getElementById('smpl-rel-week-wrap');
+    const roundWrap = document.getElementById('smpl-rel-round-wrap');
+    const weekSel = document.getElementById('smpl-rel-week');
+    const roundSel = document.getElementById('smpl-rel-round');
+    const dateInput = document.getElementById('smpl-rel-date');
+    const timeInput = document.getElementById('smpl-rel-time');
+    const sumEl = document.getElementById('smpl-rel-live-summary');
+
+    if (mode === 'NEXT_WEEK' && weekSel) {
+      const nextW = Math.min(totalWeeks, curWeek + 1);
+      if (Number(weekSel.value) < nextW && curWeek < totalWeeks) {
+        weekSel.value = String(nextW);
+      }
+    } else if (mode === 'CURRENT_WEEK' && weekSel) {
+      weekSel.value = String(curWeek);
+    }
+
+    if (weekWrap) weekWrap.style.display = mode === 'SINGLE_ROUND' ? 'none' : 'flex';
+    if (roundWrap) roundWrap.style.display = mode === 'SINGLE_ROUND' ? 'flex' : 'none';
+
+    let targetWeek = curWeek;
+    let targetRound = (curWeek - 1) * rpw + 1;
+    if (mode === 'SINGLE_ROUND' && roundSel) {
+      targetRound = Math.max(1, Math.min(maxRound, Number(roundSel.value || 1)));
+      targetWeek = Math.max(1, Math.min(totalWeeks, Math.ceil(targetRound / rpw)));
+    } else if (weekSel) {
+      targetWeek = Math.max(1, Math.min(totalWeeks, Number(weekSel.value || curWeek)));
+      targetRound = (targetWeek - 1) * rpw + 1;
+    }
+
+    const closeUpTo = mode === 'SINGLE_ROUND'
+      ? Math.max(0, targetRound - 1)
+      : Math.max(0, (targetWeek - 1) * rpw);
+    const prevClosed = Math.max(0, Number(wc.closedRoundsUpTo || 0));
+    const effCloseUpTo = Math.max(prevClosed, closeUpTo);
+
+    const playersById = {};
+    ((state && state.players) || []).forEach(function (p) { if (p && p.id) playersById[p.id] = p; });
+    let willEscalateCount = 0;
+    if (effCloseUpTo > 0) {
+      ((state && state.matches) || []).forEach(function (m) {
+        if (!m || m.status !== 'SCHEDULED' || m.isByeWalkover) return;
+        const rnd = Number(m.round || 0);
+        if (rnd < 1 || rnd > effCloseUpTo) return;
+        const pH = playersById[m.homeId];
+        const pA = playersById[m.awayId];
+        if ((pH && pH.isPlaceholder) || (pA && pA.isPlaceholder)) return;
+        willEscalateCount += 1;
+      });
+    }
+
+    if (sumEl && dateInput && timeInput) {
+      const dVal = String(dateInput.value || '');
+      const tVal = String(timeInput.value || '23:59');
+      const rStart = (targetWeek - 1) * rpw + 1;
+      const rEnd = Math.min(maxRound, targetWeek * rpw);
+      const humanDl = /^\d{4}-\d{2}-\d{2}$/.test(dVal)
+        ? formatRoundExtensionDateLabel(dVal, tVal, 'Europe/Warsaw')
+        : 'wybierz datę z kalendarza';
+      const thuNote = /^\d{4}-\d{2}-\d{2}$/.test(dVal)
+        ? (isYmdThursday(dVal)
+            ? '✅ Oficjalny Czwartek 23:59'
+            : '⚠️ Uwaga: wybrana data nie wypada w czwartek (regulaminowo kolejka kończy się w czwartek 23:59)')
+        : '';
+      const escPart = effCloseUpTo > 0
+        ? (willEscalateCount > 0
+            ? ('🚨 Zamknięcie K1–K' + effCloseUpTo + ': ' + willEscalateCount + ' nierozegranych meczów trafi od razu do Skrzynki Działań Adminów!')
+            : ('✅ Kolejki K1–K' + effCloseUpTo + ' zostaną zamknięte (0 zaległych meczów SCHEDULED).'))
+        : 'Start od K1 — brak wcześniejszych kolejek do zamknięcia.';
+      sumEl.textContent = '🚀 Start: Tydzień #' + targetWeek + ' (K' + rStart + '–K' + rEnd + ') • Koniec: ' + humanDl + (thuNote ? ' • ' + thuNote : '') + ' • ' + escPart;
+    }
+  }
+
+  function applyReleaseThursdayPreset(presetKey) {
+    if (typeof document === 'undefined' || !window.SMPL_DB) return;
+    const dateEl = document.getElementById('smpl-rel-date');
+    const timeEl = document.getElementById('smpl-rel-time');
+    if (!dateEl || !timeEl) return;
+    const today = getTodayWarsawYmd();
+    const nearestThu = typeof window.SMPL_DB.getNextThursdayDeadlineYmd === 'function'
+      ? window.SMPL_DB.getNextThursdayDeadlineYmd(today, false)
+      : addDaysWarsawPlainDate(today, 3);
+    if (presetKey === 'next_thu') {
+      dateEl.value = addDaysWarsawPlainDate(nearestThu, 7);
+    } else {
+      dateEl.value = nearestThu;
+    }
+    timeEl.value = '23:59';
+    setAccessibleFieldValidity(dateEl, true, '', false);
+    setAccessibleFieldValidity(timeEl, true, '', false);
+    syncReleaseRoundDialogUi();
+  }
+
+  function openReleaseRoundDialog(options) {
+    if (!requireStrictAdmin('puszczenie kolejki')) return;
+    if (typeof document === 'undefined' || !window.SMPL_DB) return;
+    ensureTemporalPolyfillLazy();
+    ensureAccessibleErrorAnnouncer();
+
+    const opts = options && typeof options === 'object' ? options : {};
+    const state = window.SMPL_DB.getState();
+    const esc = function (v) {
+      return window.SMPL_VIEWS && window.SMPL_VIEWS.escapeHtml ? window.SMPL_VIEWS.escapeHtml(v) : String(v || '');
+    };
+    const wc = (state && state.weeklyConfig && typeof state.weeklyConfig === 'object') ? state.weeklyConfig : {};
+    const rpw = Math.max(1, Number(wc.roundsPerWeek || 4));
+    const curWeek = Math.max(1, Number(wc.currentWeek || 1));
+    let maxRound = 15;
+    Object.keys((state && state.leagues) || {}).forEach(function (lid) {
+      if (state.leagues[lid] && Number(state.leagues[lid].totalRounds || 0) > maxRound) {
+        maxRound = Number(state.leagues[lid].totalRounds || 0);
+      }
+    });
+    ((state && state.matches) || []).forEach(function (m) {
+      if (m && Number(m.round || 0) > maxRound) maxRound = Number(m.round || 0);
+    });
+    const totalWeeks = Math.max(1, Math.ceil(maxRound / rpw));
+
+    const defaultMode = opts.mode || (curWeek < totalWeeks ? 'NEXT_WEEK' : 'CURRENT_WEEK');
+    const initWeek = defaultMode === 'NEXT_WEEK' ? Math.min(totalWeeks, curWeek + 1) : curWeek;
+    const initRound = Number(opts.roundNum || ((initWeek - 1) * rpw + 1));
+    const today = getTodayWarsawYmd();
+    const initDate = typeof window.SMPL_DB.getNextThursdayDeadlineYmd === 'function'
+      ? window.SMPL_DB.getNextThursdayDeadlineYmd(today, defaultMode === 'NEXT_WEEK')
+      : addDaysWarsawPlainDate(today, 4);
+    const initTime = '23:59';
+
+    let dlg = document.getElementById('smpl-release-round-dialog');
+    if (!dlg) {
+      dlg = document.createElement('dialog');
+      dlg.id = 'smpl-release-round-dialog';
+      dlg.className = 'smpl-round-ext-dialog';
+      dlg.setAttribute('closedby', 'any');
+      dlg.setAttribute('aria-labelledby', 'smpl-release-round-title');
+      document.body.appendChild(dlg);
+      dlg.addEventListener('close', function () {
+        dlg.returnValue = '';
+      });
+      if (typeof HTMLDialogElement !== 'undefined' && !('closedBy' in HTMLDialogElement.prototype) && !_releaseRoundDialogClosedByBound) {
+        _releaseRoundDialogClosedByBound = true;
+        let pressedOutsideRel = false;
+        const outsideRel = function (ev, dialogEl) {
+          const r = dialogEl.getBoundingClientRect();
+          return ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom;
+        };
+        dlg.addEventListener('pointerdown', function (ev) { pressedOutsideRel = outsideRel(ev, dlg); });
+        dlg.addEventListener('pointerup', function (ev) { if (pressedOutsideRel && outsideRel(ev, dlg) && dlg.open) dlg.close(); });
+      }
+    }
+
+    const weekOptionsHtml = [];
+    for (let w = 1; w <= totalWeeks; w++) {
+      const ws = (w - 1) * rpw + 1;
+      const we = Math.min(maxRound, w * rpw);
+      weekOptionsHtml.push(
+        '<option value="' + w + '" ' + (w === initWeek ? 'selected' : '') + '>Tydz. #' + w + ' (K' + ws + '–K' + we + ')' + (w === curWeek ? ' • OBECNY' : '') + '</option>'
+      );
+    }
+    const roundOptionsHtml = [];
+    for (let r = 1; r <= maxRound; r++) {
+      roundOptionsHtml.push(
+        '<option value="' + r + '" ' + (r === initRound ? 'selected' : '') + '>Kolejka #' + r + ' (Tydzień #' + Math.ceil(r / rpw) + ')</option>'
+      );
+    }
+
+    dlg.innerHTML = `
+      <div class="p-5 sm:p-6">
+        <div class="flex items-start justify-between gap-3 pb-3.5 mb-4 border-b border-white/10">
+          <div>
+            <span class="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/45 text-emerald-200 text-[10px] font-display font-black uppercase">
+              🚀 STEROWANIE KOLEJKĄ SMPL • KONIEC ZAWSZE CZWARTEK 23:59
+            </span>
+            <h1 id="smpl-release-round-title" class="font-display font-black text-lg sm:text-xl text-white uppercase mt-1">
+              🚀 Puść Nową Kolejkę / Zamknij Obecną Wcześniej
+            </h1>
+            <p class="text-xs text-slate-300 mt-0.5">
+              Kolejka kończy się domyślnie w <strong>Czwartek o 23:59</strong>, ale każdy Admin może wystartować następną wcześniej — nierozegrane mecze trafią od razu do Adminów.
+            </p>
+          </div>
+          <button type="button" id="smpl-rel-close-top" aria-label="Zamknij okno puszczania kolejki" class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-bold text-xs">
+            ✕
+          </button>
+        </div>
+
+        <form id="smpl-release-round-form" class="smpl-round-ext-form" method="post" action="#release-round" aria-labelledby="smpl-release-round-title" novalidate>
+          <fieldset class="smpl-ext-fieldset">
+            <legend>1. Co chcesz teraz zrobić? *</legend>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+              <div class="smpl-ext-radio-row">
+                <input type="radio" id="smpl-rel-mode-next" name="releaseMode" value="NEXT_WEEK" ${defaultMode === 'NEXT_WEEK' ? 'checked' : ''} />
+                <label for="smpl-rel-mode-next">🚀 Puść kolejny tydzień (także wcześniej)</label>
+              </div>
+              <div class="smpl-ext-radio-row">
+                <input type="radio" id="smpl-rel-mode-cur" name="releaseMode" value="CURRENT_WEEK" ${defaultMode === 'CURRENT_WEEK' ? 'checked' : ''} />
+                <label for="smpl-rel-mode-cur">📢 Ogłoś / odśwież bieżący (#${curWeek})</label>
+              </div>
+              <div class="smpl-ext-radio-row">
+                <input type="radio" id="smpl-rel-mode-rnd" name="releaseMode" value="SINGLE_ROUND" ${defaultMode === 'SINGLE_ROUND' ? 'checked' : ''} />
+                <label for="smpl-rel-mode-rnd">⚽ Wskazana Kolejka</label>
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+            <div class="smpl-ext-field" id="smpl-rel-week-wrap">
+              <label for="smpl-rel-week" class="smpl-ext-label">Docelowy Tydzień Rozgrywkowy <span aria-hidden="true">*</span></label>
+              <select id="smpl-rel-week" name="weekNum" aria-invalid="false" class="smpl-ext-control">
+                ${weekOptionsHtml.join('')}
+              </select>
+            </div>
+
+            <div class="smpl-ext-field" id="smpl-rel-round-wrap" style="display:none;">
+              <label for="smpl-rel-round" class="smpl-ext-label">Docelowa Kolejka <span aria-hidden="true">*</span></label>
+              <select id="smpl-rel-round" name="roundNum" aria-invalid="false" class="smpl-ext-control">
+                ${roundOptionsHtml.join('')}
+              </select>
+            </div>
+
+            <div class="smpl-ext-field">
+              <div class="smpl-ext-label">⚡ Szybki wybór Czwartku 23:59:</div>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" onclick="SMPL_APP.applyReleaseThursdayPreset('this_thu')" class="flex-1 px-3 py-2 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-400/45 text-xs font-display font-bold">
+                  📅 Najbliższy Czwartek 23:59
+                </button>
+                <button type="button" onclick="SMPL_APP.applyReleaseThursdayPreset('next_thu')" class="flex-1 px-3 py-2 rounded-xl bg-amber-500/25 hover:bg-amber-500/40 text-amber-200 border border-amber-400/50 text-xs font-display font-bold">
+                  📅 Kolejny Czwartek (+7 dni)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="smpl-ext-field">
+              <label for="smpl-rel-date" class="smpl-ext-label">Data końca kolejki (domyślnie Czwartek) <span aria-hidden="true">*</span></label>
+              <input type="date" id="smpl-rel-date" name="deadlineDate" value="${esc(initDate)}" required aria-invalid="false" data-error="smpl-rel-date-error" class="smpl-ext-control" autofocus />
+              <span id="smpl-rel-date-error" class="smpl-field-error">Wybierz poprawną datę zakończenia kolejki (RRRR-MM-DD).</span>
+            </div>
+            <div class="smpl-ext-field">
+              <label for="smpl-rel-time" class="smpl-ext-label">Godzina zamknięcia (regulaminowo 23:59) <span aria-hidden="true">*</span></label>
+              <input type="time" id="smpl-rel-time" name="deadlineTime" value="${esc(initTime)}" required aria-invalid="false" data-error="smpl-rel-time-error" class="smpl-ext-control" />
+              <span id="smpl-rel-time-error" class="smpl-field-error">Podaj poprawną godzinę zakończenia kolejki (np. 23:59).</span>
+            </div>
+          </div>
+
+          <div id="smpl-rel-live-summary" role="status" aria-live="polite" class="mb-3 px-3.5 py-2.5 rounded-xl bg-indigo-950/60 border border-indigo-400/40 text-xs font-bold text-indigo-100 leading-relaxed">
+            Obliczanie podsumowania kolejki...
+          </div>
+
+          <details class="mb-3 rounded-xl bg-slate-900/75 border border-white/10 px-3.5 py-2 text-xs text-slate-300">
+            <summary class="cursor-pointer font-display font-bold text-amber-200 select-none">
+              ℹ️ Co dzieje się z nierozegranymi meczami po zakończeniu lub wcześniejszym puszczeniu?
+            </summary>
+            <p class="mt-2 text-[11px] leading-relaxed text-slate-300">
+              Wszystkie nierozegrane mecze (<code>SCHEDULED</code>) z zamkniętych kolejek automatycznie trafiają do <strong>Skrzynki Działań Adminów</strong> (w zakładkach <em>Wyniki</em> oraz <em>Terminarz & Kolejki</em>) razem z dowodami „Kiedy Gramy?” i sporami VAR. Każdy Admin może tam jednym kliknięciem przyznać walkower jednostronny, obustronny <code>0:0 WO</code> lub dać dogrywkę.
+            </p>
+          </details>
+
+          <div class="smpl-ext-check-row">
+            <input type="checkbox" id="smpl-rel-notify" name="notifyPlayers" value="1" checked />
+            <label for="smpl-rel-notify">🔔 Wyślij powiadomienie w portalu i PUSH do wszystkich aktywnych graczy o starcie kolejki i terminie Czwartek 23:59</label>
+          </div>
+
+          <div id="smpl-rel-form-error" role="alert" class="hidden mb-3 p-3 rounded-xl bg-rose-950/75 border border-rose-400/60 text-xs font-bold text-rose-200"></div>
+
+          <div class="smpl-ext-sticky-footer flex flex-wrap items-center justify-end gap-2 border-t border-white/10">
+            <button type="button" id="smpl-rel-cancel-btn" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-display font-bold uppercase">
+              Anuluj
+            </button>
+            <button type="submit" id="smpl-rel-submit-btn" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-display font-black text-xs uppercase shadow-xl">
+              🚀 Zatwierdź i Puść Kolejkę
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    const closeBtnTop = document.getElementById('smpl-rel-close-top');
+    const cancelBtn = document.getElementById('smpl-rel-cancel-btn');
+    const closeSafe = function () { if (dlg && dlg.open) dlg.close(); };
+    if (closeBtnTop) closeBtnTop.addEventListener('click', closeSafe);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeSafe);
+
+    const formEl = document.getElementById('smpl-release-round-form');
+    const dateInput = document.getElementById('smpl-rel-date');
+    const timeInput = document.getElementById('smpl-rel-time');
+    const weekSel = document.getElementById('smpl-rel-week');
+    const roundSel = document.getElementById('smpl-rel-round');
+    const errBox = document.getElementById('smpl-rel-form-error');
+    const submitBtn = document.getElementById('smpl-rel-submit-btn');
+
+    const showRelError = function (msg) {
+      if (!errBox) return;
+      if (msg) {
+        errBox.textContent = '⚠️ ' + msg;
+        errBox.classList.remove('hidden');
+      } else {
+        errBox.textContent = '';
+        errBox.classList.add('hidden');
+      }
+    };
+
+    const validateRelField = function (fld, announceNow) {
+      if (!fld) return true;
+      if (fld === dateInput) {
+        const ok = /^\d{4}-\d{2}-\d{2}$/.test(String(dateInput.value || '').trim());
+        return setAccessibleFieldValidity(dateInput, ok, 'Wybierz poprawną datę zakończenia kolejki (RRRR-MM-DD).', announceNow);
+      }
+      if (fld === timeInput) {
+        const ok = /^\d{2}:\d{2}$/.test(String(timeInput.value || '').trim());
+        return setAccessibleFieldValidity(timeInput, ok, 'Podaj poprawną godzinę zakończenia kolejki (np. 23:59).', announceNow);
+      }
+      return true;
+    };
+
+    if (formEl) {
+      const radios = formEl.querySelectorAll('input[name="releaseMode"]');
+      for (let ri = 0; ri < radios.length; ri++) {
+        radios[ri].addEventListener('change', function () {
+          const selMode = radios[ri].value;
+          if (dateInput && typeof window.SMPL_DB.getNextThursdayDeadlineYmd === 'function') {
+            dateInput.value = window.SMPL_DB.getNextThursdayDeadlineYmd(getTodayWarsawYmd(), selMode === 'NEXT_WEEK');
+          }
+          syncReleaseRoundDialogUi();
+        });
+      }
+      if (weekSel) weekSel.addEventListener('change', syncReleaseRoundDialogUi);
+      if (roundSel) roundSel.addEventListener('change', syncReleaseRoundDialogUi);
+
+      [dateInput, timeInput].forEach(function (fld) {
+        if (!fld) return;
+        fld.addEventListener('input', function () {
+          setAccessibleFieldValidity(fld, true, '', false);
+          showRelError('');
+          syncReleaseRoundDialogUi();
+        });
+        fld.addEventListener('blur', function () {
+          validateRelField(fld, true);
+        });
+        fld.addEventListener('invalid', function () {
+          validateRelField(fld, false);
+        });
+      });
+
+      formEl.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        const dOk = validateRelField(dateInput, false);
+        const tOk = validateRelField(timeInput, false);
+        if (!dOk) {
+          showRelError('Wybierz poprawną datę zakończenia kolejki.');
+          dateInput.focus();
+          return;
+        }
+        if (!tOk) {
+          showRelError('Podaj poprawną godzinę zakończenia kolejki.');
+          timeInput.focus();
+          return;
+        }
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+          const checkedModeEl = formEl.querySelector('input[name="releaseMode"]:checked');
+          const modeVal = checkedModeEl ? checkedModeEl.value : 'NEXT_WEEK';
+          let targetWeek = curWeek;
+          let targetRound = (curWeek - 1) * rpw + 1;
+          if (modeVal === 'SINGLE_ROUND' && roundSel) {
+            targetRound = Math.max(1, Math.min(maxRound, Number(roundSel.value || 1)));
+            targetWeek = Math.max(1, Math.min(totalWeeks, Math.ceil(targetRound / rpw)));
+          } else if (weekSel) {
+            targetWeek = Math.max(1, Math.min(totalWeeks, Number(weekSel.value || curWeek)));
+            targetRound = (targetWeek - 1) * rpw + 1;
+          }
+          const closeUpToRound = modeVal === 'SINGLE_ROUND'
+            ? Math.max(0, targetRound - 1)
+            : Math.max(0, (targetWeek - 1) * rpw);
+          const notifyChk = document.getElementById('smpl-rel-notify');
+          const isEarlyRelease = targetWeek > curWeek || closeUpToRound > Number(wc.closedRoundsUpTo || 0);
+
+          const res = window.SMPL_DB.releaseRoundByAdmin(
+            {
+              weekNum: targetWeek,
+              roundNum: targetRound,
+              closeUpToRound: closeUpToRound,
+              deadlineDate: dateInput.value,
+              deadlineTime: timeInput.value || '23:59',
+              isEarlyRelease: isEarlyRelease,
+              notifyPlayers: Boolean(notifyChk && notifyChk.checked)
+            },
+            getCurrentAdminDisplayName()
+          );
+          closeSafe();
+          renderAll();
+          const escMsg = res && res.unplayedEscalatedCount > 0
+            ? (' • 🚨 ' + res.unplayedEscalatedCount + ' nierozegranych meczów przekazano do Adminów!')
+            : '';
+          showToast('🚀 Puszczono Tydzień #' + targetWeek + ' (koniec: Czwartek ' + dateInput.value + ' ' + (timeInput.value || '23:59') + ')' + escMsg);
+        } catch (err) {
+          if (submitBtn) submitBtn.disabled = false;
+          showRelError((err && err.message) || 'Nie udało się puścić kolejki.');
+        }
+      });
+    }
+
+    if (typeof dlg.showModal === 'function') {
+      if (!dlg.open) dlg.showModal();
+    } else {
+      dlg.setAttribute('open', 'open');
+    }
+    syncReleaseRoundDialogUi();
+  }
+
+  function handleResolveUnplayedTie(matchIdsCsv, decision, winnerPlayerId, noteInputId) {
+    if (!requireStrictAdmin('rozstrzygnięcie nierozegranego meczu')) return;
+    if (!window.SMPL_DB || typeof window.SMPL_DB.resolveUnplayedByAdmin !== 'function') return;
+    const matchIds = String(matchIdsCsv || '')
+      .split(',')
+      .map(function (x) { return String(x || '').trim(); })
+      .filter(Boolean);
+    if (!matchIds.length) {
+      showToast('Brak wskazanych meczów do rozstrzygnięcia.', 'error');
+      return;
+    }
+    const noteEl = (noteInputId && typeof document !== 'undefined') ? document.getElementById(noteInputId) : null;
+    const reasonText = noteEl && noteEl.value
+      ? String(noteEl.value).trim()
+      : 'Brak rozegrania meczu do końca kolejki (Czwartek 23:59) — decyzja Administracji SMPL.';
+    try {
+      const res = window.SMPL_DB.resolveUnplayedByAdmin(
+        {
+          matchIds: matchIds,
+          decision: decision || 'BOTH_LOSE',
+          winnerPlayerId: winnerPlayerId || '',
+          reason: reasonText
+        },
+        getCurrentAdminDisplayName()
+      );
+      renderAll();
+      showToast('⚖️ Rozstrzygnięto nierozegrane spotkania (' + ((res && res.resolvedCount) || matchIds.length) + ') — tabela zaktualizowana!');
+    } catch (err) {
+      showToast((err && err.message) || 'Błąd rozstrzygania nierozegranego meczu.', 'error');
+    }
+  }
+
+  function handleResolveAllUnplayedBothLose() {
+    if (!requireStrictAdmin('masowe rozstrzygnięcie zaległych meczów')) return;
+    if (!window.SMPL_DB || typeof window.SMPL_DB.getUnplayedMatchesForAdminAction !== 'function') return;
+    const state = window.SMPL_DB.getState();
+    const info = window.SMPL_DB.getUnplayedMatchesForAdminAction(state, 'ALL');
+    const ids = (info.matches || []).map(function (m) { return m.id; });
+    if (!ids.length) {
+      showToast('Brak zaległych meczów po terminie.', 'error');
+      return;
+    }
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      const ok = window.confirm(
+        'Czy na pewno chcesz zamknąć WSZYSTKIE nierozegrane mecze po terminie (' + ids.length + ' szt.) jako obustronny walkower 0:0 WO (0 pkt dla obu stron)?'
+      );
+      if (!ok) return;
+    }
+    try {
+      const res = window.SMPL_DB.resolveUnplayedByAdmin(
+        {
+          matchIds: ids,
+          decision: 'BOTH_LOSE',
+          winnerPlayerId: '',
+          reason: 'Brak rozegrania meczu do końca kolejki (Czwartek 23:59) — obustronny walkower 0:0 WO decyzji Administracji.'
+        },
+        getCurrentAdminDisplayName()
+      );
+      renderAll();
+      showToast('⛔ Zamknięto ' + ((res && res.resolvedCount) || ids.length) + ' zaległych meczów jako obustronny 0:0 WO.');
+    } catch (err) {
+      showToast((err && err.message) || 'Błąd masowego zamykania zaległych meczów.', 'error');
+    }
+  }
+
   function downloadCountdownPosterPng() {
     if (typeof document === 'undefined') return Promise.resolve(false);
     const cdCfg = window.SMPL_DB.getSeasonCountdownConfig();
@@ -13156,6 +13722,10 @@ window.SMPL_APP = (function () {
     applyRoundExtReasonPreset,
     handleRemoveRoundExtension,
     copyRoundExtensionMessenger,
+    openReleaseRoundDialog,
+    applyReleaseThursdayPreset,
+    handleResolveUnplayedTie,
+    handleResolveAllUnplayedBothLose,
     adminLoadWebhooksPanel,
     adminSaveWebhooks,
     adminTestWebhooks,
