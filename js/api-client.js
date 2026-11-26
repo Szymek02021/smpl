@@ -1251,52 +1251,20 @@ window.SMPL_DB = (function () {
 
       if (!Array.isArray(p.trophies)) p.trophies = [];
       const mappedTr = trophiesByFold[fk] || archiveTrophiesMap[matched.name] || null;
-      if (Array.isArray(mappedTr)) {
-        mappedTr.forEach(function (mt) {
-          if (!p.trophies.some(function (t) {
-            return (mt.id && t.id === mt.id) || (t.title === mt.title && t.season === mt.season);
-          })) {
-            p.trophies.unshift(JSON.parse(JSON.stringify(mt)));
-          }
+      const combinedRaw = p.trophies.concat(Array.isArray(mappedTr) ? JSON.parse(JSON.stringify(mappedTr)) : []);
+      if (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.sanitizeAndDedupeSeasonTrophies === 'function') {
+        p.trophies = window.SMPL_ENGINE.sanitizeAndDedupeSeasonTrophies(combinedRaw, []);
+      } else {
+        p.trophies = combinedRaw.filter(function (t) {
+          if (!t) return false;
+          const tid = String(t.id || '');
+          const ttl = String(t.title || '');
+          const tsn = String(t.season || '');
+          if (/^(TR_HIST_|tr_join_|tr_add_|tr_top15_)/i.test(tid)) return false;
+          if (/Oficjalnie Dopisany|Dopisano do|Zawodnik Score Match Ligi/i.test(ttl)) return false;
+          if (/Sezony\s*1[–-]5|Wszech Czas/i.test(tsn)) return false;
+          return true;
         });
-      }
-
-      const hadSummaryHistTrophy = p.trophies.some(function (t) {
-        return t && t.id && String(t.id).indexOf('TR_HIST_') === 0;
-      });
-      if (hadSummaryHistTrophy) {
-        p.trophies = p.trophies.filter(function (t) {
-          return !(t && t.id && String(t.id).indexOf('TR_HIST_') === 0);
-        });
-        if (!Array.isArray(mappedTr) || mappedTr.length === 0) {
-          if (matched.gold > 0) {
-            p.trophies.unshift({
-              id: 'TR_HIST_GOLD_' + matched.seasons + '_' + p.id,
-              icon: '\uD83D\uDC51',
-              title: matched.gold + 'x Mistrz Score Match Liga (Archiwum S1\u2013S55)',
-              season: 'Sezony 1\u201355 (' + matched.seasons + ' sez.)',
-              rarity: 'LEGENDARY'
-            });
-          }
-          if (matched.silver > 0) {
-            p.trophies.unshift({
-              id: 'TR_HIST_SILVER_' + matched.seasons + '_' + p.id,
-              icon: '\uD83E\uDD48',
-              title: matched.silver + 'x Wicemistrz Score Match Liga (Archiwum S1\u2013S55)',
-              season: 'Sezony 1\u201355',
-              rarity: 'GOLD'
-            });
-          }
-          if (matched.bronze > 0) {
-            p.trophies.unshift({
-              id: 'TR_HIST_BRONZE_' + matched.seasons + '_' + p.id,
-              icon: '\uD83E\uDD49',
-              title: matched.bronze + 'x Br\u0105zowy Medalista Score Match Liga (Archiwum S1\u2013S55)',
-              season: 'Sezony 1\u201355',
-              rarity: 'SILVER'
-            });
-          }
-        }
       }
 
       if (statsChanged) updatedCount += 1;
@@ -3811,36 +3779,33 @@ state = enrichFromArchive(data.state);
 
     player.historicalStats = statsObj;
 
-    // Odśwież automatyczne medale z archiwum (bez duplikatów przy zmianie przypisania)
+    // Odśwież wyłącznie konkretne trofea sezonowe z archiwum (zero duplikatów zbiorczych "Sezony 1–55" i zero wpisów "dopisano")
     if (!player.trophies) player.trophies = [];
-    player.trophies = player.trophies.filter(function (t) {
-      return !(t && t.id && String(t.id).indexOf('TR_HIST_') === 0);
-    });
-    if (statsObj.gold > 0) {
-      player.trophies.unshift({
-        id: 'TR_HIST_GOLD_' + Date.now(),
-        icon: '👑',
-        title: `${statsObj.gold}x Mistrz Score Match Liga (Archiwum S1–S55)`,
-        season: `Sezony 1–55 (${statsObj.seasons} sez.)`,
-        rarity: 'LEGENDARY'
+    const archMapAssign = (window.SMPL_ARCHIVE_DATA && window.SMPL_ARCHIVE_DATA.PLAYER_TROPHIES_MAP) || {};
+    const lookupTrName = (matchedArchiveEntry && matchedArchiveEntry.name) || player.historicalArchiveName || player.name;
+    let archSeasonTr = archMapAssign[lookupTrName] || null;
+    if (!archSeasonTr) {
+      const targetFold = canonicalArchiveFold(lookupTrName);
+      Object.keys(archMapAssign).some(function (k) {
+        if (canonicalArchiveFold(k) === targetFold) {
+          archSeasonTr = archMapAssign[k];
+          return true;
+        }
+        return false;
       });
     }
-    if (statsObj.silver > 0) {
-      player.trophies.unshift({
-        id: 'TR_HIST_SILVER_' + Date.now(),
-        icon: '🥈',
-        title: `${statsObj.silver}x Wicemistrz Score Match Liga (Archiwum S1–S55)`,
-        season: `Sezony 1–55`,
-        rarity: 'GOLD'
-      });
-    }
-    if (statsObj.bronze > 0) {
-      player.trophies.unshift({
-        id: 'TR_HIST_BRONZE_' + Date.now(),
-        icon: '🥉',
-        title: `${statsObj.bronze}x Brązowy Medalista Score Match Liga (Archiwum S1–S55)`,
-        season: `Sezony 1–55`,
-        rarity: 'SILVER'
+    const mergedForPlayer = player.trophies.concat(Array.isArray(archSeasonTr) ? JSON.parse(JSON.stringify(archSeasonTr)) : []);
+    if (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.sanitizeAndDedupeSeasonTrophies === 'function') {
+      const dossAssign = typeof window.SMPL_ENGINE.findArchiveDossierByName === 'function'
+        ? window.SMPL_ENGINE.findArchiveDossierByName(state, lookupTrName, player.name)
+        : null;
+      const finRecs = dossAssign && Array.isArray(dossAssign.seasonRecords)
+        ? dossAssign.seasonRecords.filter(function (rc) { return !rc.inProgress; })
+        : [];
+      player.trophies = window.SMPL_ENGINE.sanitizeAndDedupeSeasonTrophies(mergedForPlayer, finRecs);
+    } else {
+      player.trophies = mergedForPlayer.filter(function (t) {
+        return !(t && t.id && /^(TR_HIST_|tr_join_|tr_add_|tr_top15_)/i.test(String(t.id)));
       });
     }
 
@@ -3905,14 +3870,11 @@ state = enrichFromArchive(data.state);
     const archiveMap = (window.SMPL_ARCHIVE_DATA && window.SMPL_ARCHIVE_DATA.PLAYER_TROPHIES_MAP) || {};
     const rawArchiveTrophies =
       (linkedHistName && archiveMap[linkedHistName]) || archiveMap[reg.name] || null;
-    const existingTrophies = rawArchiveTrophies ? JSON.parse(JSON.stringify(rawArchiveTrophies)) : [];
-    existingTrophies.push({
-      id: 'tr_join_' + Date.now(),
-      icon: '🚀',
-      title: 'Oficjalnie Dopisany do ' + (state.leagues[targetLeagueId].name || targetLeagueId),
-      season: 'Sezon ' + (state.season || 56),
-      rarity: 'GOLD'
-    });
+    const existingTrophies = rawArchiveTrophies
+      ? (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.sanitizeAndDedupeSeasonTrophies === 'function'
+          ? window.SMPL_ENGINE.sanitizeAndDedupeSeasonTrophies(JSON.parse(JSON.stringify(rawArchiveTrophies)), [])
+          : JSON.parse(JSON.stringify(rawArchiveTrophies)))
+      : [];
 
     const leagueName = state.leagues[targetLeagueId].name || targetLeagueId;
 
@@ -9400,15 +9362,7 @@ state = enrichFromArchive(data.state);
           joinedSeason: curSeason,
           manualCreatedBy: actorName,
           active: true,
-          trophies: [
-            {
-              id: 'tr_add_' + tsMs,
-              icon: '⚽',
-              title: 'Zawodnik Score Match Ligi (' + targetLg + ')',
-              season: 'Sezon ' + curSeason,
-              rarity: 'SILVER'
-            }
-          ],
+          trophies: [],
           notifications: [
             {
               id: 'NOTIF_MAN_' + tsMs,

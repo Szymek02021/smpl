@@ -3241,6 +3241,425 @@ html[data-smpl-theme="dawn"] dialog.smpl-round-ext-dialog {
   color: #f8fafc !important;
 }
 
+/* ==========================================================================
+   WYSZUKIWARKA KART UT & KARIER ARCHIWUM S1–S55 (v78 / Update V2.21)
+   ========================================================================== */
+.smpl-ut-explorer-shell {
+  border-radius: 1.5rem;
+  padding: 1.1rem 1.15rem;
+  margin-block-end: 1.5rem;
+  background:
+    radial-gradient(ellipse 85% 65% at 10% 0%, rgba(250, 204, 21, 0.14) 0%, transparent 62%),
+    radial-gradient(ellipse 75% 60% at 92% 0%, rgba(16, 185, 129, 0.14) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(9, 15, 32, 0.96) 0%, rgba(5, 9, 21, 0.98) 100%);
+  border: 1px solid rgba(250, 204, 21, 0.38);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.68), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+}
+
+@media (min-width: 640px) {
+  .smpl-ut-explorer-shell {
+    padding: 1.35rem 1.5rem;
+  }
+}
+
+.smpl-ut-search-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-block-start: 0.9rem;
+}
+
+@media (min-width: 860px) {
+  .smpl-ut-search-form {
+    grid-template-columns: minmax(0, 1.7fr) minmax(210px, 0.85fr) auto;
+    align-items: end;
+  }
+}
+
+.smpl-ut-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.smpl-ut-field-label {
+  font-family: 'Exo 2', system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fde68a;
+}
+
+.smpl-ut-search-input,
+.smpl-ut-sort-select {
+  width: 100%;
+  font: inherit;
+  font-size: max(1rem, 1em);
+  min-height: 48px;
+  padding: 0.65rem 0.95rem;
+  border-radius: 0.9rem;
+  background: rgba(2, 6, 23, 0.92);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  box-sizing: border-box;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+@media (pointer: coarse) {
+  .smpl-ut-search-input,
+  .smpl-ut-sort-select {
+    min-height: 52px;
+  }
+}
+
+.smpl-ut-search-input:focus-visible,
+.smpl-ut-sort-select:focus-visible,
+.smpl-ut-filter-pill:focus-visible,
+.smpl-ut-mini-card:focus-visible,
+.smpl-career-table-region:focus-visible {
+  outline: 2.5px solid #34d399;
+  outline-offset: 2px;
+  border-color: #34d399;
+}
+
+.smpl-ut-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  margin-block-start: 0.85rem;
+}
+
+.smpl-ut-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  padding: 0.35rem 0.72rem;
+  border-radius: 0.78rem;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #cbd5e1;
+  font-family: 'Exo 2', system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.smpl-ut-filter-pill:hover {
+  background: rgba(30, 41, 59, 0.95);
+  color: #ffffff;
+}
+
+.smpl-ut-filter-pill.is-active {
+  background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%);
+  border-color: #fde047;
+  color: #090d16;
+  box-shadow: 0 6px 18px rgba(250, 204, 21, 0.28);
+}
+
+/* Siatka Mini-Kart UT w wyszukiwarce */
+.smpl-ut-mini-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-block-start: 0.95rem;
+}
+
+@media (min-width: 560px) {
+  .smpl-ut-mini-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .smpl-ut-mini-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1240px) {
+  .smpl-ut-mini-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.smpl-ut-mini-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.85rem 0.9rem;
+  border-radius: 1.1rem;
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.95) 0%, rgba(5, 10, 24, 0.98) 100%);
+  border: 1.5px solid rgba(250, 204, 21, 0.34);
+  color: #f8fafc;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+/* Odroczenie renderowania wyłącznie dla kart poza pierwszym widokiem (defer-rendering-heavy-content) */
+.smpl-ut-mini-card.is-deferred {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 196px;
+}
+
+.smpl-ut-mini-card.tier-icon {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(250, 204, 21, 0.22) 0%, transparent 58%),
+    linear-gradient(160deg, rgba(34, 24, 9, 0.95) 0%, rgba(7, 11, 24, 0.98) 100%);
+  border-color: rgba(250, 204, 21, 0.68);
+}
+
+.smpl-ut-mini-card.tier-totw {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.22) 0%, transparent 58%),
+    linear-gradient(160deg, rgba(11, 25, 52, 0.95) 0%, rgba(7, 11, 24, 0.98) 100%);
+  border-color: rgba(56, 189, 248, 0.62);
+}
+
+.smpl-ut-mini-card.is-selected {
+  box-shadow: 0 0 0 2px #34d399, 0 14px 32px rgba(16, 185, 129, 0.28);
+  border-color: #34d399;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .smpl-ut-mini-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.65), 0 0 20px rgba(250, 204, 21, 0.2);
+  }
+}
+
+.smpl-ut-mini-ovr {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 0.24rem 0.42rem;
+  border-radius: 0.7rem;
+  background: rgba(2, 6, 23, 0.85);
+  border: 1px solid rgba(250, 204, 21, 0.52);
+  flex-shrink: 0;
+}
+
+.smpl-ut-mini-attrs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.24rem;
+  padding: 0.36rem 0.42rem;
+  border-radius: 0.65rem;
+  background: rgba(2, 6, 23, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+  font-size: 0.62rem;
+}
+
+/* Responsywna tabela historii sezon po sezonie (@container + sticky headers) */
+.smpl-career-table-region {
+  overflow: auto;
+  max-inline-size: 100%;
+  max-block-size: min(520px, 75vh);
+  container-type: inline-size;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(2, 6, 23, 0.9);
+}
+
+.smpl-career-resp-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+  font-size: 0.76rem;
+  --col-2: "Dywizja";
+  --col-3: "Miejsce";
+  --col-4: "Mecze";
+  --col-5: "Bilans W-R-P";
+  --col-6: "Bramki";
+  --col-7: "Punkty";
+  --col-8: "Tytuł / Uwagi";
+}
+
+.smpl-career-resp-table thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background: #050a18;
+}
+
+.smpl-career-resp-table thead th {
+  padding: 0.68rem 0.65rem;
+  border-block-end: 1px solid rgba(255, 255, 255, 0.14);
+  font-family: 'Exo 2', system-ui, sans-serif;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.smpl-career-resp-table tbody th,
+.smpl-career-resp-table tbody td {
+  padding: 0.6rem 0.65rem;
+  border-block-end: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+}
+
+.smpl-career-resp-table tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: #070e20;
+  font-family: 'Exo 2', system-ui, sans-serif;
+  font-weight: 900;
+  color: #fcd34d;
+}
+
+.smpl-career-resp-table tbody tr:hover th,
+.smpl-career-resp-table tbody tr:hover td {
+  background: rgba(30, 41, 59, 0.68);
+}
+
+@container (width < 600px) {
+  .smpl-career-resp-table,
+  .smpl-career-resp-table thead,
+  .smpl-career-resp-table tbody,
+  .smpl-career-resp-table tr,
+  .smpl-career-resp-table th,
+  .smpl-career-resp-table td {
+    display: block;
+  }
+
+  .smpl-career-resp-table thead {
+    display: none;
+  }
+
+  .smpl-career-resp-table tbody tr {
+    margin: 0.6rem;
+    border-radius: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(9, 15, 31, 0.95);
+    overflow: hidden;
+  }
+
+  .smpl-career-resp-table tbody th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    background: rgba(15, 23, 42, 0.98);
+    border-block-end: 1px solid rgba(250, 204, 21, 0.25);
+    padding: 0.55rem 0.75rem;
+  }
+
+  .smpl-career-resp-table tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.42rem 0.75rem;
+    white-space: normal;
+    text-align: right;
+  }
+
+  .smpl-career-resp-table tbody td:nth-child(2)::before { content: var(--col-2) ": "; color: #94a3b8; font-weight: 700; text-align: left; }
+  .smpl-career-resp-table tbody td:nth-child(3)::before { content: var(--col-3) ": "; color: #94a3b8; font-weight: 700; text-align: left; }
+  .smpl-career-resp-table tbody td:nth-child(4)::before { content: var(--col-4) ": "; color: #94a3b8; font-weight: 700; text-align: left; }
+  .smpl-career-resp-table tbody td:nth-child(5)::before { content: var(--col-5) ": "; color: #94a3b8; font-weight: 700; text-align: left; }
+  .smpl-career-resp-table tbody td:nth-child(6)::before { content: var(--col-6) ": "; color: #94a3b8; font-weight: 700; text-align: left; }
+  .smpl-career-resp-table tbody td:nth-child(7)::before { content: var(--col-7) ": "; color: #94a3b8; font-weight: 700; text-align: left; }
+  .smpl-career-resp-table tbody td:nth-child(8)::before { content: var(--col-8) ": "; color: #94a3b8; font-weight: 700; text-align: left; }
+}
+
+html.light .smpl-ut-explorer-shell,
+html[data-smpl-theme="light"] .smpl-ut-explorer-shell,
+html[data-smpl-theme="dawn"] .smpl-ut-explorer-shell,
+html.light .smpl-ut-mini-card,
+html[data-smpl-theme="light"] .smpl-ut-mini-card,
+html[data-smpl-theme="dawn"] .smpl-ut-mini-card,
+html.light .smpl-career-table-region,
+html[data-smpl-theme="light"] .smpl-career-table-region,
+html[data-smpl-theme="dawn"] .smpl-career-table-region {
+  color: #f8fafc !important;
+}
+
+/* ==========================================================================
+   KOMPAKTOWA GABLOTA TROFEÓW Z PASKIEM PRZEWIJANIA I SUWAKIEM (v78)
+   ========================================================================== */
+.smpl-trophy-vault-scroller {
+  --scrollbar-thumb: #f59e0b;
+  --scrollbar-track: #091124;
+
+  max-block-size: 236px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: 0.35rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+@media (prefers-contrast: more) {
+  .smpl-trophy-vault-scroller {
+    --scrollbar-thumb: #ffffff;
+    --scrollbar-track: #000000;
+  }
+}
+
+@supports not (scrollbar-color: auto) {
+  .smpl-trophy-vault-scroller {
+    scrollbar-width: auto;
+  }
+
+  .smpl-trophy-vault-scroller::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .smpl-trophy-vault-scroller::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+
+  .smpl-trophy-vault-scroller::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 9999px;
+  }
+}
+
+.smpl-trophy-vault-scroller:focus-visible {
+  outline: 2.5px solid #fbbf24;
+  outline-offset: 2px;
+  border-radius: 0.85rem;
+}
+
+.smpl-trophy-slider-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-block-end: 0.65rem;
+  padding: 0.42rem 0.68rem;
+  border-radius: 0.85rem;
+  background: rgba(2, 6, 23, 0.86);
+  border: 1px solid rgba(250, 204, 21, 0.32);
+}
+
+.smpl-trophy-range-input {
+  flex: 1 1 auto;
+  min-width: 80px;
+  height: 6px;
+  accent-color: #fbbf24;
+  cursor: pointer;
+}
+
+
+
 
 
 

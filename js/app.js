@@ -253,7 +253,15 @@ window.SMPL_APP = (function () {
   };
 
   const profileState = {
-    playerId: 'L1_P09'
+    playerId: 'L1_P09',
+    comparePlayerId: '',
+    explorer: {
+      query: '',
+      filter: 'ALL',
+      sort: 'OVR',
+      limit: 8,
+      gridExpanded: true
+    }
   };
 
   const gbFormState = {
@@ -275,7 +283,14 @@ window.SMPL_APP = (function () {
     leagueId: 'L1',
     seasonGroup: 'ALL',
     playerName: '',
-    search: ''
+    search: '',
+    utExplorer: {
+      query: '',
+      filter: 'ALL',
+      sort: 'OVR',
+      limit: 24,
+      gridExpanded: true
+    }
   };
 
   const submitFormState = {
@@ -1942,11 +1957,173 @@ window.SMPL_APP = (function () {
     renderAll();
   }
 
+  function getActiveUtExplorerObj() {
+    return activeTab === 'archive' ? archiveState.utExplorer : profileState.explorer;
+  }
+
+  function refreshUtExplorerMountInPlace() {
+    if (!window.SMPL_DB || !window.SMPL_VIEWS || !window.SMPL_ENGINE) return false;
+    const mount = document.getElementById('smpl-ut-explorer-results-mount');
+    if (!mount) return false;
+    const state = window.SMPL_DB.getState();
+    const exp = getActiveUtExplorerObj();
+    const selId = activeTab === 'profile' ? (profileState.playerId || '') : '';
+    mount.innerHTML = window.SMPL_VIEWS.renderUtCardsExplorerResultsHtml(state, exp, selId);
+
+    const statusEl = document.getElementById('smpl-ut-explorer-status');
+    if (statusEl && typeof window.SMPL_ENGINE.getUnifiedUtPlayersCatalog === 'function' && typeof window.SMPL_VIEWS.filterAndSortUtCatalog === 'function') {
+      const cat = window.SMPL_ENGINE.getUnifiedUtPlayersCatalog(state);
+      const cnt = window.SMPL_VIEWS.filterAndSortUtCatalog(cat, exp).length;
+      statusEl.textContent = '🎯 Wyniki: ' + cnt + ' / ' + cat.length + ' graczy';
+    }
+    return true;
+  }
+
+  function handleUtExplorerInput(val) {
+    const exp = getActiveUtExplorerObj();
+    exp.query = String(val == null ? '' : val);
+    exp.gridExpanded = true;
+    if (exp.limit < 12) exp.limit = 12;
+    if (!refreshUtExplorerMountInPlace()) {
+      renderAll();
+    }
+  }
+
+  function handleUtExplorerKeydown(event) {
+    if (!event) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      // IME-safe Enter check (including Safari WebKit keyCode 229 fallback)
+      if (event.isComposing || event.keyCode === 229) {
+        return;
+      }
+      handleUtExplorerSubmit(event);
+    }
+  }
+
+  function handleUtExplorerSubmit(event) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    if (!window.SMPL_DB || !window.SMPL_ENGINE || !window.SMPL_VIEWS) return false;
+    const state = window.SMPL_DB.getState();
+    const cat = window.SMPL_ENGINE.getUnifiedUtPlayersCatalog(state);
+    const exp = getActiveUtExplorerObj();
+    const matches = window.SMPL_VIEWS.filterAndSortUtCatalog(cat, exp);
+    if (matches && matches.length > 0) {
+      selectUtExplorerPlayer(matches[0].id);
+    } else {
+      showToast('Nie znaleziono zawodnika pasującego do wyszukiwania.', 'error');
+    }
+    return false;
+  }
+
+  function setUtExplorerFilter(filterId) {
+    const exp = getActiveUtExplorerObj();
+    exp.filter = filterId || 'ALL';
+    exp.gridExpanded = true;
+    exp.limit = activeTab === 'archive' ? 24 : 12;
+    renderAll();
+  }
+
+  function setUtExplorerSort(sortId) {
+    const exp = getActiveUtExplorerObj();
+    exp.sort = sortId || 'OVR';
+    exp.gridExpanded = true;
+    if (!refreshUtExplorerMountInPlace()) {
+      renderAll();
+    }
+  }
+
+  function loadMoreUtExplorerCards(step) {
+    const exp = getActiveUtExplorerObj();
+    exp.gridExpanded = true;
+    exp.limit = Math.max(12, Number(exp.limit || 12)) + Math.max(1, Number(step || 24));
+    if (!refreshUtExplorerMountInPlace()) {
+      renderAll();
+    }
+  }
+
+  function toggleUtExplorerGrid(expandBool) {
+    const exp = getActiveUtExplorerObj();
+    exp.gridExpanded = Boolean(expandBool);
+    renderAll();
+  }
+
+  function resetUtExplorerFilters() {
+    const exp = getActiveUtExplorerObj();
+    exp.query = '';
+    exp.filter = 'ALL';
+    exp.sort = 'OVR';
+    exp.limit = activeTab === 'archive' ? 24 : 8;
+    exp.gridExpanded = true;
+    renderAll();
+  }
+
+  function selectUtExplorerPlayer(playerId) {
+    if (!playerId) return;
+    profileState.playerId = String(playerId);
+    const state = window.SMPL_DB.getState();
+    const p = (state.players || []).find((item) => item && item.id === playerId);
+    if (p && p.leagueId && p.leagueId !== 'POOL' && p.leagueId !== activeLeague) {
+      activeLeague = p.leagueId;
+    }
+    activeTab = 'profile';
+    renderAll();
+    setTimeout(() => {
+      const anchor = document.getElementById('smpl-ut-active-card-anchor');
+      if (anchor && typeof anchor.scrollIntoView === 'function') {
+        try { anchor.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_e) {}
+      }
+    }, 40);
+  }
+
+  function openArchiveUtCard(playerNameOrId) {
+    closeRankTooltip();
+    closeModal();
+    const state = window.SMPL_DB.getState();
+    const resolved = (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.resolvePlayerOrArchiveEntity === 'function')
+      ? window.SMPL_ENGINE.resolvePlayerOrArchiveEntity(state, playerNameOrId)
+      : null;
+    const targetId = resolved && resolved.id ? resolved.id : ('ARCH::' + String(playerNameOrId || '').trim());
+    selectUtExplorerPlayer(targetId);
+  }
+
+  function setUtCareerComparePlayer(compareId) {
+    profileState.comparePlayerId = String(compareId || '');
+    renderAll();
+  }
+
+  function handleTrophyVaultSlider(pctVal) {
+    const scroller = document.getElementById('smpl-trophy-vault-scroller');
+    if (!scroller) return;
+    const pct = Math.max(0, Math.min(100, Number(pctVal || 0)));
+    const maxScroll = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    scroller.scrollTop = Math.round((pct / 100) * maxScroll);
+    const lbl = document.getElementById('smpl-trophy-vault-pct');
+    if (lbl) lbl.textContent = Math.round(pct) + '%';
+  }
+
+  function handleTrophyVaultScroll(scrollerEl) {
+    const scroller = scrollerEl || document.getElementById('smpl-trophy-vault-scroller');
+    if (!scroller) return;
+    const maxScroll = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    const pct = maxScroll > 0 ? Math.min(100, Math.max(0, Math.round((scroller.scrollTop / maxScroll) * 100))) : 0;
+    const range = document.getElementById('smpl-trophy-vault-range');
+    if (range) range.value = String(pct);
+    const lbl = document.getElementById('smpl-trophy-vault-pct');
+    if (lbl) lbl.textContent = pct + '%';
+  }
+
+  function stepTrophyVaultScroll(deltaPx) {
+    const scroller = document.getElementById('smpl-trophy-vault-scroller');
+    if (!scroller) return;
+    scroller.scrollBy({ top: Number(deltaPx || 0), behavior: 'smooth' });
+  }
+
   function setProfilePlayer(playerId) {
     profileState.playerId = playerId;
     const state = window.SMPL_DB.getState();
     const p = state.players.find((item) => item.id === playerId);
-    if (p && p.leagueId !== activeLeague) {
+    if (p && p.leagueId && p.leagueId !== 'POOL' && p.leagueId !== activeLeague) {
       activeLeague = p.leagueId;
     }
     renderAll();
@@ -1958,8 +2135,10 @@ window.SMPL_APP = (function () {
     const state = window.SMPL_DB.getState();
     const p = state.players.find((item) => item.id === playerId);
     if (p) {
-      activeLeague = p.leagueId;
+      if (p.leagueId && p.leagueId !== 'POOL') activeLeague = p.leagueId;
       profileState.playerId = p.id;
+    } else if (playerId && String(playerId).indexOf('ARCH::') === 0) {
+      profileState.playerId = String(playerId);
     }
     activeTab = 'profile';
     renderAll();
@@ -13450,6 +13629,20 @@ window.SMPL_APP = (function () {
     setH2HPlayer,
     setProfilePlayer,
     openPlayerProfileTab,
+    handleUtExplorerInput,
+    handleUtExplorerKeydown,
+    handleUtExplorerSubmit,
+    setUtExplorerFilter,
+    setUtExplorerSort,
+    loadMoreUtExplorerCards,
+    toggleUtExplorerGrid,
+    resetUtExplorerFilters,
+    selectUtExplorerPlayer,
+    openArchiveUtCard,
+    setUtCareerComparePlayer,
+    handleTrophyVaultSlider,
+    handleTrophyVaultScroll,
+    stepTrophyVaultScroll,
     handlePlayerLoginSubmit,
     openPasswordReminderModal,
     handlePlayerPasswordReminderSubmit,

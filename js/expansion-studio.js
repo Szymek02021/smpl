@@ -545,7 +545,10 @@ window.SMPL_STUDIO = (function () {
   function calculatePlayerAchievements(state, playerId) {
     var s = state || {};
     var pid = String(playerId || '');
-    var player = (s.players || []).find(function (p) { return p && String(p.id) === pid; }) || null;
+    var player = (s.players || []).find(function (p) { return p && String(p.id) === pid; }) ||
+      ((typeof window !== 'undefined' && window.SMPL_ENGINE && typeof window.SMPL_ENGINE.resolvePlayerOrArchiveEntity === 'function' && pid)
+        ? window.SMPL_ENGINE.resolvePlayerOrArchiveEntity(s, pid)
+        : null);
     if (!player) return { unlockedCount: 0, totalCount: 0, items: [] };
 
     var archRow = findArchiveCareerEntry(player.name, player.historicalArchiveName);
@@ -2652,7 +2655,10 @@ window.SMPL_STUDIO = (function () {
     if (typeof document === 'undefined') return Promise.resolve({ ok: false, error: 'Canvas niedostepny.' });
     var s = state || {};
     var pid = String(playerId || '');
-    var player = (s.players || []).find(function (p) { return p && String(p.id) === pid; });
+    var player = (s.players || []).find(function (p) { return p && String(p.id) === pid; }) ||
+      ((typeof window !== 'undefined' && window.SMPL_ENGINE && typeof window.SMPL_ENGINE.resolvePlayerOrArchiveEntity === 'function' && pid)
+        ? window.SMPL_ENGINE.resolvePlayerOrArchiveEntity(s, pid)
+        : null);
     if (!player) return Promise.resolve({ ok: false, error: 'Nie znaleziono zawodnika.' });
 
     var ut = (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.calculatePlayerUTCard === 'function')
@@ -3144,6 +3150,21 @@ window.SMPL_STUDIO = (function () {
    * Uwaga: opisujemy wyłącznie funkcje i poprawki dla graczy (zero wewnętrznych detali serwera).
    */
   var BUILTIN_PLAYER_UPDATES = [
+    {
+      id: 'BUILTIN_V2_21',
+      version: 'V2.21',
+      date: '2026-11-26',
+      category: 'NOWOŚĆ',
+      title: 'Wyszukiwarka Wszystkich Kart UT i Karier z Archiwum S1–S55 (Także Bez Konta)!',
+      summary: 'W zakładkach „Karta UT” oraz „Archiwum S1–S55” uruchomiliśmy pełną wyszukiwarkę i katalog wszystkich 377 zawodników w historii Score Match Liga — możesz wyszukać i sprawdzić Kartę UT 3D, trofea oraz dokładny przebieg kariery każdego gracza nawet wtedy, gdy nie posiada konta w obecnym sezonie!',
+      highlights: [
+        'Wpisz imię, nazwisko, nick lub sezon w nowej Wyszukiwarce Kart UT (w zakładce „🎴 Karta UT” lub „🏛️ Archiwum → 🎴 Wyszukiwarka Kart UT”), filtruj po Ikonach, Medalistach, Ekstraklasie L1 lub graczach z samego Archiwum i otwórz pełną Kartę UT 3D dowolnego zawodnika z sezonów 1–55.',
+        'Każdy profil prezentuje nową „Księgę Kariery Zawodnika (S1–S55)”: erę występów, życiowy sezon (Peak), rekord goli i defensywy, średnie na mecz, rozkład występów szczebel po szczeblu w ligach L1–L9, wykres trajektorii oraz responsywną tabelę wszystkich rozegranych sezonów.',
+        'Uporządkowaliśmy Gablotę Trofeów: wyświetla wyłącznie konkretne trofea sezonowe (zero zbiorczych powtórzeń typu „Sezony 1–55” i zero sztucznych wpisów „Oficjalnie Dopisany do ligi”) w kompaktowym oknie z paskiem przewijania i wygodnym suwakiem!'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
     {
       id: 'BUILTIN_V2_20',
       version: 'V2.20',

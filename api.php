@@ -3828,13 +3828,7 @@ if ($method === 'POST') {
                     'joinedSeason' => $curSeason,
                     'manualCreatedBy' => $admName,
                     'active' => true,
-                    'trophies' => count($inTrophies) > 0 ? $inTrophies : array(array(
-                        'id' => 'tr_add_' . $tsMs,
-                        'icon' => '⚽',
-                        'title' => 'Zawodnik Score Match Ligi (' . $leagueId . ')',
-                        'season' => 'Sezon ' . $curSeason,
-                        'rarity' => 'SILVER'
-                    )),
+                    'trophies' => count($inTrophies) > 0 ? $inTrophies : array(),
                     'notifications' => array(array(
                         'id' => 'NOTIF_MAN_' . $tsMs,
                         'time' => $nowFmt,

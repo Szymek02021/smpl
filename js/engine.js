@@ -607,21 +607,591 @@ window.SMPL_ENGINE = (function () {
   }
 
   /**
-   * 6. KARTA ZAWODNIKA ULTIMATE TEAM (OVR 75–99) + ULUBIONY RYWAL / NEMEZIS / STYL GRY (Z EXCELA!)
+   * 6. KARTA ZAWODNIKA ULTIMATE TEAM (OVR 75–99) + WYSZUKIWARKA KART ARCHIWUM S1–S55 (BEZ KONTA I Z KONTEM)
    */
-  function calculatePlayerUTCard(state, playerId) {
-    const players = state.players || [];
-    const player = players.find((p) => p.id === playerId) || players[0];
-    if (!player) return null;
+  const ARCHIVE_UT_LEAGUE_LABELS = {
+    L1: 'Ekstraklasa (L1)',
+    L2: '2. Liga (L2)',
+    L3: '3. Liga (L3)',
+    L4: '4. Liga (L4)',
+    L5: '5. Liga (L5)',
+    L6: '6. Liga (L6)',
+    L7: '7. Liga (L7)',
+    L8: '8. Liga (L8)',
+    L9: '9. Liga (L9)',
+    L10: '10. Liga (L10)'
+  };
 
-    const playersMap = {};
-    players.forEach((p) => {
-      playersMap[p.id] = p;
+  const ARCHIVE_UT_CANON_MAP = {
+    'piort pastuszak': 'Piotr Pastuszak',
+    'piote pastuszak': 'Piotr Pastuszak',
+    'sebastain niezborala': 'Sebastian Niezbora\u0142a',
+    'mak herdus': 'Maks Herdu\u015B',
+    'maciej maciejewski': 'Maciek Maciejewski',
+    'kuba paszkiewicz': 'Jakub Paszkiewicz',
+    'michal pelka': 'Micha\u0142 Pe\u0142ka',
+    'lukasz papik': '\u0141ukasz Papik'
+  };
+
+  let _archiveUtIndexCacheKey = '';
+  let _archiveUtIndexCache = null;
+  let _unifiedUtCatalogKey = '';
+  let _unifiedUtCatalogCache = null;
+
+  function foldArchiveSearchText(str) {
+    const map = { 'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z' };
+    return String(str == null ? '' : str)
+      .trim()
+      .toLowerCase()
+      .replace(/[ąćęłńóśźż]/g, function (ch) { return map[ch] || ch; })
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function canonicalUtArchiveName(rawName) {
+    if (typeof window !== 'undefined' && window.SMPL_DB && typeof window.SMPL_DB.canonicalArchiveName === 'function') {
+      return window.SMPL_DB.canonicalArchiveName(rawName);
+    }
+    const clean = String(rawName == null ? '' : rawName).replace(/\s+/g, ' ').trim();
+    const fk = foldArchiveSearchText(clean);
+    return ARCHIVE_UT_CANON_MAP[fk] || clean;
+  }
+
+  function isInvalidArchiveName(name) {
+    const clean = String(name == null ? '' : name).trim();
+    if (!clean || clean === '-' || clean === '—' || clean === '...') return true;
+    return /^wolny\s*los|^wl\d+$|^pauza$|brak\s*danych|^vacat|^rezerwa$/i.test(clean);
+  }
+
+  function parseLeagueNum(lid) {
+    const n = parseInt(String(lid || 'L9').replace(/\D/g, ''), 10);
+    return isNaN(n) || n <= 0 ? 9 : n;
+  }
+
+  function extractTrophySeasonNumber(seasonStr, titleStr) {
+    const s = String(seasonStr == null ? '' : seasonStr).trim();
+    const t = String(titleStr == null ? '' : titleStr).trim();
+    // Reject multi-season ranges like "Sezony 1–55", "S1-S54", "1–55"
+    if (/\d+\s*[–-]\s*\d+/.test(s) || /sezony\s+\d+/i.test(s) || /wszech\s*czas|all[-\s]*time|ranking\s+og/i.test(s)) {
+      return null;
+    }
+    const m1 = s.match(/(?:sezon|sez\.?|s)\s*#?(\d{1,3})\b/i);
+    if (m1) return parseInt(m1[1], 10);
+    const mOnly = s.match(/^(\d{1,3})$/);
+    if (mOnly) return parseInt(mOnly[1], 10);
+    const mTitle = t.match(/(?:sezon|sez\.?|w\s+s)\s*#?(\d{1,3})\b/i);
+    if (mTitle && !/\d+\s*[–-]\s*\d+/.test(t)) return parseInt(mTitle[1], 10);
+    return null;
+  }
+
+  function inferTrophyDivisionAndPlace(titleStr, idStr) {
+    const rawId = String(idStr == null ? '' : idStr);
+    const mId = rawId.match(/(?:^|_)s(\d+)_(L\d+)_([123])\b/i);
+    if (mId) {
+      return { kind: 'PODIUM', div: mId[2].toUpperCase(), place: parseInt(mId[3], 10) };
+    }
+    const folded = foldArchiveSearchText(titleStr);
+    let place = 0;
+    if (/\bwicemistrz\b|\b2\.\s*miejsce\b|\bii\s*miejsce\b|\bsrebr/i.test(folded)) place = 2;
+    else if (/\bbrazow|\b3\.\s*miejsce\b|\biii\s*miejsce\b/i.test(folded)) place = 3;
+    else if (/\bmistrz\b|\b1\.\s*miejsce\b|\bi\s*miejsce\b/i.test(folded)) place = 1;
+
+    if (place > 0) {
+      let div = 'L1';
+      const mLiga = folded.match(/\b([2-9]|10)\.\s*lig/);
+      const mCode = folded.match(/\b(l[1-9]|l10)\b/);
+      if (mLiga) div = 'L' + mLiga[1];
+      else if (mCode) div = mCode[1].toUpperCase();
+      else if (/ekstraklas|mistrz\s+polski/.test(folded)) div = 'L1';
+      return { kind: 'PODIUM', div: div, place: place };
+    }
+    return null;
+  }
+
+  function sanitizeAndDedupeSeasonTrophies(rawTrophies, finishedSeasonRecords) {
+    const candidates = Array.isArray(rawTrophies) ? rawTrophies.slice() : [];
+    // Also ensure all finished season podiums (pos 1..3) exist as concrete season trophies
+    if (Array.isArray(finishedSeasonRecords)) {
+      finishedSeasonRecords.forEach(function (rc) {
+        if (!rc || rc.inProgress || Number(rc.pos || 99) > 3) return;
+        const isL1 = rc.leagueId === 'L1';
+        const placeTitle = rc.pos === 1
+          ? (isL1 ? 'Mistrz Polski Ekstraklasy SMPL' : ('Mistrz ' + rc.leagueLabel + ' SMPL'))
+          : rc.pos === 2
+          ? (isL1 ? 'Wicemistrz Polski Ekstraklasy SMPL' : ('Wicemistrz ' + rc.leagueLabel + ' SMPL'))
+          : (isL1 ? 'Brązowy Medalista Ekstraklasy SMPL' : ('3. Miejsce — ' + rc.leagueLabel + ' SMPL'));
+        candidates.push({
+          id: 'tr_s' + rc.seasonNumber + '_' + rc.leagueId + '_' + rc.pos,
+          icon: rc.pos === 1 ? (isL1 ? '👑' : '🏆') : (rc.pos === 2 ? '🥈' : '🥉'),
+          title: placeTitle + ' (' + rc.PKT + ' pkt)',
+          season: 'Sezon ' + rc.seasonNumber,
+          rarity: rc.pos === 1 && isL1 ? 'LEGENDARY' : (rc.pos === 1 ? 'GOLD' : 'SILVER')
+        });
+      });
+    }
+
+    const out = [];
+    const seenKeys = {};
+
+    candidates.forEach(function (tr) {
+      if (!tr || typeof tr !== 'object') return;
+      const tid = String(tr.id || '');
+      const rawTitle = String(tr.title || '').trim();
+      const rawSeason = String(tr.season || '').trim();
+      if (!rawTitle) return;
+
+      // 1. Block filler membership / assignment pseudo-trophies ("Oficjalnie Dopisany do...", "Zawodnik Score Match Ligi...")
+      if (/^(tr_join_|tr_add_|TR_HIST_|tr_top15_)/i.test(tid)) return;
+      const foldedTitle = foldArchiveSearchText(rawTitle);
+      const foldedSeason = foldArchiveSearchText(rawSeason);
+      if (/oficjalnie\s+dopisan|dopisan[yo]\s+do|dopisano\s+do|przypisan[yo]\s+do|zawodnik\s+score|uczestnik\s+(sezonu|ligi|ekstraklasy|\d+\.\s*ligi)/.test(foldedTitle)) {
+        return;
+      }
+
+      // 2. Block multi-season / all-time summary duplicates ("1x Mistrz...", "Sezony 1–55", "Ranking Wszech Czasów")
+      if (/\b\d+\s*x\s*(mistrz|wicemistrz|brazow|medal)|archiwum\s*s1|legenda\s+top\s+\d+\s+all/.test(foldedTitle)) {
+        return;
+      }
+      if (/sezony\s*\d+|wszech\s*czas|all[-\s]*time|\bs1\s*[–-]\s*s\d+/.test(foldedSeason)) {
+        return;
+      }
+
+      // 3. Require a concrete single season ("Sezon X")
+      const sNum = extractTrophySeasonNumber(rawSeason, rawTitle);
+      if (!sNum || sNum <= 0) return;
+
+      const canonicalSeason = 'Sezon ' + sNum;
+      const podiumMeta = inferTrophyDivisionAndPlace(rawTitle, tid);
+      const dedupeKey = podiumMeta
+        ? ('S' + sNum + '::PODIUM::' + podiumMeta.div + '::' + podiumMeta.place)
+        : ('S' + sNum + '::AWARD::' + foldedTitle.replace(/\(\d+\s*pkt\)/g, '').replace(/\s+/g, ' ').trim());
+
+      if (seenKeys[dedupeKey]) return;
+      seenKeys[dedupeKey] = true;
+
+      out.push({
+        id: tid || ('tr_clean_s' + sNum + '_' + out.length),
+        icon: tr.icon || '🏆',
+        title: rawTitle,
+        season: canonicalSeason,
+        rarity: tr.rarity || 'GOLD',
+        _seasonNum: sNum,
+        _placeOrder: podiumMeta ? podiumMeta.place : 4
+      });
     });
 
-    const standings = calculateStandings(state, player.leagueId);
-    const row = standings.find((r) => r.playerId === player.id) || {
-      position: 1,
+    out.sort(function (a, b) {
+      if (b._seasonNum !== a._seasonNum) return b._seasonNum - a._seasonNum;
+      return a._placeOrder - b._placeOrder;
+    });
+
+    return out.map(function (item) {
+      return {
+        id: item.id,
+        icon: item.icon,
+        title: item.title,
+        season: item.season,
+        rarity: item.rarity
+      };
+    });
+  }
+
+  function buildArchiveIndexCache(state) {
+    const s = state || {};
+    const archGlobal = (typeof window !== 'undefined' && window.SMPL_ARCHIVE_DATA) ? window.SMPL_ARCHIVE_DATA : {};
+    const seasonsList = (Array.isArray(s.historicalSeasons) && s.historicalSeasons.length > 0)
+      ? s.historicalSeasons
+      : (archGlobal.HISTORICAL_SEASONS || []);
+    const careerList = (Array.isArray(s.careerRanking) && s.careerRanking.length > 0)
+      ? s.careerRanking
+      : (archGlobal.CAREER_RANKING || []);
+    const allTimeList = (Array.isArray(s.allTimeRanking) && s.allTimeRanking.length > 0)
+      ? s.allTimeRanking
+      : (archGlobal.ALL_TIME_RANKING || []);
+    const trophiesMap = archGlobal.PLAYER_TROPHIES_MAP || {};
+
+    const key = [seasonsList.length, careerList.length, allTimeList.length, Object.keys(trophiesMap).length].join('|');
+    if (_archiveUtIndexCache && _archiveUtIndexCacheKey === key) {
+      return _archiveUtIndexCache;
+    }
+
+    const byFolded = {};
+    const orderedFolded = [];
+
+    function ensureBucket(rawName) {
+      const canon = canonicalUtArchiveName(rawName);
+      if (isInvalidArchiveName(canon)) return null;
+      const fk = foldArchiveSearchText(canon);
+      if (!fk) return null;
+      if (!byFolded[fk]) {
+        byFolded[fk] = {
+          name: canon,
+          folded: fk,
+          careerEntry: null,
+          allTimeL1Entry: null,
+          seasonRecords: [],
+          seenSeasonKeys: {},
+          rawTrophies: []
+        };
+        orderedFolded.push(fk);
+      }
+      return byFolded[fk];
+    }
+
+    careerList.forEach(function (c) {
+      if (!c || !c.name) return;
+      const b = ensureBucket(c.name);
+      if (b && !b.careerEntry) b.careerEntry = c;
+    });
+
+    allTimeList.forEach(function (a) {
+      if (!a || !a.name) return;
+      const b = ensureBucket(a.name);
+      if (b && !b.allTimeL1Entry) b.allTimeL1Entry = a;
+    });
+
+    Object.keys(trophiesMap).forEach(function (tName) {
+      const b = ensureBucket(tName);
+      if (!b) return;
+      const arr = trophiesMap[tName];
+      if (Array.isArray(arr)) {
+        arr.forEach(function (tr) {
+          if (tr) b.rawTrophies.push(tr);
+        });
+      }
+    });
+
+    seasonsList.forEach(function (sec) {
+      if (!sec || !sec.leagues) return;
+      const sNum = Number(sec.seasonNumber || 0);
+      const inProg = Boolean(sec.inProgress);
+      Object.keys(sec.leagues).forEach(function (lid) {
+        const rows = sec.leagues[lid] || [];
+        rows.forEach(function (r) {
+          if (!r || Number(r.M || 0) <= 0) return;
+          const b = ensureBucket(r.name);
+          if (!b) return;
+          const dKey = sNum + '_' + lid;
+          if (b.seenSeasonKeys[dKey]) return;
+          b.seenSeasonKeys[dKey] = true;
+          b.seasonRecords.push({
+            seasonNumber: sNum,
+            inProgress: inProg,
+            leagueId: lid,
+            leagueNum: parseLeagueNum(lid),
+            leagueLabel: ARCHIVE_UT_LEAGUE_LABELS[lid] || lid,
+            pos: Number(r.pos || 99),
+            M: Number(r.M || 0),
+            W: Number(r.W || 0),
+            R: Number(r.R || 0),
+            P: Number(r.P || 0),
+            BZ: Number(r.BZ || 0),
+            BS: Number(r.BS || 0),
+            diff: Number(r.diff != null ? r.diff : (Number(r.BZ || 0) - Number(r.BS || 0))),
+            PKT: Number(r.PKT || 0),
+            note: String(r.note || '')
+          });
+        });
+      });
+    });
+
+    const recordsList = [];
+    orderedFolded.forEach(function (fk, idx) {
+      const b = byFolded[fk];
+      b.seasonRecords.sort(function (x, y) {
+        if (y.seasonNumber !== x.seasonNumber) return y.seasonNumber - x.seasonNumber;
+        return x.leagueNum - y.leagueNum;
+      });
+
+      const finishedRecs = b.seasonRecords.filter(function (rc) { return !rc.inProgress; });
+      const allRecs = b.seasonRecords;
+
+      // Aggregate fallback if not in CAREER_RANKING
+      let aggM = 0, aggW = 0, aggR = 0, aggP = 0, aggGF = 0, aggGA = 0, aggPts = 0;
+      let aggGold = 0, aggSilver = 0, aggBronze = 0, l1Seas = 0;
+      const divMap = {};
+      let debutSeason = null;
+      let lastSeason = null;
+      let bestSeason = null;
+      let highestGoalSeason = null;
+      let bestDefenseSeason = null;
+
+      allRecs.forEach(function (rc) {
+        if (debutSeason === null || rc.seasonNumber < debutSeason) debutSeason = rc.seasonNumber;
+        if (lastSeason === null || rc.seasonNumber > lastSeason) lastSeason = rc.seasonNumber;
+
+        if (!divMap[rc.leagueId]) {
+          divMap[rc.leagueId] = {
+            leagueId: rc.leagueId,
+            leagueNum: rc.leagueNum,
+            leagueLabel: rc.leagueLabel,
+            seasons: 0,
+            matches: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
+            gf: 0,
+            ga: 0,
+            pkt: 0,
+            titles: 0,
+            podiums: 0,
+            bestPos: rc.pos
+          };
+        }
+        const dm = divMap[rc.leagueId];
+        dm.seasons += 1;
+        dm.matches += rc.M;
+        dm.wins += rc.W;
+        dm.draws += rc.R;
+        dm.losses += rc.P;
+        dm.gf += rc.BZ;
+        dm.ga += rc.BS;
+        dm.pkt += rc.PKT;
+        if (rc.pos < dm.bestPos) dm.bestPos = rc.pos;
+        if (!rc.inProgress) {
+          if (rc.pos === 1) dm.titles += 1;
+          if (rc.pos <= 3) dm.podiums += 1;
+        }
+
+        if (!rc.inProgress) {
+          aggM += rc.M;
+          aggW += rc.W;
+          aggR += rc.R;
+          aggP += rc.P;
+          aggGF += rc.BZ;
+          aggGA += rc.BS;
+          aggPts += rc.PKT;
+          if (rc.leagueId === 'L1') l1Seas += 1;
+          if (rc.pos === 1) aggGold += 1;
+          else if (rc.pos === 2) aggSilver += 1;
+          else if (rc.pos === 3) aggBronze += 1;
+        }
+
+        // Best season selection: prefer finished seasons, higher league (smaller leagueNum), better pos, higher PKT
+        const candScore = (rc.inProgress ? -100000 : 0) - (rc.leagueNum * 1000) - (rc.pos * 25) + rc.PKT + (rc.diff * 0.2);
+        const curBestScore = bestSeason
+          ? ((bestSeason.inProgress ? -100000 : 0) - (bestSeason.leagueNum * 1000) - (bestSeason.pos * 25) + bestSeason.PKT + (bestSeason.diff * 0.2))
+          : -9999999;
+        if (candScore > curBestScore) bestSeason = rc;
+
+        if (!highestGoalSeason || rc.BZ > highestGoalSeason.BZ || (rc.BZ === highestGoalSeason.BZ && rc.leagueNum < highestGoalSeason.leagueNum)) {
+          highestGoalSeason = rc;
+        }
+        if (rc.M >= 14 && (!bestDefenseSeason || (rc.BS / rc.M) < (bestDefenseSeason.BS / bestDefenseSeason.M))) {
+          bestDefenseSeason = rc;
+        }
+      });
+
+      const ce = b.careerEntry;
+      const l1e = b.allTimeL1Entry;
+      const seasonsCount = ce ? Number(ce.seasons || 0) : Math.max(finishedRecs.length, allRecs.length > 0 ? 1 : 0);
+      const totalMatches = ce ? Number(ce.matches || 0) : (aggM || (allRecs[0] ? allRecs[0].M : 0));
+      const totalWins = ce ? Number(ce.wins || 0) : (aggW || (allRecs[0] ? allRecs[0].W : 0));
+      const totalDraws = ce ? Number(ce.draws || 0) : (aggR || (allRecs[0] ? allRecs[0].R : 0));
+      const totalLosses = ce ? Number(ce.losses || 0) : (aggP || (allRecs[0] ? allRecs[0].P : 0));
+      const totalGF = ce ? Number(ce.gf || 0) : (aggGF || (allRecs[0] ? allRecs[0].BZ : 0));
+      const totalGA = ce ? Number(ce.ga || 0) : (aggGA || (allRecs[0] ? allRecs[0].BS : 0));
+      const totalGD = ce && ce.gd != null ? Number(ce.gd) : (totalGF - totalGA);
+      const totalWinPct = ce && ce.winPct != null
+        ? Number(ce.winPct)
+        : (totalMatches > 0 ? Number(((totalWins / totalMatches) * 100).toFixed(1)) : 0);
+      const matchPoints = ce ? Number(ce.points || 0) : (aggPts || (allRecs[0] ? allRecs[0].PKT : 0));
+      const totalCareerPts = ce ? Number(ce.total || ce.points || 0) : matchPoints;
+      const gold = ce ? Number(ce.gold || 0) : aggGold;
+      const silver = ce ? Number(ce.silver || 0) : aggSilver;
+      const bronze = ce ? Number(ce.bronze || 0) : aggBronze;
+      const medals = ce ? Number(ce.medals != null ? ce.medals : (gold + silver + bronze)) : (gold + silver + bronze);
+
+      let bestPosLabel = (ce && ce.bestPos) || (l1e && l1e.bestPos) || '';
+      if (!bestPosLabel && bestSeason) {
+        bestPosLabel = '#' + bestSeason.pos + ' (' + bestSeason.leagueId + ')';
+      }
+
+      // Normalize to concrete single-season trophies only (zero S1–S55 summary duplicates, zero "dopisano" filler)
+      const finalTrophies = sanitizeAndDedupeSeasonTrophies(b.rawTrophies, finishedRecs);
+
+      const divisionsBreakdown = Object.keys(divMap)
+        .map(function (k) { return divMap[k]; })
+        .sort(function (x, y) { return x.leagueNum - y.leagueNum; });
+
+      const peakLeagueId = divisionsBreakdown.length > 0
+        ? divisionsBreakdown[0].leagueId
+        : (l1e ? 'L1' : 'L2');
+      const lastPlayedLeagueId = allRecs.length > 0 ? allRecs[0].leagueId : peakLeagueId;
+      const eraSpanLabel = debutSeason !== null && lastSeason !== null
+        ? (debutSeason === lastSeason ? ('S' + debutSeason) : ('S' + debutSeason + ' – S' + lastSeason))
+        : (seasonsCount > 0 ? (seasonsCount + ' sez.') : 'Archiwum');
+
+      const summaryObj = {
+        rank: ce ? cRankVal(ce.rank) : (l1e ? cRankVal(l1e.rank) : '-'),
+        careerRank: ce ? cRankVal(ce.rank) : null,
+        l1Rank: l1e ? cRankVal(l1e.rank) : (ce && ce.l1Rank ? cRankVal(ce.l1Rank) : null),
+        seasons: Math.max(1, seasonsCount),
+        l1Seasons: ce && ce.l1Seasons != null ? Number(ce.l1Seasons) : (l1e ? Number(l1e.seasons || l1Seas) : l1Seas),
+        matches: totalMatches,
+        wins: totalWins,
+        draws: totalDraws,
+        losses: totalLosses,
+        gf: totalGF,
+        ga: totalGA,
+        gd: totalGD,
+        winPct: totalWinPct,
+        points: matchPoints,
+        posPts: ce ? Number(ce.posPts || 0) : 0,
+        total: totalCareerPts,
+        gold: gold,
+        silver: silver,
+        bronze: bronze,
+        medals: medals,
+        bestPos: bestPosLabel || ('#' + (bestSeason ? bestSeason.pos : 1) + ' (' + peakLeagueId + ')')
+      };
+
+      const entryOut = {
+        indexOrder: idx,
+        name: b.name,
+        folded: b.folded,
+        peakLeagueId: peakLeagueId,
+        lastPlayedLeagueId: lastPlayedLeagueId,
+        debutSeason: debutSeason,
+        lastSeason: lastSeason,
+        eraSpanLabel: eraSpanLabel,
+        bestSeason: bestSeason,
+        highestGoalSeason: highestGoalSeason,
+        bestDefenseSeason: bestDefenseSeason,
+        divisionsBreakdown: divisionsBreakdown,
+        seasonRecords: allRecs,
+        trophies: finalTrophies,
+        summary: summaryObj
+      };
+      byFolded[fk] = entryOut;
+      if (totalMatches > 0 || seasonsCount > 0) {
+        recordsList.push(entryOut);
+      }
+    });
+
+    function cRankVal(v) {
+      const n = Number(v);
+      return !isNaN(n) && n > 0 ? n : null;
+    }
+
+    _archiveUtIndexCacheKey = key;
+    _archiveUtIndexCache = {
+      byFolded: byFolded,
+      list: recordsList
+    };
+    return _archiveUtIndexCache;
+  }
+
+  function findArchiveDossierByName(state, nameA, nameB) {
+    const idx = buildArchiveIndexCache(state);
+    const fA = foldArchiveSearchText(canonicalUtArchiveName(nameA));
+    if (fA && idx.byFolded[fA]) return idx.byFolded[fA];
+    const fB = foldArchiveSearchText(canonicalUtArchiveName(nameB));
+    if (fB && idx.byFolded[fB]) return idx.byFolded[fB];
+    return null;
+  }
+
+  function buildArchiveAvatarFallback(name, seedIdx) {
+    if (typeof window !== 'undefined' && window.SMPL_MEDIA && typeof window.SMPL_MEDIA.generatePlayerAvatar === 'function') {
+      return window.SMPL_MEDIA.generatePlayerAvatar(name, 'S1-S55', seedIdx || 0);
+    }
+    return 'css/icon-192.png';
+  }
+
+  function resolvePlayerOrArchiveEntity(state, playerIdOrName) {
+    const s = state || {};
+    const players = Array.isArray(s.players) ? s.players : [];
+    const raw = String(playerIdOrName == null ? '' : playerIdOrName).trim();
+
+    if (raw) {
+      // 1. Direct match by active/pool player ID
+      const byId = players.find(function (p) { return p && String(p.id) === raw; });
+      if (byId) return byId;
+
+      // 2. Archive Virtual ID "ARCH::<name>" or plain historical name
+      const cleanArchName = raw.indexOf('ARCH::') === 0 ? raw.slice(6).trim() : raw;
+      const foldedTarget = foldArchiveSearchText(canonicalUtArchiveName(cleanArchName));
+
+      // Check if this historical person actually has an active/pool account in state.players!
+      if (foldedTarget) {
+        const linkedActive = players.find(function (p) {
+          if (!p || isPlaceholderPlayer(p)) return false;
+          const fn = foldArchiveSearchText(canonicalUtArchiveName(p.name));
+          const fa = p.historicalArchiveName ? foldArchiveSearchText(canonicalUtArchiveName(p.historicalArchiveName)) : '';
+          return fn === foldedTarget || (fa && fa === foldedTarget);
+        });
+        if (linkedActive && raw.indexOf('ARCH::') !== 0) {
+          return linkedActive;
+        }
+      }
+
+      const doss = findArchiveDossierByName(s, cleanArchName, '');
+      if (doss) {
+        return {
+          id: 'ARCH::' + doss.name,
+          name: doss.name,
+          nick: 'Archiwum ' + doss.eraSpanLabel,
+          leagueId: doss.lastPlayedLeagueId || doss.peakLeagueId || 'L1',
+          peakLeagueId: doss.peakLeagueId || 'L1',
+          active: false,
+          isArchiveVirtual: true,
+          isArchiveOnly: true,
+          hasActiveAccount: false,
+          historicalArchiveName: doss.name,
+          historicalStats: doss.summary,
+          trophies: doss.trophies,
+          avatar: buildArchiveAvatarFallback(doss.name, doss.indexOrder)
+        };
+      }
+    }
+
+    if (players.length > 0) return players[0];
+    const idxAll = buildArchiveIndexCache(s);
+    if (idxAll.list.length > 0) {
+      const top0 = idxAll.list[0];
+      return {
+        id: 'ARCH::' + top0.name,
+        name: top0.name,
+        nick: 'Archiwum ' + top0.eraSpanLabel,
+        leagueId: top0.lastPlayedLeagueId || top0.peakLeagueId || 'L1',
+        peakLeagueId: top0.peakLeagueId || 'L1',
+        active: false,
+        isArchiveVirtual: true,
+        isArchiveOnly: true,
+        hasActiveAccount: false,
+        historicalArchiveName: top0.name,
+        historicalStats: top0.summary,
+        trophies: top0.trophies,
+        avatar: buildArchiveAvatarFallback(top0.name, 0)
+      };
+    }
+    return null;
+  }
+
+  function calculatePlayerUTCard(state, playerId) {
+    const s = state || {};
+    const players = s.players || [];
+    const player = resolvePlayerOrArchiveEntity(s, playerId);
+    if (!player) return null;
+
+    const isArchVirtual = Boolean(player.isArchiveVirtual);
+    const playersMap = {};
+    players.forEach(function (p) {
+      if (p && p.id) playersMap[p.id] = p;
+    });
+
+    const dossier = findArchiveDossierByName(s, player.historicalArchiveName || player.name, player.name);
+
+    const standings = !isArchVirtual ? calculateStandings(s, player.leagueId) : [];
+    const liveRow = !isArchVirtual ? standings.find(function (r) { return r.playerId === player.id; }) : null;
+
+    // For archive-only players, represent seasonRow using their latest/best historical season metrics cleanly
+    const latestHistSeason = dossier && dossier.seasonRecords && dossier.seasonRecords.length > 0
+      ? dossier.seasonRecords[0]
+      : null;
+
+    const row = liveRow || {
+      position: latestHistSeason ? latestHistSeason.pos : 1,
       M: 0,
       W: 0,
       R: 0,
@@ -634,77 +1204,112 @@ window.SMPL_ENGINE = (function () {
       cleanSheetPct: 0,
       goalsForAvg: 0,
       goalsAgainstAvg: 0,
-      winRate: 0,
+      winRate: dossier && dossier.summary ? dossier.summary.winPct : 0,
       form: [],
       history: []
     };
 
-    const catalog =
-      typeof window !== 'undefined' &&
-      window.SMPL_DB &&
-      typeof window.SMPL_DB.getHistoricalPlayersCatalog === 'function'
-        ? window.SMPL_DB.getHistoricalPlayersCatalog()
-        : null;
-    const careerFallbackList = state.careerRanking || (window.SMPL_ARCHIVE_DATA && window.SMPL_ARCHIVE_DATA.CAREER_RANKING) || [];
-    const allTimeList = state.allTimeRanking || (window.SMPL_ARCHIVE_DATA && window.SMPL_ARCHIVE_DATA.ALL_TIME_RANKING) || [];
-    const lookupList = catalog && catalog.length > 0 ? catalog : (careerFallbackList.length > 0 ? careerFallbackList : allTimeList);
-    const archTarget = player.historicalArchiveName || player.name || '';
-    const matchedFromArchive =
-      (typeof window !== 'undefined' &&
-        window.SMPL_DB &&
-        typeof window.SMPL_DB.findArchiveEntryByName === 'function' &&
-        (window.SMPL_DB.findArchiveEntryByName(archTarget) || window.SMPL_DB.findArchiveEntryByName(player.name))) ||
-      lookupList.find(
-        (a) =>
-          a.name.toLowerCase() === String(archTarget).toLowerCase() ||
-          a.name.toLowerCase() === String(player.name || '').toLowerCase()
-      );
-    const allTimeEntry = player.historicalStats || matchedFromArchive || {
+    const allTimeEntry = (dossier && dossier.summary) || player.historicalStats || {
       rank: '-',
-      seasons: 1,
+      careerRank: null,
+      l1Rank: null,
+      seasons: Math.max(1, row.M > 0 ? 1 : 0),
+      l1Seasons: player.leagueId === 'L1' && row.M > 0 ? 1 : 0,
       matches: row.M,
       wins: row.W,
       draws: row.R,
       losses: row.P,
       gf: row.BZ,
       ga: row.BS,
+      gd: row.diff,
+      winPct: row.winRate || 0,
       points: row.PKT,
       total: row.PKT,
       gold: 0,
       silver: 0,
       bronze: 0,
-      bestPos: '#' + (row.position || 1) + ' (' + player.leagueId + ')'
+      medals: 0,
+      bestPos: '#' + (row.position || 1) + ' (' + (player.leagueId || 'L1') + ')'
     };
 
-    const trophies = player.trophies || [];
-    const formPts = (row.form || []).reduce((acc, f) => acc + (f.result === 'Z' ? 3 : f.result === 'R' ? 1 : 0), 0);
+    // Merge custom trophies on active account with historical archive trophies (strictly concrete seasons, zero duplicates or "dopisano" filler)
+    const finishedForMerge = dossier && Array.isArray(dossier.seasonRecords)
+      ? dossier.seasonRecords.filter(function (rc) { return !rc.inProgress; })
+      : [];
+    const mergedTrophies = sanitizeAndDedupeSeasonTrophies(
+      (player.trophies || []).concat(dossier && dossier.trophies ? dossier.trophies : []),
+      finishedForMerge
+    );
 
-    // 6 Statystyk FIFA / EA FC Ultimate Team (68..99)
-    const ata = Math.min(99, Math.max(70, Math.round(72 + (row.goalsForAvg || 1.2) * 10 + (allTimeEntry.gf > 400 ? 4 : 0))));
-    const def = Math.min(99, Math.max(70, Math.round(74 + (row.cleanSheets || 0) * 4 - (row.goalsAgainstAvg || 1.0) * 4)));
-    const forStat = Math.min(99, Math.max(68, Math.round(70 + formPts * 1.9)));
-    const skt = Math.min(99, Math.max(70, Math.round(68 + (row.winRate || 50) * 0.3)));
-    const dos = Math.min(99, Math.max(72, Math.round(71 + Math.min(25, (allTimeEntry.seasons || 1) * 0.9) + trophies.length * 1.2)));
-    const men = Math.min(99, Math.max(72, Math.round(75 + (row.W * 2) - row.P + (allTimeEntry.gold || 0) * 2)));
+    let ata, def, forStat, skt, dos, men;
+    const hasLiveMatches = !isArchVirtual && Number(row.M || 0) > 0;
+    const histM = Number(allTimeEntry.matches || 0);
 
-    const ovr = Math.min(99, Math.max(76, Math.round((ata + def + forStat + skt + dos + men) / 6)));
+    if (hasLiveMatches) {
+      const formPts = (row.form || []).reduce(function (acc, f) { return acc + (f.result === 'Z' ? 3 : f.result === 'R' ? 1 : 0); }, 0);
+      ata = Math.min(99, Math.max(70, Math.round(72 + (row.goalsForAvg || 1.2) * 10 + (allTimeEntry.gf > 400 ? 4 : 0))));
+      def = Math.min(99, Math.max(70, Math.round(74 + (row.cleanSheets || 0) * 4 - (row.goalsAgainstAvg || 1.0) * 4)));
+      forStat = Math.min(99, Math.max(68, Math.round(70 + formPts * 1.9)));
+      skt = Math.min(99, Math.max(70, Math.round(68 + (row.winRate || 50) * 0.3)));
+      dos = Math.min(99, Math.max(72, Math.round(71 + Math.min(25, (allTimeEntry.seasons || 1) * 0.9) + mergedTrophies.length * 1.2)));
+      men = Math.min(99, Math.max(72, Math.round(75 + (row.W * 2) - row.P + (allTimeEntry.gold || 0) * 2)));
+    } else if (histM > 0) {
+      // Authentic historical UT Card calculation from S1–S55 career & recent seasons
+      const gfAvg = Number(allTimeEntry.gf || 0) / histM;
+      const gaAvg = Number(allTimeEntry.ga || 0) / histM;
+      const winPct = Number(allTimeEntry.winPct || ((Number(allTimeEntry.wins || 0) / histM) * 100));
+      const l1Seas = Number(allTimeEntry.l1Seasons || 0);
+      const totSeas = Number(allTimeEntry.seasons || 1);
+      const goldCnt = Number(allTimeEntry.gold || 0);
+      const silverCnt = Number(allTimeEntry.silver || 0);
+      const bronzeCnt = Number(allTimeEntry.bronze || 0);
+      const peakDivNum = dossier && dossier.peakLeagueId ? parseLeagueNum(dossier.peakLeagueId) : parseLeagueNum(player.leagueId);
+      const divTierBonus = peakDivNum === 1 ? 5 : peakDivNum === 2 ? 3 : peakDivNum === 3 ? 1.5 : 0;
+
+      // Recent form from last up to 3 historical seasons
+      let recM = 0, recW = 0, recPodiums = 0;
+      if (dossier && dossier.seasonRecords) {
+        dossier.seasonRecords.slice(0, 3).forEach(function (rc) {
+          recM += rc.M;
+          recW += rc.W;
+          if (!rc.inProgress && rc.pos <= 3) recPodiums += 1;
+        });
+      }
+      const recWinPct = recM > 0 ? (recW / recM) * 100 : winPct;
+
+      const careerGoalsBonus = allTimeEntry.gf >= 1200 ? 6 : allTimeEntry.gf >= 600 ? 4 : allTimeEntry.gf >= 250 ? 2 : 0;
+      ata = Math.min(99, Math.max(71, Math.round(67 + gfAvg * 16.5 + careerGoalsBonus + divTierBonus * 0.6)));
+      def = Math.min(99, Math.max(70, Math.round(89 - Math.max(0.55, gaAvg - 0.55) * 18 + divTierBonus * 0.8 + (winPct > 50 ? 3 : 0))));
+      forStat = Math.min(99, Math.max(70, Math.round(66 + recWinPct * 0.44 + recPodiums * 2.5 + divTierBonus * 0.5)));
+      skt = Math.min(99, Math.max(70, Math.round(65 + winPct * 0.48 + (allTimeEntry.gd > 100 ? 4 : allTimeEntry.gd > 20 ? 2 : 0) + divTierBonus * 0.4)));
+      dos = Math.min(99, Math.max(72, Math.round(70 + Math.min(22, totSeas * 0.58) + Math.min(5, l1Seas * 0.22) + Math.min(4, mergedTrophies.length * 0.35))));
+      men = Math.min(99, Math.max(72, Math.round(72 + winPct * 0.22 + goldCnt * 2.2 + silverCnt * 1.1 + bronzeCnt * 0.6 + (l1Seas >= 10 ? 3 : 0) + divTierBonus * 0.5)));
+    } else {
+      ata = 78;
+      def = 76;
+      forStat = 75;
+      skt = 76;
+      dos = 73;
+      men = 76;
+    }
+
+    const ovr = Math.min(99, Math.max(75, Math.round((ata + def + forStat + skt + dos + men) / 6)));
 
     let cardTier = 'GOLD_PRO';
     let cardLabel = 'ZŁOTA KARTA PRO SMPL';
-    if (ovr >= 89 || (allTimeEntry.gold || 0) >= 3) {
+    if (ovr >= 89 || (allTimeEntry.gold || 0) >= 3 || (allTimeEntry.l1Seasons || 0) >= 15) {
       cardTier = 'ICON_LEGEND';
       cardLabel = 'IKONA & LEGENDA SMPL';
-    } else if (ovr >= 84 || row.position <= 3) {
+    } else if (ovr >= 83 || (allTimeEntry.medals || 0) >= 2 || (hasLiveMatches && row.position <= 3)) {
       cardTier = 'TOTW_STAR';
       cardLabel = 'GWIAZDA LIGI (TOTW)';
     }
 
-    // Wyliczanie Ulubionego Rywala i Nemezis z rozegranych meczów (dokładnie jak w Excelu!)
     let favoriteRival = 'Brak danych (rozegraj więcej meczów)';
     let nemesis = 'Brak danych (rozegraj więcej meczów)';
     if (row.history && row.history.length > 0) {
       const oppStats = {};
-      row.history.forEach((h) => {
+      row.history.forEach(function (h) {
         if (!oppStats[h.opponentId]) {
           oppStats[h.opponentId] = { name: h.opponentName, pts: 0, gf: 0, ga: 0, games: 0 };
         }
@@ -717,8 +1322,8 @@ window.SMPL_ENGINE = (function () {
         os.ga += Number(parts[1] || 0);
       });
 
-      const oppArr = Object.keys(oppStats).map((k) => oppStats[k]);
-      oppArr.sort((a, b) => {
+      const oppArr = Object.keys(oppStats).map(function (k) { return oppStats[k]; });
+      oppArr.sort(function (a, b) {
         if (b.pts !== a.pts) return b.pts - a.pts;
         return (b.gf - b.ga) - (a.gf - a.ga);
       });
@@ -726,7 +1331,7 @@ window.SMPL_ENGINE = (function () {
         favoriteRival = oppArr[0].name + ' (' + oppArr[0].pts + ' pkt, bilans ' + oppArr[0].gf + ':' + oppArr[0].ga + ')';
       }
 
-      const nemArr = oppArr.slice().sort((a, b) => {
+      const nemArr = oppArr.slice().sort(function (a, b) {
         if (a.pts !== b.pts) return a.pts - b.pts;
         return (a.gf - a.ga) - (b.gf - b.ga);
       });
@@ -735,21 +1340,27 @@ window.SMPL_ENGINE = (function () {
       } else {
         nemesis = 'Brak pogromcy — komplet zwycięstw! 🔥';
       }
+    } else if (dossier && dossier.bestSeason) {
+      const bs = dossier.bestSeason;
+      favoriteRival = 'Szczyt kariery: Sezon ' + bs.seasonNumber + ' • ' + bs.leagueLabel + ' (#' + bs.pos + ' • ' + bs.PKT + ' pkt, ' + bs.BZ + ':' + bs.BS + ')';
+      if (dossier.highestGoalSeason) {
+        nemesis = 'Rekord bramek: ' + dossier.highestGoalSeason.BZ + ' goli w S' + dossier.highestGoalSeason.seasonNumber + ' (' + dossier.highestGoalSeason.leagueId + ')';
+      } else {
+        nemesis = 'Bilans historyczny W-R-P: ' + allTimeEntry.wins + '-' + allTimeEntry.draws + '-' + allTimeEntry.losses;
+      }
     }
 
-    // Styl gry (z Excela: Catenaccio / Mur, Tiki-Taka, Królewska Dominacja, Zbalansowany)
     let playstyle = '⚖️ Taktyczny Balans SMPL';
-    if (row.cleanSheetPct >= 45 || def >= 88) {
-      playstyle = '🧱 Żelazne Catenaccio / Mur (Mistrz Czystych Kont)';
-    } else if (row.goalsForAvg >= 2.0 || ata >= 88) {
+    if ((hasLiveMatches && row.cleanSheetPct >= 45) || def >= 88) {
+      playstyle = '🧱 Żelazne Catenaccio / Mur (Mistrz Defensywy)';
+    } else if ((hasLiveMatches && row.goalsForAvg >= 2.0) || ata >= 88) {
       playstyle = '🔥 Ofensywna Tiki-Taka (Maszyna Bramkowa)';
-    } else if (row.winRate >= 65) {
+    } else if ((hasLiveMatches ? row.winRate : (allTimeEntry.winPct || 0)) >= 55) {
       playstyle = '👑 Królewska Dominacja (Kontrola Meczu)';
-    } else if (men >= 86) {
-      playstyle = '⚡ Zabójcza Kontra & Stalowe Nerwy';
+    } else if (men >= 86 || dos >= 90) {
+      playstyle = '⚡ Doświadczony Strateg & Stalowe Nerwy';
     }
 
-    // Seria i Komentarz Mentalny
     let streakText = 'Brak serii';
     if (row.form && row.form.length > 0) {
       const lastRes = row.form[row.form.length - 1].result;
@@ -760,42 +1371,54 @@ window.SMPL_ENGINE = (function () {
       }
       const labelMap = { Z: 'zwycięstw z rzędu 🔥', R: 'remisów z rzędu 🤝', P: 'meczów bez wygranej ⚠️' };
       streakText = count + ' ' + (labelMap[lastRes] || '');
+    } else if (dossier) {
+      streakText = dossier.eraSpanLabel + ' • ' + allTimeEntry.seasons + ' sez. (' + (allTimeEntry.medals || 0) + 'x podium 🏆)';
     }
 
     let mentalReport = 'Solidna dyspozycja w Score Match Lidze. Kluczowe będą najbliższe 4 kolejki tygodnia.';
-    if (row.position === 1) {
+    if (hasLiveMatches && row.position === 1) {
       mentalReport = 'Lider tabeli! Mentalność zwycięzcy — rywale grają przeciwko niemu z podwójną presją.';
-    } else if (row.position <= 3) {
+    } else if (hasLiveMatches && row.position <= 3) {
       mentalReport = 'Ścisła czołówka ligi. Bardzo wysoka powtarzalność i żelazna koncentracja w obronie.';
-    } else if (forStat >= 84) {
-      mentalReport = 'W gazie! Ostatnie kolejki pokazują wyraźny skok formy i skuteczności pod bramką.';
+    } else if (dossier && histM > 0) {
+      if ((allTimeEntry.gold || 0) >= 3) {
+        mentalReport = 'Utytułowana Ikona SMPL (' + allTimeEntry.gold + 'x Złoto, ' + allTimeEntry.matches + ' meczów w latach ' + dossier.eraSpanLabel + '). Zawodnik o mistrzowskim DNA i żelaznej regularności.';
+      } else if ((allTimeEntry.l1Seasons || 0) >= 5) {
+        mentalReport = 'Sprawdzony bywalec Ekstraklasy (' + allTimeEntry.l1Seasons + ' sezonów w L1, łącznie ' + allTimeEntry.matches + ' spotkań i ' + allTimeEntry.gf + ' zdobytych bramek).';
+      } else if ((allTimeEntry.medals || 0) >= 1) {
+        mentalReport = 'Medalista rozgrywek Score Match Liga (' + allTimeEntry.bestPos + '). Udokumentowany dorobek ' + allTimeEntry.points + ' punktów meczowych w ' + allTimeEntry.seasons + ' sezonach.';
+      } else {
+        mentalReport = 'Zapisany w oficjalnych księgach historii SMPL (' + dossier.eraSpanLabel + '): ' + allTimeEntry.matches + ' rozegranych meczów, ' + allTimeEntry.gf + ' goli i ' + allTimeEntry.points + ' pkt.';
+      }
     }
 
-    // Nadchodzące mecze gracza z oznaczeniem 🏠 DOM (Ty zapraszasz!) / ✈️ WYJAZD (Czekasz na zaproszenie)
-    const upcomingMatches = (state.matches || [])
-      .filter(
-        (m) =>
-          m.leagueId === player.leagueId &&
-          (m.status === 'SCHEDULED' || m.status === 'PENDING') &&
-          (m.homeId === player.id || m.awayId === player.id)
-      )
-      .sort((a, b) => Number(a.round) - Number(b.round))
-      .slice(0, 6)
-      .map((m) => {
-        const isHome = m.homeId === player.id;
-        const opp = playersMap[isHome ? m.awayId : m.homeId] || { name: 'Rywal', nick: 'SMPL' };
-        return {
-          matchId: m.id,
-          round: m.round,
-          week: getWeekForRound(m.round, (state.weeklyConfig && state.weeklyConfig.roundsPerWeek) || 4),
-          isHome: isHome,
-          roleLabel: isHome ? '🏠 DOM (Ty zapraszasz!)' : '✈️ WYJAZD (Czekasz na zapr.)',
-          opponentName: opp.name,
-          opponentNick: opp.nick,
-          status: m.status,
-          score: m.homeScore !== null ? m.homeScore + ':' + m.awayScore : null
-        };
-      });
+    const upcomingMatches = !isArchVirtual
+      ? (s.matches || [])
+          .filter(function (m) {
+            return (
+              m.leagueId === player.leagueId &&
+              (m.status === 'SCHEDULED' || m.status === 'PENDING') &&
+              (m.homeId === player.id || m.awayId === player.id)
+            );
+          })
+          .sort(function (a, b) { return Number(a.round) - Number(b.round); })
+          .slice(0, 6)
+          .map(function (m) {
+            const isHome = m.homeId === player.id;
+            const opp = playersMap[isHome ? m.awayId : m.homeId] || { name: 'Rywal', nick: 'SMPL' };
+            return {
+              matchId: m.id,
+              round: m.round,
+              week: getWeekForRound(m.round, (s.weeklyConfig && s.weeklyConfig.roundsPerWeek) || 4),
+              isHome: isHome,
+              roleLabel: isHome ? '🏠 DOM (Ty zapraszasz!)' : '✈️ WYJAZD (Czekasz na zapr.)',
+              opponentName: opp.name,
+              opponentNick: opp.nick,
+              status: m.status,
+              score: m.homeScore !== null ? m.homeScore + ':' + m.awayScore : null
+            };
+          })
+      : [];
 
     const attrsObj = {
       ATA: ata,
@@ -806,12 +1429,35 @@ window.SMPL_ENGINE = (function () {
       MEN: men
     };
 
+    const careerDossier = {
+      isArchiveOnly: isArchVirtual,
+      hasActiveAccount: !isArchVirtual,
+      debutSeason: dossier ? dossier.debutSeason : null,
+      lastSeason: dossier ? dossier.lastSeason : null,
+      eraSpanLabel: dossier ? dossier.eraSpanLabel : ('Sezon ' + (s.season || 56)),
+      peakLeagueId: dossier ? dossier.peakLeagueId : (player.leagueId || 'L1'),
+      lastPlayedLeagueId: dossier ? dossier.lastPlayedLeagueId : (player.leagueId || 'L1'),
+      bestSeason: dossier ? dossier.bestSeason : null,
+      highestGoalSeason: dossier ? dossier.highestGoalSeason : null,
+      bestDefenseSeason: dossier ? dossier.bestDefenseSeason : null,
+      divisionsBreakdown: dossier ? dossier.divisionsBreakdown : [],
+      seasonRecords: dossier ? dossier.seasonRecords : [],
+      careerRank: allTimeEntry.careerRank || (typeof allTimeEntry.rank === 'number' ? allTimeEntry.rank : null),
+      l1Rank: allTimeEntry.l1Rank || null,
+      avgPtsPerMatch: histM > 0 ? (Number(allTimeEntry.points || 0) / histM).toFixed(2) : (row.M > 0 ? (row.PKT / row.M).toFixed(2) : '0.00'),
+      avgGoalsPerMatch: histM > 0 ? (Number(allTimeEntry.gf || 0) / histM).toFixed(2) : (row.M > 0 ? (row.BZ / row.M).toFixed(2) : '0.00'),
+      avgConcededPerMatch: histM > 0 ? (Number(allTimeEntry.ga || 0) / histM).toFixed(2) : (row.M > 0 ? (row.BS / row.M).toFixed(2) : '0.00')
+    };
+
     return {
       player: player,
+      isArchiveOnly: isArchVirtual,
+      hasActiveAccount: !isArchVirtual,
+      careerDossier: careerDossier,
       seasonRow: row,
       row: row,
       allTime: allTimeEntry,
-      trophies: trophies,
+      trophies: mergedTrophies,
       ovr: ovr,
       cardTier: cardTier,
       cardLabel: cardLabel,
@@ -825,6 +1471,130 @@ window.SMPL_ENGINE = (function () {
       mentalReport: mentalReport,
       upcomingMatches: upcomingMatches
     };
+  }
+
+  function getUnifiedUtPlayersCatalog(state) {
+    const s = state || {};
+    const players = (s.players || []).filter(function (p) { return p && !isPlaceholderPlayer(p); });
+    const archIdx = buildArchiveIndexCache(s);
+    const sig = [
+      players.length,
+      players.map(function (p) { return p.id + ':' + (p.historicalArchiveName || '') + ':' + (p.leagueId || ''); }).join(','),
+      (s.matches || []).length,
+      _archiveUtIndexCacheKey
+    ].join('||');
+
+    if (_unifiedUtCatalogCache && _unifiedUtCatalogKey === sig) {
+      return _unifiedUtCatalogCache;
+    }
+
+    const coveredFolded = {};
+    const items = [];
+
+    // 1. Players with an account in current state.players
+    players.forEach(function (p, idx) {
+      const ut = calculatePlayerUTCard(s, p.id);
+      if (!ut) return;
+      const fn = foldArchiveSearchText(canonicalUtArchiveName(p.name));
+      const fa = p.historicalArchiveName ? foldArchiveSearchText(canonicalUtArchiveName(p.historicalArchiveName)) : '';
+      if (fn) coveredFolded[fn] = true;
+      if (fa) coveredFolded[fa] = true;
+
+      const at = ut.allTime || {};
+      const cd = ut.careerDossier || {};
+      const bs = cd.bestSeason;
+      items.push({
+        id: p.id,
+        name: p.name,
+        nick: p.nick || '',
+        foldedSearch: foldArchiveSearchText([p.name, p.nick || '', p.historicalArchiveName || '', p.clanName || '', p.clanTag || ''].join(' ')),
+        hasActiveAccount: true,
+        isArchiveOnly: false,
+        inPool: Boolean(p.active === false || p.leagueId === 'POOL'),
+        activeLeagueId: p.leagueId || 'POOL',
+        peakLeagueId: cd.peakLeagueId || p.leagueId || 'L1',
+        ovr: ut.ovr,
+        cardTier: ut.cardTier,
+        cardLabel: ut.cardLabel,
+        attrs: ut.attributes,
+        seasons: Number(at.seasons || 1),
+        l1Seasons: Number(at.l1Seasons || 0),
+        matches: Number(at.matches || 0) + Number((ut.row && ut.row.M) || 0),
+        wins: Number(at.wins || 0) + Number((ut.row && ut.row.W) || 0),
+        draws: Number(at.draws || 0) + Number((ut.row && ut.row.R) || 0),
+        losses: Number(at.losses || 0) + Number((ut.row && ut.row.P) || 0),
+        gf: Number(at.gf || 0) + Number((ut.row && ut.row.BZ) || 0),
+        ga: Number(at.ga || 0) + Number((ut.row && ut.row.BS) || 0),
+        gd: Number(at.gd || 0) + Number((ut.row && ut.row.diff) || 0),
+        winPct: Number(at.winPct || (ut.row && ut.row.winRate) || 0),
+        totalPts: Number(at.total || at.points || 0) + Number((ut.row && ut.row.PKT) || 0),
+        gold: Number(at.gold || 0),
+        silver: Number(at.silver || 0),
+        bronze: Number(at.bronze || 0),
+        medals: Number(at.medals != null ? at.medals : ((at.gold || 0) + (at.silver || 0) + (at.bronze || 0))),
+        bestPos: String(at.bestPos || '-'),
+        eraSpanLabel: cd.eraSpanLabel || ('S' + (s.season || 56)),
+        bestSeasonLabel: bs ? ('S' + bs.seasonNumber + ' ' + bs.leagueId + ' #' + bs.pos + ' (' + bs.PKT + ' pkt)') : '',
+        trophiesCount: (ut.trophies || []).length,
+        avatar: p.avatar || buildArchiveAvatarFallback(p.name, idx)
+      });
+    });
+
+    // 2. All historical archive players (S1–S55) without a current account
+    archIdx.list.forEach(function (doss) {
+      if (coveredFolded[doss.folded]) return;
+      const archId = 'ARCH::' + doss.name;
+      const ut = calculatePlayerUTCard(s, archId);
+      if (!ut) return;
+      const at = ut.allTime || {};
+      const bs = doss.bestSeason;
+      items.push({
+        id: archId,
+        name: doss.name,
+        nick: 'Archiwum ' + doss.eraSpanLabel,
+        foldedSearch: doss.folded + ' archiwum ' + foldArchiveSearchText(doss.eraSpanLabel) + ' ' + foldArchiveSearchText(doss.peakLeagueId || ''),
+        hasActiveAccount: false,
+        isArchiveOnly: true,
+        inPool: false,
+        activeLeagueId: null,
+        peakLeagueId: doss.peakLeagueId || 'L1',
+        ovr: ut.ovr,
+        cardTier: ut.cardTier,
+        cardLabel: ut.cardLabel,
+        attrs: ut.attributes,
+        seasons: Number(at.seasons || 1),
+        l1Seasons: Number(at.l1Seasons || 0),
+        matches: Number(at.matches || 0),
+        wins: Number(at.wins || 0),
+        draws: Number(at.draws || 0),
+        losses: Number(at.losses || 0),
+        gf: Number(at.gf || 0),
+        ga: Number(at.ga || 0),
+        gd: Number(at.gd || 0),
+        winPct: Number(at.winPct || 0),
+        totalPts: Number(at.total || at.points || 0),
+        gold: Number(at.gold || 0),
+        silver: Number(at.silver || 0),
+        bronze: Number(at.bronze || 0),
+        medals: Number(at.medals != null ? at.medals : ((at.gold || 0) + (at.silver || 0) + (at.bronze || 0))),
+        bestPos: String(at.bestPos || '-'),
+        eraSpanLabel: doss.eraSpanLabel,
+        bestSeasonLabel: bs ? ('S' + bs.seasonNumber + ' ' + bs.leagueId + ' #' + bs.pos + ' (' + bs.PKT + ' pkt)') : '',
+        trophiesCount: (ut.trophies || []).length,
+        avatar: ut.player.avatar
+      });
+    });
+
+    items.sort(function (a, b) {
+      if (b.ovr !== a.ovr) return b.ovr - a.ovr;
+      if (b.totalPts !== a.totalPts) return b.totalPts - a.totalPts;
+      if (b.gold !== a.gold) return b.gold - a.gold;
+      return b.matches - a.matches;
+    });
+
+    _unifiedUtCatalogCache = items;
+    _unifiedUtCatalogKey = sig;
+    return items;
   }
 
   /**
@@ -1990,6 +2760,11 @@ window.SMPL_ENGINE = (function () {
     getWeekForRound: getWeekForRound,
     getRoundsRangeForWeek: getRoundsRangeForWeek,
     calculatePlayerUTCard: calculatePlayerUTCard,
+    sanitizeAndDedupeSeasonTrophies: sanitizeAndDedupeSeasonTrophies,
+    foldArchiveSearchText: foldArchiveSearchText,
+    resolvePlayerOrArchiveEntity: resolvePlayerOrArchiveEntity,
+    findArchiveDossierByName: findArchiveDossierByName,
+    getUnifiedUtPlayersCatalog: getUnifiedUtPlayersCatalog,
     calculateGoldenBallStandings: calculateGoldenBallStandings,
     generateWeeklyMessengerReport: generateWeeklyMessengerReport,
     calculateGoldenBootRanking: calculateGoldenBootRanking,

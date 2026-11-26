@@ -2061,13 +2061,7 @@ const server = http.createServer((req, res) => {
                 joinedSeason: curSeason,
                 manualCreatedBy: admName,
                 active: true,
-                trophies: inTrophies.length > 0 ? inTrophies : [{
-                  id: 'tr_add_' + tsMs,
-                  icon: '⚽',
-                  title: `Zawodnik Score Match Ligi (${leagueId})`,
-                  season: `Sezon ${curSeason}`,
-                  rarity: 'SILVER'
-                }],
+                trophies: inTrophies.length > 0 ? inTrophies : [],
                 notifications: [{
                   id: 'NOTIF_MAN_' + tsMs,
                   time: nowFmt,

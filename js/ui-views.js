@@ -1788,8 +1788,563 @@ window.SMPL_VIEWS = (function () {
   }
 
   // =========================================================================
-  // 5. KARTA ZAWODNIKA ULTIMATE TEAM (OVR 75–99) + GABLOTA TROFEÓW + STATYSTYKI Z EXCELA
+  // 5. KARTA ZAWODNIKA ULTIMATE TEAM (OVR 75–99) + WYSZUKIWARKA KART ARCHIWUM S1–S55
   // =========================================================================
+  function filterAndSortUtCatalog(catalog, explorerState) {
+    const exp = explorerState || {};
+    const rawQ = String(exp.query || '').trim();
+    const foldedQ = window.SMPL_ENGINE && typeof window.SMPL_ENGINE.foldArchiveSearchText === 'function'
+      ? window.SMPL_ENGINE.foldArchiveSearchText(rawQ)
+      : foldArchivePl(rawQ);
+    const tokens = foldedQ ? foldedQ.split(' ').filter(Boolean) : [];
+    const filterKey = exp.filter || 'ALL';
+    const sortKey = exp.sort || 'OVR';
+
+    const filtered = (catalog || []).filter((item) => {
+      if (filterKey === 'ICONS' && item.cardTier !== 'ICON_LEGEND') return false;
+      if (filterKey === 'MEDALISTS' && Number(item.medals || 0) <= 0) return false;
+      if (filterKey === 'L1' && Number(item.l1Seasons || 0) <= 0 && item.activeLeagueId !== 'L1') return false;
+      if (filterKey === 'ACTIVE_ACCOUNT' && !item.hasActiveAccount) return false;
+      if (filterKey === 'ARCHIVE_ONLY' && !item.isArchiveOnly) return false;
+      if (tokens.length > 0) {
+        for (let i = 0; i < tokens.length; i++) {
+          if (item.foldedSearch.indexOf(tokens[i]) === -1) return false;
+        }
+      }
+      return true;
+    });
+
+    filtered.sort((a, b) => {
+      if (sortKey === 'TOTAL_PTS') {
+        if (b.totalPts !== a.totalPts) return b.totalPts - a.totalPts;
+        return b.ovr - a.ovr;
+      }
+      if (sortKey === 'GOLD') {
+        if (b.gold !== a.gold) return b.gold - a.gold;
+        if (b.medals !== a.medals) return b.medals - a.medals;
+        return b.totalPts - a.totalPts;
+      }
+      if (sortKey === 'SEASONS') {
+        if (b.seasons !== a.seasons) return b.seasons - a.seasons;
+        return b.matches - a.matches;
+      }
+      if (sortKey === 'MATCHES') {
+        if (b.matches !== a.matches) return b.matches - a.matches;
+        return b.totalPts - a.totalPts;
+      }
+      if (sortKey === 'NAME') {
+        return a.name.localeCompare(b.name, 'pl');
+      }
+      if (b.ovr !== a.ovr) return b.ovr - a.ovr;
+      if (b.totalPts !== a.totalPts) return b.totalPts - a.totalPts;
+      return b.matches - a.matches;
+    });
+
+    return filtered;
+  }
+
+  function renderUtCardsExplorerResultsHtml(state, explorerState, selectedPlayerId) {
+    const catalog = (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.getUnifiedUtPlayersCatalog === 'function')
+      ? window.SMPL_ENGINE.getUnifiedUtPlayersCatalog(state)
+      : [];
+    const exp = explorerState || {};
+    const hasQuery = Boolean(String(exp.query || '').trim());
+    const gridExpanded = exp.gridExpanded !== false || hasQuery;
+    const limit = Math.max(8, Number(exp.limit || 12));
+    const filtered = filterAndSortUtCatalog(catalog, exp);
+    const visibleItems = gridExpanded ? filtered.slice(0, limit) : [];
+
+    if (!gridExpanded) {
+      return `
+        <div class="mt-3 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+          <span>📚 Katalog wszystkich <strong>${catalog.length}</strong> kart UT z historii S1–S${state.season || 56} jest zwinięty (wpisz imię wyżej lub rozwiń siatkę kart).</span>
+          <button type="button" onclick="SMPL_APP.toggleUtExplorerGrid(true)" class="px-3 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/35 border border-amber-400/45 text-amber-200 font-display font-bold uppercase text-[11px]">
+            🎴 Rozwiń siatkę kart (${filtered.length})
+          </button>
+        </div>
+      `;
+    }
+
+    if (filtered.length === 0) {
+      return `
+        <div class="mt-4 p-6 rounded-2xl bg-slate-950/90 border border-white/10 text-center space-y-2">
+          <div class="text-2xl">🔎</div>
+          <div class="font-display font-bold text-sm text-white uppercase">Nie znaleziono zawodnika dla podanego zapytania</div>
+          <p class="text-xs text-slate-400">Sprawdź pisownię imienia lub nazwiska albo wyczyść aktywne filtry wyszukiwarki.</p>
+          <button type="button" onclick="SMPL_APP.resetUtExplorerFilters()" class="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-display font-black text-xs uppercase">
+            Wyczyść wyszukiwanie i pokaż wszystkich (${catalog.length})
+          </button>
+        </div>
+      `;
+    }
+
+    const cardsHtml = visibleItems.map((c, idx) => {
+      const safeId = escapeHtml(c.id).replace(/'/g, "\\'");
+      const isSelected = String(c.id) === String(selectedPlayerId || '');
+      const tierCls = c.cardTier === 'ICON_LEGEND' ? 'tier-icon' : (c.cardTier === 'TOTW_STAR' ? 'tier-totw' : '');
+      const tierShort = c.cardTier === 'ICON_LEGEND' ? '👑 IKONA' : (c.cardTier === 'TOTW_STAR' ? '⚡ TOTW' : '🏅 PRO');
+      const tierBadgeCls = c.cardTier === 'ICON_LEGEND'
+        ? 'bg-amber-400 text-slate-950'
+        : (c.cardTier === 'TOTW_STAR' ? 'bg-sky-400 text-slate-950' : 'bg-emerald-400/25 text-emerald-200 border border-emerald-400/40');
+      const accountPill = c.hasActiveAccount
+        ? `<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/45 text-emerald-300 text-[10px] font-bold">🟢 Konto S${state.season || 56}${c.inPool ? ' (Pula)' : ' • ' + escapeHtml(c.activeLeagueId)}</span>`
+        : `<span class="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-200 text-[10px] font-bold">🏛️ Archiwum • Bez konta</span>`;
+      const at = c.attrs || { ATA: 75, DEF: 75, FOR: 75, SKT: 75, DOS: 75, MEN: 75 };
+
+      return `
+        <button type="button" onclick="SMPL_APP.selectUtExplorerPlayer('${safeId}')" class="smpl-ut-mini-card ${tierCls} ${isSelected ? 'is-selected' : ''} ${idx >= 8 ? 'is-deferred' : ''}">
+          <div class="w-full space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="smpl-ut-mini-ovr">
+                  <span class="font-display font-black text-lg text-amber-300 leading-none">${c.ovr}</span>
+                  <span class="text-[9px] font-display font-bold text-slate-300 uppercase mt-0.5">OVR</span>
+                </div>
+                <img src="${c.avatar}" alt="" width="40" height="40" loading="lazy" class="w-10 h-10 rounded-full object-cover border-2 border-amber-400/70 flex-shrink-0" />
+                <div class="min-w-0">
+                  <div class="font-display font-black text-sm text-white truncate leading-tight">${escapeHtml(c.name)}</div>
+                  <div class="text-[11px] text-slate-300 truncate">${escapeHtml(c.eraSpanLabel)} • ${c.seasons} sez.</div>
+                </div>
+              </div>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-display font-black uppercase flex-shrink-0 ${tierBadgeCls}">${tierShort}</span>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-1.5">
+              ${accountPill}
+              <span class="text-[10px] font-bold text-amber-300 truncate">Najwyżej: ${escapeHtml(c.bestPos)}</span>
+            </div>
+
+            <div class="smpl-ut-mini-attrs font-mono-num">
+              <div><div class="text-slate-400">ATA</div><div class="font-bold text-amber-300">${at.ATA}</div></div>
+              <div><div class="text-slate-400">DEF</div><div class="font-bold text-emerald-300">${at.DEF}</div></div>
+              <div><div class="text-slate-400">FOR</div><div class="font-bold text-sky-300">${at.FOR}</div></div>
+              <div><div class="text-slate-400">SKT</div><div class="font-bold text-amber-200">${at.SKT}</div></div>
+              <div><div class="text-slate-400">DOS</div><div class="font-bold text-purple-300">${at.DOS}</div></div>
+              <div><div class="text-slate-400">MEN</div><div class="font-bold text-emerald-200">${at.MEN}</div></div>
+            </div>
+          </div>
+
+          <div class="w-full pt-2 border-t border-white/10 flex items-center justify-between gap-2 text-[11px] font-mono-num">
+            <span class="text-slate-300"><strong>${c.matches}</strong>M • ⚽ ${c.gf} • <span class="text-emerald-300">${c.winPct}%</span></span>
+            <span class="font-bold text-white">👑${c.gold} 🥈${c.silver} 🥉${c.bronze}</span>
+          </div>
+        </button>
+      `;
+    }).join('');
+
+    const remaining = filtered.length - visibleItems.length;
+    return `
+      <div class="smpl-ut-mini-grid">
+        ${cardsHtml}
+      </div>
+      <div class="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span class="text-slate-400">Wyświetlono <strong class="text-white">${visibleItems.length}</strong> z <strong class="text-amber-300">${filtered.length}</strong> pasujących kart UT. Kliknij kartę, aby otworzyć pełny profil 3D i przebieg kariery S1–S55!</span>
+        <div class="flex flex-wrap items-center gap-2">
+          ${remaining > 0
+            ? `<button type="button" onclick="SMPL_APP.loadMoreUtExplorerCards(24)" class="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-black text-xs uppercase shadow">
+                 ➕ Pokaż więcej kart (+${Math.min(24, remaining)})
+               </button>
+               ${remaining > 24
+                 ? `<button type="button" onclick="SMPL_APP.loadMoreUtExplorerCards(${remaining})" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/15 text-slate-200 font-display font-bold text-xs uppercase">
+                      Wszystkie (${filtered.length})
+                    </button>`
+                 : ''}`
+            : ''}
+          <button type="button" onclick="SMPL_APP.toggleUtExplorerGrid(false)" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/15 text-slate-300 font-display font-bold text-xs uppercase">
+            ▲ Zwiń siatkę
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderUtCardsExplorerSectionHtml(state, explorerState, selectedPlayerId, inArchiveTab) {
+    const catalog = (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.getUnifiedUtPlayersCatalog === 'function')
+      ? window.SMPL_ENGINE.getUnifiedUtPlayersCatalog(state)
+      : [];
+    const exp = Object.assign(
+      { query: '', filter: 'ALL', sort: 'OVR', limit: inArchiveTab ? 24 : 8, gridExpanded: true },
+      explorerState || {}
+    );
+    if (inArchiveTab) exp.gridExpanded = true;
+
+    const counts = {
+      ALL: catalog.length,
+      ICONS: catalog.filter((c) => c.cardTier === 'ICON_LEGEND').length,
+      MEDALISTS: catalog.filter((c) => c.medals > 0).length,
+      L1: catalog.filter((c) => c.l1Seasons > 0 || c.activeLeagueId === 'L1').length,
+      ACTIVE_ACCOUNT: catalog.filter((c) => c.hasActiveAccount).length,
+      ARCHIVE_ONLY: catalog.filter((c) => c.isArchiveOnly).length
+    };
+    const filteredCount = filterAndSortUtCatalog(catalog, exp).length;
+
+    const filters = [
+      { id: 'ALL', label: `🌐 Wszyscy (${counts.ALL})` },
+      { id: 'ICONS', label: `👑 Ikony & Legendy (${counts.ICONS})` },
+      { id: 'MEDALISTS', label: `🏆 Medaliści (${counts.MEDALISTS})` },
+      { id: 'L1', label: `⚡ Ekstraklasa L1 (${counts.L1})` },
+      { id: 'ARCHIVE_ONLY', label: `🏛️ Archiwum / Bez konta (${counts.ARCHIVE_ONLY})` },
+      { id: 'ACTIVE_ACCOUNT', label: `🟢 Konta S${state.season || 56} (${counts.ACTIVE_ACCOUNT})` }
+    ];
+
+    return `
+      <section class="smpl-ut-explorer-shell" aria-labelledby="smpl-ut-explorer-heading">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div>
+            <div class="inline-flex flex-wrap items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/45 text-amber-200 text-[11px] font-display font-black uppercase tracking-wider">
+              <span>🎴 BAZA WSZYSTKICH KART UT S1–S${state.season || 56}</span>
+              <span>•</span>
+              <span class="text-emerald-300">${catalog.length} ZAWODNIKÓW (Z KONTEM I BEZ KONTA!)</span>
+            </div>
+            <h2 id="smpl-ut-explorer-heading" class="font-display font-black text-xl sm:text-2xl text-white uppercase mt-2">
+              🔍 Wyszukiwarka Kart Ultimate Team i Karier z Archiwum
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl">
+              Wyszukaj <strong>dowolnego zawodnika z całej historii Score Match Liga (Sezony 1–55)</strong> — nawet jeśli nie gra obecnie i nie posiada założonego konta! Zobaczysz jego dokładną Kartę UT 3D, OVR, medale, przebieg kariery w dywizjach L1–L9 oraz wszystkie historyczne tabele.
+            </p>
+          </div>
+          <div id="smpl-ut-explorer-status" role="status" aria-live="polite" class="px-3.5 py-2 rounded-xl bg-slate-950/90 border border-emerald-400/40 text-xs font-bold text-emerald-300 self-start lg:self-center whitespace-nowrap">
+            🎯 Wyniki: ${filteredCount} / ${catalog.length} graczy
+          </div>
+        </div>
+
+        <search aria-label="Wyszukiwarka kart Ultimate Team i historii kariery graczy">
+          <form id="smpl-ut-explorer-form" action="#profile" method="GET" onsubmit="return SMPL_APP.handleUtExplorerSubmit(event)" class="smpl-ut-search-form">
+            <div class="smpl-ut-field-group">
+              <label for="smpl-ut-explorer-q" class="smpl-ut-field-label">Imię, nazwisko, nick lub sezon (np. Michał Wu, Chmielowski, Paziak, S42):</label>
+              <input
+                type="search"
+                id="smpl-ut-explorer-q"
+                name="q"
+                value="${escapeHtml(exp.query || '')}"
+                placeholder="Wpisz imię lub nazwisko dowolnego gracza z historii..."
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="none"
+                spellcheck="false"
+                enterkeyhint="search"
+                oninput="SMPL_APP.handleUtExplorerInput(this.value)"
+                onkeydown="SMPL_APP.handleUtExplorerKeydown(event)"
+                class="smpl-ut-search-input"
+              />
+            </div>
+
+            <div class="smpl-ut-field-group">
+              <label for="smpl-ut-explorer-sort" class="smpl-ut-field-label">Sortuj karty według:</label>
+              <select id="smpl-ut-explorer-sort" name="sort" onchange="SMPL_APP.setUtExplorerSort(this.value)" class="smpl-ut-sort-select">
+                <option value="OVR" ${exp.sort === 'OVR' ? 'selected' : ''}>⭐ Ocena OVR (Najwyższa)</option>
+                <option value="TOTAL_PTS" ${exp.sort === 'TOTAL_PTS' ? 'selected' : ''}>🏆 Punkty Kariery (Total)</option>
+                <option value="GOLD" ${exp.sort === 'GOLD' ? 'selected' : ''}>👑 Złote Medale &amp; Podium</option>
+                <option value="SEASONS" ${exp.sort === 'SEASONS' ? 'selected' : ''}>📚 Liczba Sezonów (S1–S55)</option>
+                <option value="MATCHES" ${exp.sort === 'MATCHES' ? 'selected' : ''}>⚽ Rozegrane Mecze</option>
+                <option value="NAME" ${exp.sort === 'NAME' ? 'selected' : ''}>🔤 Alfabetycznie (A–Z)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button type="submit" class="btn-league px-4 py-3 rounded-xl font-display font-black text-xs uppercase whitespace-nowrap min-h-[48px]">
+                🎴 Otwórz #1
+              </button>
+              ${exp.query || exp.filter !== 'ALL'
+                ? `<button type="button" onclick="SMPL_APP.resetUtExplorerFilters()" class="px-3.5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/15 text-slate-200 font-display font-bold text-xs uppercase min-h-[48px]">
+                     ✕ Reset
+                   </button>`
+                : ''}
+            </div>
+          </form>
+
+          <div class="smpl-ut-filter-bar" role="group" aria-label="Filtry kategorii zawodników">
+            ${filters.map((f) => `
+              <button type="button" aria-pressed="${exp.filter === f.id ? 'true' : 'false'}" onclick="SMPL_APP.setUtExplorerFilter('${f.id}')" class="smpl-ut-filter-pill ${exp.filter === f.id ? 'is-active' : ''}">
+                <span>${f.label}</span>
+              </button>
+            `).join('')}
+          </div>
+        </search>
+
+        <div id="smpl-ut-explorer-results-mount">
+          ${renderUtCardsExplorerResultsHtml(state, exp, selectedPlayerId)}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderDeepArchiveCareerDossierHtml(state, utData, catalog, compareTargetId) {
+    const cd = utData.careerDossier || {};
+    const p = utData.player;
+    const allTime = utData.allTime || {};
+    const recs = cd.seasonRecords || [];
+    const divs = cd.divisionsBreakdown || [];
+    const bs = cd.bestSeason;
+    const hgs = cd.highestGoalSeason;
+    const bds = cd.bestDefenseSeason;
+
+    if (recs.length === 0 && Number(allTime.matches || 0) <= 0) {
+      return '';
+    }
+
+    const safeLookupName = escapeHtml(p.historicalArchiveName || p.name).replace(/'/g, "\\'");
+
+    // Optional 1v1 UT & Historical Career Comparison inside the dossier
+    const defaultCompareCandidate = (catalog || []).find((c) => c.id !== p.id) || null;
+    const effCompareId = compareTargetId && (catalog || []).some((c) => c.id === compareTargetId && c.id !== p.id)
+      ? compareTargetId
+      : (defaultCompareCandidate ? defaultCompareCandidate.id : '');
+    const cmpUt = effCompareId && window.SMPL_ENGINE && typeof window.SMPL_ENGINE.calculatePlayerUTCard === 'function'
+      ? window.SMPL_ENGINE.calculatePlayerUTCard(state, effCompareId)
+      : null;
+    const sharedHist = (cmpUt && window.SMPL_STUDIO && typeof window.SMPL_STUDIO.computeHistoricalH2H === 'function')
+      ? window.SMPL_STUDIO.computeHistoricalH2H(
+          p.name,
+          cmpUt.player.name,
+          p.historicalArchiveName || p.name,
+          cmpUt.player.historicalArchiveName || cmpUt.player.name
+        )
+      : null;
+
+    const compareHtml = cmpUt
+      ? (() => {
+          const aAt = utData.allTime || {};
+          const bAt = cmpUt.allTime || {};
+          const cmpRows = [
+            { lbl: 'Ocena Karty OVR', a: utData.ovr, b: cmpUt.ovr },
+            { lbl: '⚡ ATA / 🧱 DEF', a: utData.attributes.ATA + ' / ' + utData.attributes.DEF, b: cmpUt.attributes.ATA + ' / ' + cmpUt.attributes.DEF, numA: utData.attributes.ATA + utData.attributes.DEF, numB: cmpUt.attributes.ATA + cmpUt.attributes.DEF },
+            { lbl: '📚 Sezony (w tym L1)', a: (aAt.seasons || 0) + ' (' + (aAt.l1Seasons || 0) + ' L1)', b: (bAt.seasons || 0) + ' (' + (bAt.l1Seasons || 0) + ' L1)', numA: aAt.seasons || 0, numB: bAt.seasons || 0 },
+            { lbl: '⚽ Mecze & Gole', a: (aAt.matches || 0) + 'M • ' + (aAt.gf || 0) + ' goli', b: (bAt.matches || 0) + 'M • ' + (bAt.gf || 0) + ' goli', numA: aAt.gf || 0, numB: bAt.gf || 0 },
+            { lbl: '🎯 Skuteczność Win%', a: (aAt.winPct || 0) + '%', b: (bAt.winPct || 0) + '%', numA: aAt.winPct || 0, numB: bAt.winPct || 0 },
+            { lbl: '👑 Medale (Zł/Sr/Br)', a: '👑' + (aAt.gold || 0) + ' 🥈' + (aAt.silver || 0) + ' 🥉' + (aAt.bronze || 0), b: '👑' + (bAt.gold || 0) + ' 🥈' + (bAt.silver || 0) + ' 🥉' + (bAt.bronze || 0), numA: (aAt.gold || 0) * 100 + (aAt.medals || 0), numB: (bAt.gold || 0) * 100 + (bAt.medals || 0) },
+            { lbl: '🏆 Punkty Kariery', a: aAt.total || aAt.points || 0, b: bAt.total || bAt.points || 0 }
+          ];
+          return `
+            <div class="glass-panel rounded-2xl p-5 sm:p-6 mb-6 border border-cyan-400/35">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3.5 mb-4 border-b border-white/10">
+                <div>
+                  <span class="px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-[10px] font-display font-black uppercase">
+                    ⚔️ PORÓWNYWARKA KART UT &amp; KARIER S1–S55 (NAWET BEZ KONTA!)
+                  </span>
+                  <h3 class="font-display font-black text-base sm:text-lg text-white uppercase mt-1">
+                    ${escapeHtml(p.name)} (${utData.ovr} OVR) vs ${escapeHtml(cmpUt.player.name)} (${cmpUt.ovr} OVR)
+                  </h3>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <label for="smpl-ut-compare-select" class="text-[11px] font-display font-bold uppercase text-slate-300">Porównaj z:</label>
+                  <select id="smpl-ut-compare-select" onchange="SMPL_APP.setUtCareerComparePlayer(this.value)" class="px-3 py-2 rounded-xl bg-slate-950 border border-cyan-400/50 text-xs text-white font-bold max-w-xs">
+                    ${(catalog || [])
+                      .filter((c) => c.id !== p.id)
+                      .map((c) => `<option value="${escapeHtml(c.id)}" ${c.id === effCompareId ? 'selected' : ''}>[${c.ovr} OVR] ${escapeHtml(c.name)} (${c.seasons} sez. • ${c.hasActiveAccount ? 'Konto' : 'Archiwum'})</option>`)
+                      .join('')}
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2 text-xs font-mono-num">
+                  ${cmpRows.map((cr) => {
+                    const nA = cr.numA != null ? Number(cr.numA) : Number(cr.a || 0);
+                    const nB = cr.numB != null ? Number(cr.numB) : Number(cr.b || 0);
+                    return `
+                      <div class="p-2.5 rounded-xl bg-slate-950/85 border border-white/10 grid grid-cols-3 items-center gap-2">
+                        <span class="font-bold ${nA > nB ? 'text-emerald-300' : 'text-white'}">${escapeHtml(String(cr.a))}</span>
+                        <span class="text-[10px] font-sans uppercase text-slate-400 text-center font-bold">${cr.lbl}</span>
+                        <span class="font-bold text-right ${nB > nA ? 'text-emerald-300' : 'text-white'}">${escapeHtml(String(cr.b))}</span>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+
+                <div class="p-4 rounded-2xl bg-slate-950/90 border border-white/10 flex flex-col justify-between">
+                  <div>
+                    <div class="font-display font-black text-xs uppercase text-amber-300 mb-2">
+                      🏛️ Wspólne Sezony w Archiwum S1–S55 (${sharedHist && sharedHist.sharedSeasons ? sharedHist.sharedSeasons.length : 0})
+                    </div>
+                    ${
+                      sharedHist && sharedHist.sharedSeasons && sharedHist.sharedSeasons.length > 0
+                        ? `
+                          <div class="flex flex-wrap gap-2 mb-3 text-xs font-bold">
+                            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-200 border border-emerald-400/40">${escapeHtml(p.name)}: ${sharedHist.higherA}x wyżej</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-200 border border-sky-400/40">${escapeHtml(cmpUt.player.name)}: ${sharedHist.higherB}x wyżej</span>
+                          </div>
+                          <div class="max-h-44 overflow-y-auto space-y-1.5 text-[11px] font-mono-num pr-1">
+                            ${sharedHist.sharedSeasons.slice(0, 10).map((sh) => `
+                              <div class="p-2 rounded-lg bg-slate-900/90 border border-white/5 flex items-center justify-between gap-2">
+                                <span class="font-display font-black text-amber-300">S${sh.season}</span>
+                                <span class="text-slate-200">${escapeHtml(sh.a.leagueId)} #${sh.a.pos} (${sh.a.PKT}p) vs ${escapeHtml(sh.b.leagueId)} #${sh.b.pos} (${sh.b.PKT}p)</span>
+                                <span class="text-[10px] font-bold ${sh.sameLeague ? 'text-emerald-300' : 'text-slate-400'}">${sh.sameLeague ? 'Ta sama liga!' : 'Różne ligi'}</span>
+                              </div>
+                            `).join('')}
+                          </div>
+                        `
+                        : `<p class="text-xs text-slate-400 py-4">Ci zawodnicy grali w innych sezonach historycznych (brak wspólnych edycji w S1–S55), ale powyżej widzisz pełne porównanie ich kart UT i dorobku!</p>`
+                    }
+                  </div>
+                  <div class="mt-3 pt-2.5 border-t border-white/10 flex justify-end">
+                    <button type="button" onclick="SMPL_APP.selectUtExplorerPlayer('${escapeHtml(cmpUt.player.id).replace(/'/g, "\\'")}')" class="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-400/45 text-cyan-200 font-display font-bold text-[11px] uppercase">
+                      🎴 Przełącz na Kartę: ${escapeHtml(cmpUt.player.name)} →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        })()
+      : '';
+
+    return `
+      <!-- SZCZEGÓŁOWY PRZEKRÓJ KARIERY W ARCHIWUM S1–S55 -->
+      <section class="glass-panel rounded-2xl p-5 sm:p-6 mb-6 border border-amber-400/35" aria-labelledby="smpl-ut-career-dossier-heading">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3.5 mb-4 border-b border-white/10">
+          <div>
+            <span class="px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/45 text-amber-300 text-[10px] font-display font-black uppercase">
+              🏛️ KSIĘGA KARIERY ZAWODNIKA • ARCHIWUM S1–S55
+            </span>
+            <h3 id="smpl-ut-career-dossier-heading" class="font-display font-black text-lg sm:text-xl text-white uppercase mt-1">
+              📊 Jak przebiegała kariera: ${escapeHtml(p.name)} (${escapeHtml(cd.eraSpanLabel || '')})
+            </h3>
+          </div>
+          <button type="button" onclick="SMPL_APP.openArchivePlayerCareer('${safeLookupName}')" class="px-3.5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/35 border border-amber-400/45 text-amber-200 font-display font-bold text-xs uppercase transition">
+            📚 Otwórz w Tabelach Archiwum →
+          </button>
+        </div>
+
+        <!-- 6 Kart Analitycznych Kariery -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+          <div class="p-3.5 rounded-xl bg-slate-950/90 border border-white/10">
+            <div class="text-[10px] font-display uppercase text-slate-400 font-bold">⏳ Lata / Era w SMPL</div>
+            <div class="font-display font-black text-base text-white mt-0.5">${escapeHtml(cd.eraSpanLabel || '-')}</div>
+            <div class="text-[11px] text-emerald-300 mt-0.5">${allTime.seasons || recs.length} sez. łącznie • ${allTime.l1Seasons || 0} sez. w Ekstraklasie (L1)</div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-950/90 border border-amber-400/35">
+            <div class="text-[10px] font-display uppercase text-amber-300 font-bold">🌟 Życiowy Sezon (Peak)</div>
+            <div class="font-display font-black text-base text-amber-300 mt-0.5">
+              ${bs ? `Sezon ${bs.seasonNumber} • ${escapeHtml(bs.leagueLabel)} (#${bs.pos})` : escapeHtml(allTime.bestPos || '-')}
+            </div>
+            <div class="text-[11px] text-slate-300 mt-0.5">
+              ${bs ? `${bs.PKT} PKT • ${bs.M}M (${bs.W}W-${bs.R}R-${bs.P}P) • Bramki ${bs.BZ}:${bs.BS}` : 'Dane z rankingu wszech czasów'}
+            </div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-950/90 border border-white/10">
+            <div class="text-[10px] font-display uppercase text-slate-400 font-bold">⚽ Rekord Strzelecki w Sezonie</div>
+            <div class="font-display font-black text-base text-amber-200 mt-0.5">
+              ${hgs ? `⚽ ${hgs.BZ} bramek (Sezon ${hgs.seasonNumber})` : `⚽ ${allTime.gf || 0} goli w karierze`}
+            </div>
+            <div class="text-[11px] text-slate-300 mt-0.5">
+              ${hgs ? `${escapeHtml(hgs.leagueLabel)} • #${hgs.pos} miejsce (${hgs.M} meczów)` : `Średnio ${cd.avgGoalsPerMatch} gola / mecz`}
+            </div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-950/90 border border-white/10">
+            <div class="text-[10px] font-display uppercase text-slate-400 font-bold">🧱 Najlepsza Defensywa Sezonu</div>
+            <div class="font-display font-black text-base text-emerald-300 mt-0.5">
+              ${bds ? `${bds.BS} straconych w ${bds.M}M (S${bds.seasonNumber})` : `Śr. ${cd.avgConcededPerMatch} str. / mecz`}
+            </div>
+            <div class="text-[11px] text-slate-300 mt-0.5">
+              ${bds ? `${escapeHtml(bds.leagueLabel)} • śr. ${(bds.BS / bds.M).toFixed(2)} gola/mecz` : `Łączny bilans bramek: ${allTime.gf || 0}:${allTime.ga || 0}`}
+            </div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-950/90 border border-white/10">
+            <div class="text-[10px] font-display uppercase text-slate-400 font-bold">📐 Średnie Karierowe na Mecz</div>
+            <div class="font-display font-black text-base text-sky-300 mt-0.5">${cd.avgPtsPerMatch} PKT / mecz</div>
+            <div class="text-[11px] text-slate-300 mt-0.5">⚽ ${cd.avgGoalsPerMatch} strz./M • 🛡️ ${cd.avgConcededPerMatch} strac./M • Win ${allTime.winPct || 0}%</div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-950/90 border border-white/10">
+            <div class="text-[10px] font-display uppercase text-slate-400 font-bold">🏅 Pozycja w Historii SMPL</div>
+            <div class="font-display font-black text-base text-white mt-0.5">
+              Kariera L1–L9: <span class="text-amber-300">${cd.careerRank ? '#' + cd.careerRank : '-'}</span>
+            </div>
+            <div class="text-[11px] text-slate-300 mt-0.5">
+              All-Time Ekstraklasa: <strong class="text-emerald-300">${cd.l1Rank ? '#' + cd.l1Rank : 'poza L1'}</strong> • Medale: 👑${allTime.gold || 0} 🥈${allTime.silver || 0} 🥉${allTime.bronze || 0}
+            </div>
+          </div>
+        </div>
+
+        ${
+          divs.length > 0
+            ? `
+              <!-- Podział Kariery na Poszczególne Ligi L1–L9 -->
+              <div class="mb-5">
+                <div class="text-xs font-display font-black uppercase text-cyan-300 mb-2.5">
+                  🏟️ Szczebel po Szczeblu — Występy w Poszczególnych Dywizjach (L1–L9):
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 font-mono-num text-xs">
+                  ${divs.map((dv) => `
+                    <div class="p-3 rounded-xl bg-slate-950/85 border ${dv.leagueId === 'L1' ? 'border-amber-400/45' : 'border-white/10'} flex items-center justify-between gap-2">
+                      <div>
+                        <div class="font-display font-black text-white">${escapeHtml(dv.leagueLabel)}</div>
+                        <div class="text-[11px] text-slate-400">${dv.seasons} sez. • ${dv.matches}M (${dv.wins}W-${dv.draws}R-${dv.losses}P)</div>
+                      </div>
+                      <div class="text-right">
+                        <div class="font-display font-black text-amber-300">${dv.pkt} PKT</div>
+                        <div class="text-[10px] text-emerald-300">Najw. #${dv.bestPos}${dv.titles > 0 ? ` • 👑${dv.titles}x` : (dv.podiums > 0 ? ` • 🏅${dv.podiums}x` : '')}</div>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `
+            : ''
+        }
+
+        ${
+          recs.length > 0
+            ? `
+              <!-- Responsywna Tabela Sezon po Sezonie (zgodna z responsive-table: sticky + @container mobile cards) -->
+              <div>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                  <h4 id="smpl-ut-career-table-heading" class="text-xs sm:text-sm font-display font-black uppercase text-amber-300">
+                    📜 Wszystkie Zapisane Sezony Zawodnika (${recs.length} sezonów — kliknij wiersz, aby otworzyć pełną tabelę sezonu)
+                  </h4>
+                  <span class="text-[11px] text-slate-400">Kompletne dane z oficjalnych tabel S1–S55</span>
+                </div>
+                <div tabindex="0" role="region" aria-labelledby="smpl-ut-career-table-heading" class="smpl-career-table-region">
+                  <table class="smpl-career-resp-table font-mono-num">
+                    <thead>
+                      <tr>
+                        <th scope="col">Sezon</th>
+                        <th scope="col">Dywizja</th>
+                        <th scope="col">Miejsce</th>
+                        <th scope="col">Mecze</th>
+                        <th scope="col">Bilans W-R-P</th>
+                        <th scope="col">Bramki</th>
+                        <th scope="col">Punkty</th>
+                        <th scope="col">Tytuł / Uwagi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${recs.map((rc) => {
+                        const posBadge = rc.inProgress
+                          ? `<span class="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-400/35 text-amber-300 font-bold">⏳ #${rc.pos}</span>`
+                          : rc.pos === 1
+                          ? `<span class="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-black">👑 #1</span>`
+                          : rc.pos === 2
+                          ? `<span class="px-1.5 py-0.5 rounded bg-slate-300/20 text-slate-200 font-black">🥈 #2</span>`
+                          : rc.pos === 3
+                          ? `<span class="px-1.5 py-0.5 rounded bg-amber-700/25 text-amber-400 font-black">🥉 #3</span>`
+                          : `<span class="text-slate-200 font-bold">#${rc.pos}</span>`;
+                        return `
+                          <tr onclick="SMPL_APP.setArchiveMode('SEASONS'); SMPL_APP.setArchiveSeason(${rc.seasonNumber}); SMPL_APP.setArchiveLeague('${rc.leagueId}'); SMPL_APP.switchTab('archive');" class="cursor-pointer transition">
+                            <th scope="row">Sezon ${rc.seasonNumber}${rc.inProgress ? ' <span class="text-[10px] text-amber-300 font-normal">(w trakcie)</span>' : ''}</th>
+                            <td class="font-sans font-bold text-white">${escapeHtml(rc.leagueLabel)}</td>
+                            <td>${posBadge}</td>
+                            <td class="text-slate-300">${rc.M}</td>
+                            <td><span class="text-emerald-400 font-bold">${rc.W}W</span>-<span class="text-amber-300">${rc.R}R</span>-<span class="text-rose-400">${rc.P}P</span></td>
+                            <td class="text-slate-200">${rc.BZ}:${rc.BS} <span class="${rc.diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}">(${rc.diff >= 0 ? '+' + rc.diff : rc.diff})</span></td>
+                            <td class="font-display font-black text-amber-300">${rc.PKT} PKT</td>
+                            <td class="font-sans text-xs text-amber-200 font-semibold">${escapeHtml(rc.note || (rc.pos === 1 && !rc.inProgress ? 'Mistrz dywizji' : '—'))}</td>
+                          </tr>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            `
+            : ''
+        }
+      </section>
+
+      ${compareHtml}
+    `;
+  }
+
   function renderPlayerProfileUTView(state, profileState, session) {
     const isAdmin = Boolean(window.SMPL_DB ? window.SMPL_DB.isStrictAdminSession(session) : (session && session.isAdminAuthenticated && session.linkMode !== 'PUBLIC'));
     const winInfo = (window.SMPL_DB && typeof window.SMPL_DB.getSeasonJoinWindowInfo === 'function')
@@ -1799,13 +2354,22 @@ window.SMPL_VIEWS = (function () {
       ? window.SMPL_DB.findPlayerForAdmin(session.adminId, state)
       : null;
 
+    const unifiedCatalog = (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.getUnifiedUtPlayersCatalog === 'function')
+      ? window.SMPL_ENGINE.getUnifiedUtPlayersCatalog(state)
+      : [];
+
+    const reqId = profileState && profileState.playerId ? String(profileState.playerId) : '';
+    const hasReqInActive = reqId && state.players.some((p) => p.id === reqId);
+    const hasReqInArchive = reqId && reqId.indexOf('ARCH::') === 0;
+
     const selectedId =
-      (profileState && profileState.playerId && state.players.some((p) => p.id === profileState.playerId))
-        ? profileState.playerId
+      (hasReqInActive || hasReqInArchive)
+        ? reqId
         : (session && session.activePlayerId && state.players.some((p) => p.id === session.activePlayerId))
         ? session.activePlayerId
         : (myAdminPlayer && myAdminPlayer.id)
         || (state.players[0] && state.players[0].id)
+        || (unifiedCatalog[0] && unifiedCatalog[0].id)
         || null;
 
     const utData = selectedId ? window.SMPL_ENGINE.calculatePlayerUTCard(state, selectedId) : null;
@@ -1879,41 +2443,54 @@ window.SMPL_VIEWS = (function () {
     }
 
     const p = utData.player;
+    const isArchOnly = Boolean(utData.isArchiveOnly || p.isArchiveVirtual);
+    const cd = utData.careerDossier || {};
     const row = utData.seasonRow;
     const utAvatar = (row && row.avatar) || p.avatar || (window.SMPL_MEDIA ? window.SMPL_MEDIA.generatePlayerAvatar(p.name, p.nick, Math.max(0, ((row && row.position) || 1) - 1)) : '');
     const allTime = utData.allTime;
     const attr = utData.attributes;
     const trophies = utData.trophies || [];
     const isLoggedInPlayer = Boolean(session && !session.isGuest && session.isPlayerAuthenticated && (session.activePlayerId || session.activeRegId));
-    const isOwnAdminPlayer = Boolean(myAdminPlayer && myAdminPlayer.id === p.id);
-    const isOwnProfile = Boolean((session && session.isPlayerAuthenticated && session.activePlayerId === p.id) || isOwnAdminPlayer);
-    const isPlayerInPool = Boolean(p.active === false || p.leagueId === 'POOL');
+    const isOwnAdminPlayer = Boolean(!isArchOnly && myAdminPlayer && myAdminPlayer.id === p.id);
+    const isOwnProfile = Boolean(!isArchOnly && ((session && session.isPlayerAuthenticated && session.activePlayerId === p.id) || isOwnAdminPlayer));
+    const isPlayerInPool = Boolean(!isArchOnly && (p.active === false || p.leagueId === 'POOL'));
     const enabledLeagues = Object.keys(state.leagues || {}).filter(
       (id) => !(state.portalSettings && Array.isArray(state.portalSettings.disabledLeagues) && state.portalSettings.disabledLeagues.includes(id))
     );
-    const utCosmetics = (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.getPlayerCosmetics === 'function')
+    const utCosmetics = (!isArchOnly && window.SMPL_STUDIO && typeof window.SMPL_STUDIO.getPlayerCosmetics === 'function')
       ? window.SMPL_STUDIO.getPlayerCosmetics(state, p.id)
       : { frameCss: '', bgCss: '', customTitle: '' };
-    const utCoinsInfo = (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.calculatePlayerCoinsBreakdown === 'function')
+    const utCoinsInfo = (!isArchOnly && window.SMPL_STUDIO && typeof window.SMPL_STUDIO.calculatePlayerCoinsBreakdown === 'function')
       ? window.SMPL_STUDIO.calculatePlayerCoinsBreakdown(state, p.id)
       : { earned: 0, spent: 0, balance: 0 };
     const utAchievements = (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.calculatePlayerAchievements === 'function')
       ? window.SMPL_STUDIO.calculatePlayerAchievements(state, p.id)
       : { unlockedCount: 0, totalCount: 0, items: [] };
     const utTrajectory = (window.SMPL_STUDIO && typeof window.SMPL_STUDIO.computePlayerCareerTrajectory === 'function')
-      ? window.SMPL_STUDIO.computePlayerCareerTrajectory(p.name, p.historicalArchiveName)
+      ? window.SMPL_STUDIO.computePlayerCareerTrajectory(p.name, p.historicalArchiveName || p.name)
       : { points: [], summary: null };
     const joinableLeagues = (winInfo.allowedLeagues && winInfo.allowedLeagues.length > 0)
       ? enabledLeagues.filter((id) => winInfo.allowedLeagues.includes(id))
       : enabledLeagues;
 
-    const playerOptions = state.players
+    const activeAccountOptions = state.players
       .filter((item) => item.active !== false || item.id === p.id)
       .map(
         (item) =>
-          `<option value="${item.id}" ${item.id === p.id ? 'selected' : ''}>[${item.active === false || item.leagueId === 'POOL' ? 'PULA' : item.leagueId}] ${escapeHtml(item.name)} (@${escapeHtml(item.nick)})</option>`
+          `<option value="${escapeHtml(item.id)}" ${item.id === p.id ? 'selected' : ''}>[${item.active === false || item.leagueId === 'POOL' ? 'PULA' : item.leagueId}] ${escapeHtml(item.name)} (@${escapeHtml(item.nick)})</option>`
       )
       .join('');
+    const archiveOnlyOptions = unifiedCatalog
+      .filter((c) => c.isArchiveOnly)
+      .map(
+        (c) =>
+          `<option value="${escapeHtml(c.id)}" ${c.id === p.id ? 'selected' : ''}>[🏛️ ${c.ovr} OVR] ${escapeHtml(c.name)} (${c.seasons} sez. • bez konta)</option>`
+      )
+      .join('');
+    const playerOptions = `
+      ${activeAccountOptions ? `<optgroup label="🟢 Aktywne Konta Sezonu ${state.season || 56}">${activeAccountOptions}</optgroup>` : ''}
+      ${archiveOnlyOptions ? `<optgroup label="🏛️ Archiwum S1–S55 (Gracze bez aktywnego konta)">${archiveOnlyOptions}</optgroup>` : ''}
+    `;
 
     const cardBgClass =
       utData.cardTier === 'ICON_LEGEND'
@@ -1975,32 +2552,69 @@ window.SMPL_VIEWS = (function () {
         })()
       : '';
 
+    const safePidJs = escapeHtml(p.id).replace(/'/g, "\\'");
+    const safeArchNameJs = escapeHtml(p.historicalArchiveName || p.name).replace(/'/g, "\\'");
+    const archiveHeritageBannerHtml = isArchOnly
+      ? `
+        <div class="glass-panel rounded-2xl p-4 sm:p-5 mb-6 border border-amber-400/50 bg-gradient-to-r from-amber-500/15 via-slate-950/90 to-emerald-950/35 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="min-w-0">
+            <div class="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/45 text-amber-200 text-[10px] font-display font-black uppercase tracking-wider">
+              <span>🏛️ KARTA HISTORYCZNA Z ARCHIWUM S1–S55</span>
+              <span>•</span>
+              <span class="text-emerald-300">GRACZ BEZ AKTYWNEGO KONTA W SEZONIE ${state.season || 56}</span>
+            </div>
+            <div class="font-display font-black text-base sm:text-lg text-white mt-1">
+              ${escapeHtml(p.name)} — pełna historia kariery (${escapeHtml(cd.eraSpanLabel || 'S1–S55')} • ${allTime.seasons || 1} sez. • ${allTime.matches || 0} meczów)
+            </div>
+            <p class="text-xs text-slate-300 mt-0.5 leading-relaxed">
+              Ta Karta Ultimate Team (<strong>${utData.ovr} OVR</strong>) i księga kariery zostały wygenerowane automatycznie z oficjalnych archiwów ligowych S1–S55. Możesz sprawdzić każdy sezon tego gracza nawet wtedy, gdy nie posiada konta w obecnym sezonie!
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+            <button type="button" onclick="SMPL_APP.openArchivePlayerCareer('${safeArchNameJs}')" class="px-3.5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/35 border border-amber-400/50 text-amber-200 font-display font-black text-xs uppercase">
+              📜 Tabele Sezonów →
+            </button>
+            ${!isLoggedInPlayer && !isAdmin
+              ? `<button type="button" onclick="SMPL_APP.switchTab('register')" class="btn-league px-3.5 py-2 rounded-xl font-display font-black text-xs uppercase shadow-lg">
+                   📝 To Ty? Załóż konto i połącz historię!
+                 </button>`
+              : ''}
+          </div>
+        </div>
+      `
+      : '';
+
     return `
       ${ownPoolBannerHtml}
+      ${renderUtCardsExplorerSectionHtml(state, profileState && profileState.explorer, p.id, false)}
+      <div id="smpl-ut-active-card-anchor"></div>
+      ${archiveHeritageBannerHtml}
       ${window.SMPL_RANKS ? window.SMPL_RANKS.profileRankPanelHtml(p, state) : ''}
       <!-- Pasek wyboru zawodnika i nagłówek Karty UT -->
       <div class="glass-panel-league rounded-2xl p-5 sm:p-6 mb-6">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <span class="px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/50 text-amber-300 text-xs font-display font-bold uppercase tracking-wider">
-              🎴 KARTA ZAWODNIKA ULTIMATE TEAM ⚡ &amp; GABLOTA TROFEÓW
+              🎴 ${isArchOnly ? 'ARCHIWALNA KARTA ZAWODNIKA ULTIMATE TEAM (S1–S55)' : 'KARTA ZAWODNIKA ULTIMATE TEAM ⚡ &amp; GABLOTA TROFEÓW'}
             </span>
             <h2 class="font-display font-black text-xl sm:text-2xl text-white uppercase mt-2">
-              Profil Gracza, Pełna Historia Kariery (S1–S55) i Trofea
+              ${escapeHtml(p.name)} — Karta UT (${utData.ovr} OVR), Kariera (S1–S55) i Trofea
             </h2>
             <p class="text-xs text-slate-300 mt-1">
-              System automatycznie przelicza ocenę ogólną <strong>OVR (75–99)</strong>, wylicza <strong>Ulubionego Rywala</strong>, <strong>Nemezis</strong>, <strong>Styl Gry</strong> oraz zbiera wszystkie medale i puchary na profilu zawodnika!
+              System automatycznie przelicza ocenę ogólną <strong>OVR (75–99)</strong>, wylicza <strong>Styl Gry</strong>, <strong>Szczyt Kariery</strong> oraz zbiera wszystkie medale i puchary na profilu każdego zawodnika w historii SMPL!
             </p>
           </div>
 
           <div class="flex flex-wrap items-center gap-2.5">
             <div>
-              <label class="block text-[10px] font-display uppercase text-slate-400 font-bold mb-1">Wybierz profil zawodnika:</label>
-              <select onchange="SMPL_APP.setProfilePlayer(this.value)" class="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-amber-400/50 text-xs sm:text-sm text-white font-bold focus:outline-none">
+              <label for="smpl-profile-quick-select" class="block text-[10px] font-display uppercase text-slate-400 font-bold mb-1">Szybki wybór z listy (${unifiedCatalog.length} graczy):</label>
+              <select id="smpl-profile-quick-select" onchange="SMPL_APP.setProfilePlayer(this.value)" class="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-amber-400/50 text-xs sm:text-sm text-white font-bold focus:outline-none max-w-[290px]">
                 ${playerOptions}
               </select>
             </div>
-            <button type="button" onclick="SMPL_APP.openMessengerForPlayer('${p.id}')" class="px-3.5 py-2.5 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-400/40 font-display font-black text-xs uppercase self-end transition flex items-center gap-1.5 shadow">💬 Napisz na Messengerze</button>
+            ${!isArchOnly
+              ? `<button type="button" onclick="SMPL_APP.openMessengerForPlayer('${safePidJs}')" class="px-3.5 py-2.5 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-400/40 font-display font-black text-xs uppercase self-end transition flex items-center gap-1.5 shadow">💬 Napisz na Messengerze</button>`
+              : ''}
             ${
               isOwnAdminPlayer
                 ? `
@@ -2055,10 +2669,12 @@ window.SMPL_VIEWS = (function () {
                    </button>`
                 : ''
             }
-            <button type="button" onclick="SMPL_APP.openSmplWrappedModal('${p.id}')" class="px-3.5 py-2.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/45 text-purple-200 border border-purple-400/50 font-display font-black text-xs uppercase self-end transition shadow">
-              🎁 SMPL Wrapped
-            </button>
-            <button type="button" onclick="SMPL_APP.downloadUtCardPosterPng('${p.id}')" class="px-3.5 py-2.5 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-400/40 font-display font-black text-xs uppercase self-end transition shadow">
+            ${!isArchOnly
+              ? `<button type="button" onclick="SMPL_APP.openSmplWrappedModal('${safePidJs}')" class="px-3.5 py-2.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/45 text-purple-200 border border-purple-400/50 font-display font-black text-xs uppercase self-end transition shadow">
+                   🎁 SMPL Wrapped
+                 </button>`
+              : ''}
+            <button type="button" onclick="SMPL_APP.downloadUtCardPosterPng('${safePidJs}')" class="px-3.5 py-2.5 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-400/40 font-display font-black text-xs uppercase self-end transition shadow">
               📸 Karta UT PNG
             </button>
             ${
@@ -2069,15 +2685,15 @@ window.SMPL_VIEWS = (function () {
                 : ''
             }
             ${
-              isAdmin
-                ? `<button onclick="SMPL_APP.openAssignHistoricalStatsModal('${p.id}')" class="px-3.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-display font-black text-xs uppercase self-end shadow-lg">
+              isAdmin && !isArchOnly
+                ? `<button onclick="SMPL_APP.openAssignHistoricalStatsModal('${safePidJs}')" class="px-3.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-display font-black text-xs uppercase self-end shadow-lg">
                      🏛️ ${isOwnAdminPlayer ? 'Moje Statystyki S1–S55 (Admin)' : 'Dopisz statystyki z poprzednich lat (1 Klik)'}
                    </button>
-                   <button onclick="SMPL_APP.openAwardTrophyModal('${p.id}')" class="btn-league px-3.5 py-2.5 rounded-xl text-xs font-display uppercase self-end">
+                   <button onclick="SMPL_APP.openAwardTrophyModal('${safePidJs}')" class="btn-league px-3.5 py-2.5 rounded-xl text-xs font-display uppercase self-end">
                      🏆 Nadaj Trofeum
                    </button>
                    ${session && session.adminRole === 'MASTER_ADMIN'
-                     ? `<button type="button" onclick="SMPL_APP.openMasterGrantCoinsModal('${p.id}')" class="px-3.5 py-2.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/50 font-display font-black text-xs uppercase self-end shadow">
+                     ? `<button type="button" onclick="SMPL_APP.openMasterGrantCoinsModal('${safePidJs}')" class="px-3.5 py-2.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/50 font-display font-black text-xs uppercase self-end shadow">
                           👑 +Coins
                         </button>`
                      : ''}`
@@ -2110,7 +2726,7 @@ window.SMPL_VIEWS = (function () {
                 <div class="font-display font-black text-3xl sm:text-5xl text-amber-300 leading-none">${utData.ovr}</div>
                 <div class="text-[10px] sm:text-[11px] font-display font-black uppercase text-white tracking-widest mt-1">OVR</div>
                 <div class="mt-1.5 sm:mt-2 px-1.5 sm:px-2 py-0.5 rounded bg-black/50 border border-white/15 text-[10px] font-display font-bold text-emerald-300 whitespace-nowrap">
-                  #${row.position} ${escapeHtml(p.leagueId)}
+                  ${isArchOnly ? `🏛️ ${escapeHtml(cd.peakLeagueId || p.leagueId)}` : `#${row.position} ${escapeHtml(p.leagueId)}`}
                 </div>
               </div>
 
@@ -2220,46 +2836,67 @@ window.SMPL_VIEWS = (function () {
 
             <!-- Podsumowanie Aktualnej Tabeli vs All-Time na dole karty -->
             <div class="grid grid-cols-4 gap-2 pt-3 border-t border-white/15 text-center text-xs">
-              <div>
-                <div class="text-[10px] text-slate-400">PKT S${state.season || 56}</div>
-                <div class="font-display font-black text-white text-sm">${row.PKT}</div>
-              </div>
-              <div>
-                <div class="text-[10px] text-slate-400">WIN %</div>
-                <div class="font-display font-black text-emerald-400 text-sm">${row.winRate}%</div>
-              </div>
-              <div>
-                <div class="text-[10px] text-slate-400">CZYSTE KONTA</div>
-                <div class="font-display font-black text-emerald-300 text-sm">🧤 ${row.cleanSheets}</div>
-              </div>
-              <div>
-                <div class="text-[10px] text-slate-400">ALL-TIME</div>
-                <div class="font-display font-black text-amber-300 text-sm">#${allTime.rank}</div>
-              </div>
+              ${isArchOnly || Number(row.M || 0) === 0
+                ? `
+                  <div>
+                    <div class="text-[10px] text-slate-400">SEZONY</div>
+                    <div class="font-display font-black text-white text-sm">${allTime.seasons || 1}</div>
+                  </div>
+                  <div>
+                    <div class="text-[10px] text-slate-400">WIN %</div>
+                    <div class="font-display font-black text-emerald-400 text-sm">${allTime.winPct || 0}%</div>
+                  </div>
+                  <div>
+                    <div class="text-[10px] text-slate-400">GOLE HIST.</div>
+                    <div class="font-display font-black text-emerald-300 text-sm">⚽ ${allTime.gf || 0}</div>
+                  </div>
+                  <div>
+                    <div class="text-[10px] text-slate-400">ALL-TIME</div>
+                    <div class="font-display font-black text-amber-300 text-sm">#${allTime.rank}</div>
+                  </div>
+                `
+                : `
+                  <div>
+                    <div class="text-[10px] text-slate-400">PKT S${state.season || 56}</div>
+                    <div class="font-display font-black text-white text-sm">${row.PKT}</div>
+                  </div>
+                  <div>
+                    <div class="text-[10px] text-slate-400">WIN %</div>
+                    <div class="font-display font-black text-emerald-400 text-sm">${row.winRate}%</div>
+                  </div>
+                  <div>
+                    <div class="text-[10px] text-slate-400">CZYSTE KONTA</div>
+                    <div class="font-display font-black text-emerald-300 text-sm">🧤 ${row.cleanSheets}</div>
+                  </div>
+                  <div>
+                    <div class="text-[10px] text-slate-400">ALL-TIME</div>
+                    <div class="font-display font-black text-amber-300 text-sm">#${allTime.rank}</div>
+                  </div>
+                `}
             </div>
           </div>
 
           ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderProfileTrustCardHtml === 'function' ? window.SMPL_SECURITY.renderProfileTrustCardHtml() : ''}
 
-          <!-- Raport Mentalny, Ulubiony Rywal i Nemezis (Dokładne odwzorowanie z Excela!) -->
+          <!-- Raport Mentalny, Ulubiony Rywal i Nemezis / Analiza Kariery -->
           <div class="glass-panel rounded-2xl p-5 mt-5 border border-white/10 space-y-3 text-xs">
             <h3 class="font-display font-black text-sm uppercase text-amber-300 tracking-wider border-b border-white/10 pb-2">
-              📊 Raport Analityczny z Arkusza SMPL
+              📊 ${isArchOnly ? 'Raport Skautingowy z Archiwum S1–S55' : 'Raport Analityczny z Arkusza SMPL'}
             </h3>
             <div class="flex items-start justify-between gap-2">
               <span class="text-slate-400">⚡ Styl Gry:</span>
               <span class="font-bold text-white text-right">${escapeHtml(utData.playstyle)}</span>
             </div>
             <div class="flex items-start justify-between gap-2">
-              <span class="text-slate-400">👑 Ulubiony Rywal:</span>
+              <span class="text-slate-400">${isArchOnly || Number(row.M || 0) === 0 ? '🌟 Szczyt Kariery:' : '👑 Ulubiony Rywal:'}</span>
               <span class="font-bold text-emerald-400 text-right">${escapeHtml(utData.favoriteRival)}</span>
             </div>
             <div class="flex items-start justify-between gap-2">
-              <span class="text-slate-400">💀 Nemezis (Trudny Rywal):</span>
+              <span class="text-slate-400">${isArchOnly || Number(row.M || 0) === 0 ? '⚽ Rekord / Bilans:' : '💀 Nemezis (Trudny Rywal):'}</span>
               <span class="font-bold text-rose-400 text-right">${escapeHtml(utData.nemesis)}</span>
             </div>
             <div class="flex items-start justify-between gap-2">
-              <span class="text-slate-400">🔥 Aktualna Seria:</span>
+              <span class="text-slate-400">${isArchOnly || Number(row.M || 0) === 0 ? '⏳ Przebieg Kariery:' : '🔥 Aktualna Seria:'}</span>
               <span class="font-bold text-amber-300 text-right">${escapeHtml(utData.streakText)}</span>
             </div>
             <div class="p-3 rounded-xl bg-slate-950/90 border border-white/10 text-slate-200 italic">
@@ -2270,47 +2907,84 @@ window.SMPL_VIEWS = (function () {
 
         <!-- PRAWA KOLUMNA: GABLOTA TROFEÓW, STATYSTYKI WSZECH CZASÓW I TERMINARZ DOM/WYJAZD -->
         <div class="lg:col-span-7 space-y-6">
-          <!-- 1. GABLOTA TROFEÓW I MEDALI GRACZA -->
-          <div class="glass-panel rounded-2xl p-5 sm:p-6 border border-amber-400/30">
-            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-white/10">
+          <!-- 1. KOMPAKTOWA GABLOTA TROFEÓW SEZONOWYCH Z SUWAKIEM (TYLKO KONKRETNE SEZONY, ZERO DUPLIKATÓW) -->
+          <div class="glass-panel rounded-2xl p-4 sm:p-5 border border-amber-400/30">
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-3 border-b border-white/10">
               <div>
-                <h3 class="font-display font-black text-base sm:text-lg text-white uppercase flex items-center gap-2">
-                  <span>🏆 Gablota Trofeów i Odznak Gracza (${trophies.length})</span>
+                <h3 id="smpl-trophy-vault-heading" class="font-display font-black text-sm sm:text-base text-white uppercase flex items-center gap-2">
+                  <span>🏆 Gablota Trofeów Sezonowych (${trophies.length})</span>
                 </h3>
-                <p class="text-xs text-slate-400">
-                  Zebrane mistrzostwa, medale ze wszystkich sezonów L1–L9 (S1–S55), Złote Rękawice oraz wyróżnienia
+                <p class="text-[11px] text-slate-400">
+                  Wyłącznie konkretne sezony S1–S${state.season || 56} — zero zbiorczych duplikatów (przewiń suwakiem poniżej)
                 </p>
               </div>
-              <div class="flex items-center gap-2 text-xs font-display font-bold">
-                <span class="px-2.5 py-1 rounded-lg bg-amber-400/20 text-amber-300 border border-amber-400/40">👑 ${allTime.gold || 0}x Złoto</span>
-                <span class="px-2.5 py-1 rounded-lg bg-slate-300/20 text-slate-200 border border-slate-300/40">🥈 ${allTime.silver || 0}x Srebro</span>
-                <span class="px-2.5 py-1 rounded-lg bg-amber-700/30 text-amber-400 border border-amber-600/40">🥉 ${allTime.bronze || 0}x Brąz</span>
+              <div class="flex items-center gap-1.5 text-[11px] font-display font-bold">
+                <span class="px-2 py-0.5 rounded-lg bg-amber-400/20 text-amber-300 border border-amber-400/40">👑 ${allTime.gold || 0}x</span>
+                <span class="px-2 py-0.5 rounded-lg bg-slate-300/20 text-slate-200 border border-slate-300/40">🥈 ${allTime.silver || 0}x</span>
+                <span class="px-2 py-0.5 rounded-lg bg-amber-700/30 text-amber-400 border border-amber-600/40">🥉 ${allTime.bronze || 0}x</span>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              ${trophies
-                .map((t) => {
-                  const borderCls =
-                    t.rarity === 'LEGENDARY'
-                      ? 'border-amber-400 bg-gradient-to-r from-amber-500/20 to-slate-950'
-                      : t.rarity === 'GOLD'
-                      ? 'border-yellow-500/50 bg-slate-950/90'
-                      : 'border-white/15 bg-slate-950/75';
-                  return `
-                    <div class="p-3.5 rounded-2xl border ${borderCls} flex items-center gap-3.5 shadow-lg">
-                      <div class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl flex-shrink-0">
-                        ${t.icon || '🏆'}
-                      </div>
-                      <div class="min-w-0">
-                        <div class="font-display font-bold text-xs sm:text-sm text-white leading-snug">${escapeHtml(t.title)}</div>
-                        <div class="text-[11px] text-amber-300 font-semibold mt-0.5">${escapeHtml(t.season)}</div>
-                      </div>
-                    </div>
-                  `;
-                })
-                .join('')}
-            </div>
+            ${
+              trophies.length > 4
+                ? `
+                  <div class="smpl-trophy-slider-bar">
+                    <label for="smpl-trophy-vault-range" class="text-[10px] font-display font-black uppercase text-amber-300 whitespace-nowrap">🎚️ Suwak (${trophies.length}):</label>
+                    <button type="button" onclick="SMPL_APP.stepTrophyVaultScroll(-130)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-200 text-[10px] font-black" aria-label="Przewiń trofea w górę">▲</button>
+                    <input
+                      type="range"
+                      id="smpl-trophy-vault-range"
+                      min="0"
+                      max="100"
+                      value="0"
+                      oninput="SMPL_APP.handleTrophyVaultSlider(this.value)"
+                      class="smpl-trophy-range-input"
+                    />
+                    <button type="button" onclick="SMPL_APP.stepTrophyVaultScroll(130)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-200 text-[10px] font-black" aria-label="Przewiń trofea w dół">▼</button>
+                    <span id="smpl-trophy-vault-pct" class="text-[10px] font-mono-num text-slate-300 w-9 text-right">0%</span>
+                  </div>
+                `
+                : ''
+            }
+
+            ${
+              trophies.length === 0
+                ? `<div class="py-5 px-3 rounded-xl bg-slate-950/75 border border-white/10 text-center text-xs text-slate-400">
+                     Brak trofeów podium (miejsca 1–3) lub nagród indywidualnych w rozegranych sezonach.
+                   </div>`
+                : `<div
+                     id="smpl-trophy-vault-scroller"
+                     tabindex="0"
+                     role="region"
+                     aria-labelledby="smpl-trophy-vault-heading"
+                     onscroll="SMPL_APP.handleTrophyVaultScroll(this)"
+                     class="smpl-trophy-vault-scroller"
+                   >
+                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                       ${trophies
+                         .map((t) => {
+                           const borderCls =
+                             t.rarity === 'LEGENDARY'
+                               ? 'border-amber-400 bg-gradient-to-r from-amber-500/20 to-slate-950'
+                               : t.rarity === 'GOLD'
+                               ? 'border-yellow-500/50 bg-slate-950/90'
+                               : 'border-white/15 bg-slate-950/75';
+                           return `
+                             <div class="p-2.5 rounded-xl border ${borderCls} flex items-center gap-2.5 shadow">
+                               <div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-lg flex-shrink-0">
+                                 ${t.icon || '🏆'}
+                               </div>
+                               <div class="min-w-0">
+                                 <div class="font-display font-bold text-xs text-white leading-snug">${escapeHtml(t.title)}</div>
+                                 <div class="text-[10px] text-amber-300 font-bold mt-0.5">${escapeHtml(t.season)}</div>
+                               </div>
+                             </div>
+                           `;
+                         })
+                         .join('')}
+                     </div>
+                   </div>`
+            }
           </div>
 
           ${(() => {
@@ -2432,51 +3106,57 @@ window.SMPL_VIEWS = (function () {
             `;
           })()}
 
-          <!-- 3. INDYWIDUALNY TERMINARZ GRACZA (🏠 DOM — TY ZAPRASZASZ vs ✈️ WYJAZD) -->
-          <div class="glass-panel rounded-2xl p-5 sm:p-6 border border-white/10">
-            <div class="flex items-center justify-between pb-2.5 mb-3 border-b border-white/10">
-              <div>
-                <h3 class="font-display font-black text-base text-white uppercase">
-                  📅 Twoje Najbliższe Mecze (4 Kolejki na Tydzień)
-                </h3>
-                <p class="text-xs text-slate-400">
-                  Pamiętaj: gdy masz <strong>🏠 DOM</strong>, to Ty wysyłasz zaproszenie do meczu rywalowi!
-                </p>
+          ${!isArchOnly
+            ? `
+              <!-- 3. INDYWIDUALNY TERMINARZ GRACZA (🏠 DOM — TY ZAPRASZASZ vs ✈️ WYJAZD) -->
+              <div class="glass-panel rounded-2xl p-5 sm:p-6 border border-white/10">
+                <div class="flex items-center justify-between pb-2.5 mb-3 border-b border-white/10">
+                  <div>
+                    <h3 class="font-display font-black text-base text-white uppercase">
+                      📅 Twoje Najbliższe Mecze (4 Kolejki na Tydzień)
+                    </h3>
+                    <p class="text-xs text-slate-400">
+                      Pamiętaj: gdy masz <strong>🏠 DOM</strong>, to Ty wysyłasz zaproszenie do meczu rywalowi!
+                    </p>
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  ${
+                    utData.upcomingMatches.length === 0
+                      ? `<div class="text-xs text-slate-400 py-4 text-center">Wszystkie zaplanowane mecze zostały rozegrane!</div>`
+                      : utData.upcomingMatches
+                          .map(
+                            (um) => `
+                              <div class="p-3 rounded-xl bg-slate-950/85 border border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <div class="flex items-center gap-2.5">
+                                  <span class="px-2 py-0.5 rounded bg-white/10 font-display font-bold text-white">K${um.round} (Tydz. ${um.week})</span>
+                                  <span class="px-2 py-0.5 rounded font-bold ${
+                                    um.isHome
+                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                      : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                                  }">${um.roleLabel}</span>
+                                  <span class="text-white font-bold">vs ${escapeHtml(um.opponentName)} (@${escapeHtml(um.opponentNick)})</span>
+                                </div>
+                                <div>
+                                  ${
+                                    um.status === 'PENDING'
+                                      ? `<span class="text-amber-300 font-bold">⏳ Czeka na Admina (${um.score})</span>`
+                                      : `<button onclick="SMPL_APP.prefillMatchSubmission('${um.matchId}')" class="btn-league px-2.5 py-1 rounded-lg text-[11px] font-display uppercase">➕ Wpisz wynik</button>`
+                                  }
+                                </div>
+                              </div>
+                            `
+                          )
+                          .join('')
+                  }
+                </div>
               </div>
-            </div>
-            <div class="space-y-2">
-              ${
-                utData.upcomingMatches.length === 0
-                  ? `<div class="text-xs text-slate-400 py-4 text-center">Wszystkie zaplanowane mecze zostały rozegrane!</div>`
-                  : utData.upcomingMatches
-                      .map(
-                        (um) => `
-                          <div class="p-3 rounded-xl bg-slate-950/85 border border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
-                            <div class="flex items-center gap-2.5">
-                              <span class="px-2 py-0.5 rounded bg-white/10 font-display font-bold text-white">K${um.round} (Tydz. ${um.week})</span>
-                              <span class="px-2 py-0.5 rounded font-bold ${
-                                um.isHome
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                              }">${um.roleLabel}</span>
-                              <span class="text-white font-bold">vs ${escapeHtml(um.opponentName)} (@${escapeHtml(um.opponentNick)})</span>
-                            </div>
-                            <div>
-                              ${
-                                um.status === 'PENDING'
-                                  ? `<span class="text-amber-300 font-bold">⏳ Czeka na Admina (${um.score})</span>`
-                                  : `<button onclick="SMPL_APP.prefillMatchSubmission('${um.matchId}')" class="btn-league px-2.5 py-1 rounded-lg text-[11px] font-display uppercase">➕ Wpisz wynik</button>`
-                              }
-                            </div>
-                          </div>
-                        `
-                      )
-                      .join('')
-              }
-            </div>
-          </div>
+            `
+            : ''}
         </div>
       </div>
+
+      ${renderDeepArchiveCareerDossierHtml(state, utData, unifiedCatalog, profileState && profileState.comparePlayerId)}
 
       <!-- KAMIENIE MILOWE & TRAJEKTORIA KARIERY S1-S55 -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
@@ -3107,8 +3787,15 @@ window.SMPL_VIEWS = (function () {
                   <tr onclick="SMPL_APP.openArchivePlayerCareer('${safeJsName}')" class="hover:bg-white/5 transition cursor-pointer">
                     <td class="py-3 pl-4 pr-2 text-center"><span class="inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-display ${badgeCls}">${r.rank}</span></td>
                     <td class="py-3 px-3 font-sans">
-                      <div class="font-bold text-white hover:text-amber-300 transition">${escapeHtml(r.name)}</div>
-                      <div class="text-[11px] text-slate-400">Najwyżej: ${escapeHtml(r.bestPos || '-')}</div>
+                      <div class="flex items-center justify-between gap-2">
+                        <div>
+                          <div class="font-bold text-white hover:text-amber-300 transition">${escapeHtml(r.name)}</div>
+                          <div class="text-[11px] text-slate-400">Najwyżej: ${escapeHtml(r.bestPos || '-')}</div>
+                        </div>
+                        <button type="button" onclick="event.stopPropagation(); SMPL_APP.openArchiveUtCard('${safeJsName}')" class="px-2 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400 text-amber-200 hover:text-slate-950 border border-amber-400/45 text-[10px] font-display font-black uppercase flex-shrink-0 transition">
+                          🎴 Karta UT
+                        </button>
+                      </div>
                     </td>
                     <td class="py-3 px-2 text-center text-slate-300 font-bold">${r.seasons}</td>
                     <td class="py-3 px-2 text-center text-slate-200">${r.matches}</td>
@@ -3189,6 +3876,9 @@ window.SMPL_VIEWS = (function () {
       .sort((a, b) => a.localeCompare(b, 'pl'));
     const activeCareerName = selectedPlayerCareer || (allTimeList[0] ? allTimeList[0].name : allCareerPlayers[0] || 'Michał Wu');
     const careerRecords = mode === 'PLAYER_HISTORY' ? collectPlayerSeasonsFromArchive(state, activeCareerName) : [];
+    const utCatalogInArch = (window.SMPL_ENGINE && typeof window.SMPL_ENGINE.getUnifiedUtPlayersCatalog === 'function')
+      ? window.SMPL_ENGINE.getUnifiedUtPlayersCatalog(state)
+      : [];
 
     return `
       <div class="archive-showcase-banner rounded-3xl p-5 sm:p-7 mb-6">
@@ -3201,11 +3891,14 @@ window.SMPL_VIEWS = (function () {
               Historia Ligi, Tabele Wszystkich Sezonów &amp; Rankingi Wszech Czasów
             </h2>
             <p class="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl">
-              Kompletna księga historii Score Match Liga od <strong>Sezonu 1</strong> po dziś — wszystkie dywizje od <strong>Ekstraklasy (L1) do 9. Ligi</strong>, ranking Ekstraklasy All-Time (${allTimeList.length}), Pełna Kariera L1–L9 (${careerList.length}), Ranking 5 Sezonów (${fiveSeasonList.length}) oraz historia każdego zawodnika.
+              Kompletna księga historii Score Match Liga od <strong>Sezonu 1</strong> po dziś — wszystkie dywizje od <strong>Ekstraklasy (L1) do 9. Ligi</strong>, Wyszukiwarka Kart UT (${utCatalogInArch.length} graczy także bez konta!), All-Time (${allTimeList.length}), Pełna Kariera L1–L9 (${careerList.length}) oraz historia każdego zawodnika.
             </p>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
+            <button onclick="SMPL_APP.setArchiveMode('UT_SEARCH')" class="px-3.5 py-2.5 rounded-xl font-display font-black text-xs uppercase transition ${mode === 'UT_SEARCH' ? 'btn-league shadow-lg' : 'bg-amber-400/20 hover:bg-amber-400/35 text-amber-200 border border-amber-400/50'}">
+              🎴 Wyszukiwarka Kart UT (${utCatalogInArch.length})
+            </button>
             <button onclick="SMPL_APP.setArchiveMode('SEASONS')" class="px-3.5 py-2.5 rounded-xl font-display font-bold text-xs uppercase transition ${mode === 'SEASONS' ? 'btn-league' : 'bg-slate-900 text-slate-300 border border-white/15'}">
               📚 Tabele S1–S55 (${seasonsList.length})
             </button>
@@ -3239,7 +3932,9 @@ window.SMPL_VIEWS = (function () {
       </div>
 
       ${
-        mode === 'ALL_TIME'
+        mode === 'UT_SEARCH'
+          ? renderUtCardsExplorerSectionHtml(state, archiveState && archiveState.utExplorer, '', true)
+          : mode === 'ALL_TIME'
           ? renderArchivePointsRankingCard({
               title: `👑 Oficjalny Ranking Wszech Czasów Ekstraklasy (${filteredAllTime.length} Legend L1)`,
               subtitle: 'Przeliczone wyłącznie ze wszystkich pełnych tabel 1. Ligi (Ekstraklasa L1, S1–S54). Kliknij zawodnika, aby otworzyć pełną karierę L1–L9.',
@@ -3404,9 +4099,14 @@ window.SMPL_VIEWS = (function () {
                   <h3 class="font-display font-black text-lg text-white uppercase">🔎 Historia Kariery Zawodnika (Sezony 1–55)</h3>
                   <p class="text-xs text-slate-400">Wybierz dowolnego spośród ${allCareerPlayers.length} graczy w historii Score Match Liga, aby prześledzić jego występy we wszystkich ligach (L1–L9).</p>
                 </div>
-                <select onchange="SMPL_APP.openArchivePlayerCareer(this.value)" class="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-amber-400/50 text-xs sm:text-sm text-white font-bold max-w-xs">
-                  ${allCareerPlayers.map((nm) => `<option value="${escapeHtml(nm)}" ${nm.toLowerCase() === activeCareerName.toLowerCase() ? 'selected' : ''}>${escapeHtml(nm)} (${allCareerNamesMap[nm]} sez.)</option>`).join('')}
-                </select>
+                <div class="flex flex-wrap items-center gap-2">
+                  <select onchange="SMPL_APP.openArchivePlayerCareer(this.value)" class="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-amber-400/50 text-xs sm:text-sm text-white font-bold max-w-xs">
+                    ${allCareerPlayers.map((nm) => `<option value="${escapeHtml(nm)}" ${nm.toLowerCase() === activeCareerName.toLowerCase() ? 'selected' : ''}>${escapeHtml(nm)} (${allCareerNamesMap[nm]} sez.)</option>`).join('')}
+                  </select>
+                  <button type="button" onclick="SMPL_APP.openArchiveUtCard('${escapeHtml(activeCareerName).replace(/'/g, "\\'")}')" class="btn-league px-4 py-2.5 rounded-xl font-display font-black text-xs uppercase shadow-lg">
+                    🎴 Zobacz Kartę UT 3D i Trofea →
+                  </button>
+                </div>
               </div>
 
               ${(() => {
@@ -3581,7 +4281,14 @@ window.SMPL_VIEWS = (function () {
                                   return `
                                     <tr onclick="SMPL_APP.openArchivePlayerCareer('${safeJsName}')" class="hover:bg-white/5 cursor-pointer transition">
                                       <td class="py-3 pl-4 pr-2 text-center font-display font-bold text-white">#${r.pos}</td>
-                                      <td class="py-3 px-3 font-sans font-bold text-white hover:text-amber-300">${escapeHtml(r.name)}</td>
+                                      <td class="py-3 px-3 font-sans font-bold text-white hover:text-amber-300">
+                                        <div class="flex items-center justify-between gap-2">
+                                          <span>${escapeHtml(r.name)}</span>
+                                          ${!/^wolny\s*los|^wl\d+$|brak danych/i.test(String(r.name || ''))
+                                            ? `<button type="button" onclick="event.stopPropagation(); SMPL_APP.openArchiveUtCard('${safeJsName}')" class="px-2 py-0.5 rounded-lg bg-amber-400/15 hover:bg-amber-400 text-amber-200 hover:text-slate-950 border border-amber-400/40 text-[10px] font-display font-black uppercase flex-shrink-0 transition">🎴 UT</button>`
+                                            : ''}
+                                        </div>
+                                      </td>
                                       <td class="py-3 px-2 text-center text-slate-300">${r.M}</td>
                                       <td class="py-3 px-2 text-center font-display font-black text-amber-300">${r.PKT}</td>
                                       <td class="py-3 px-2 text-center text-emerald-400">${r.W}</td>
@@ -5966,6 +6673,8 @@ window.SMPL_VIEWS = (function () {
     renderScheduleView,
     renderH2HView,
     renderPlayerProfileUTView,
+    filterAndSortUtCatalog,
+    renderUtCardsExplorerResultsHtml,
     renderGoldenBallView,
     renderCompetitionsView,
     renderArchiveView,

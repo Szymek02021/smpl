@@ -607,7 +607,11 @@ window.SMPL_RANKS = (function () {
     const hs = player.historicalStats || {};
     const at = ctx.allTimeByName[nameLower] ||
       (player.historicalArchiveName ? ctx.allTimeByName[String(player.historicalArchiveName).trim().toLowerCase()] : null) || {};
-    const ovr = ctx.ovrByPlayerId[player.id] || 76;
+    const ovr =
+      ctx.ovrByPlayerId[player.id] ||
+      (typeof window !== 'undefined' && window.SMPL_ENGINE && typeof window.SMPL_ENGINE.calculatePlayerUTCard === 'function'
+        ? Number((window.SMPL_ENGINE.calculatePlayerUTCard(safeState, player.id) || {}).ovr || 76)
+        : 76);
 
     const histSet = ctx.seasonAppearances[nameLower];
     const histCount = histSet ? histSet.size : 0;
@@ -668,6 +672,11 @@ window.SMPL_RANKS = (function () {
       unlock(
         'LEGEND_MISTRZ',
         `Oficjalny Mistrz Ekstraklasy (tytuł Zarządu)${goldMedals > 0 ? ` • ${goldMedals}× Złoto SMPL` : ''} • OVR ${ovr}`
+      );
+    } else if (player.isArchiveVirtual && goldMedals >= 1 && (Number(at.l1BestPos === '#1' ? 1 : 0) || trophies.some((t) => t && t.rarity === 'LEGENDARY'))) {
+      unlock(
+        'LEGEND_MISTRZ',
+        `Historyczny Mistrz Ekstraklasy SMPL (${goldMedals}× Złoto w karierze S1–S55) • OVR ${ovr}`
       );
     }
 
@@ -1139,7 +1148,11 @@ window.SMPL_RANKS = (function () {
   // Treść interaktywnego Szklanego Tooltipa (pop-upu) po kliknięciu w rangę gracza
   function renderRankTooltipContent(playerId, state, focusBadgeId) {
     const safeState = state || {};
-    const player = (safeState.players || []).find((p) => p.id === playerId);
+    const player =
+      (safeState.players || []).find((p) => p.id === playerId) ||
+      (typeof window !== 'undefined' && window.SMPL_ENGINE && typeof window.SMPL_ENGINE.resolvePlayerOrArchiveEntity === 'function'
+        ? window.SMPL_ENGINE.resolvePlayerOrArchiveEntity(safeState, playerId)
+        : null);
     if (!player) return '';
     const r = getPlayerRank(player, safeState);
     if (!r) return '';

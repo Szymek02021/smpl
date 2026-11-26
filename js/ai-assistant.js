@@ -289,6 +289,14 @@ window.SMPL_AI = (function () {
   // Pełna Baza Wiedzy Startowej SMPL (pokrywa typowe pytania graczy na starcie i podczas ligi)
   const BASE_KB = [
     {
+      id: 'KB_ARCHIVE_UT_EXPLORER',
+      category: 'Karty UT & Archiwum',
+      title: 'Jak wyszukać Kartę UT i historię kariery dowolnego gracza z Archiwum S1–S55 (nawet bez konta)?',
+      keywords: ['karta', 'ut', 'wyszukiwarka', 'archiwum', 'historia', 'kariera', 'ovr', 'legenda', 'szukaj', 'dawniej', 'konto'],
+      learnedPhrases: ['jak zobaczyc karte ut gracza bez konta', 'gdzie sprawdzic kariere zawodnika z archiwum', 'wyszukiwarka kart ut', 'jak gral zawodnik w starych sezonach'],
+      answer: 'Wejdź w zakładkę **„🎴 Karta UT”** albo **„🏛️ Archiwum S1–S55 → 🎴 Wyszukiwarka Kart UT”**! Wpisz imię lub nazwisko dowolnego spośród **377 zawodników z historii ligi (Sezony 1–55)** — nawet jeśli gracz nie ma założonego konta w obecnym sezonie, od razu zobaczysz jego **Kartę Ultimate Team 3D (OVR, 6 atrybutów, rangi)**, gablotę medali, życiowy sezon, rozkład występów w ligach L1–L9, porównanie 1v1 z innym graczem oraz pobierzesz jego kartę jako **PNG**!'
+    },
+    {
       id: 'KB_SECURITY_SHIELD',
       category: 'Prywatność & Zasady',
       title: 'Czy portal SMPL jest bezpieczny? Wirusy, SSL i Certyfikat 0/94 VirusTotal',
