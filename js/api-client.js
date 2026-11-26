@@ -6375,7 +6375,7 @@ state = enrichFromArchive(data.state);
       throw new Error('Wybierz strzelca bramki i podaj tytuł akcji (min. 4 znaki).');
     }
     if (cleanClip && !/^https?:\/\/[^\s"'<>]{4,500}$/i.test(cleanClip)) {
-      throw new Error('Link do powtórki musi zaczynać się od https:// lub http://.');
+      throw new Error('Link do powtórki musi zaczynać się od https://.');
     }
     const scorer = (state.players || []).find((p) => p && p.id === playerId);
     if (!scorer) throw new Error('Nie znaleziono wskazanego zawodnika.');

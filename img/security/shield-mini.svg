@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none">
+  <defs>
+    <linearGradient id="miniRim" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6EE7B7"/>
+      <stop offset="55%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#22D3EE"/>
+    </linearGradient>
+    <linearGradient id="miniFill" x1="16" y1="3" x2="16" y2="29" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#064E3B"/>
+      <stop offset="100%" stop-color="#04131D"/>
+    </linearGradient>
+  </defs>
+  <path d="M16 2.5L27.5 7V15.5C27.5 22.6 22.6 27.4 16 29.8C9.4 27.4 4.5 22.6 4.5 15.5V7L16 2.5Z" fill="url(#miniFill)" stroke="url(#miniRim)" stroke-width="2.1" stroke-linejoin="round"/>
+  <path d="M16 5.6L24.5 9V15.3C24.5 20.6 20.9 24.4 16 26.4C11.1 24.4 7.5 20.6 7.5 15.3V9L16 5.6Z" stroke="#A7F3D0" stroke-opacity="0.28" stroke-width="1"/>
+  <path d="M11.3 16.1L14.5 19.3L21.1 12.5" stroke="#ECFDF5" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

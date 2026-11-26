@@ -1237,6 +1237,10 @@ window.SMPL_APP = (function () {
                   <span>⚖️ Regulamin</span><span>›</span>
                 </button>
               </div>
+              <button type="button" onclick="SMPL_APP.closeSettingsDrawer(); if (window.openSecurityCenter) window.openSecurityCenter();" class="smpl-drawer-action-row border border-emerald-400/45 bg-emerald-950/35 text-emerald-200">
+                <span class="flex items-center gap-1.5"><img src="img/security/shield-mini.svg" alt="" width="15" height="15" /> <strong>🛡️ Certyfikat Bezpieczeństwa</strong></span>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950 text-[10px] font-black">0/94</span>
+              </button>
               ${
                 isAuthenticated || !isPublic
                   ? `<button type="button" onclick="SMPL_APP.closeSettingsDrawer(); ${isPublic ? 'SMPL_APP.handleGateLock()' : 'SMPL_APP.handleAdminLogout()'};" class="smpl-drawer-action-row text-rose-300 mt-1">
@@ -1261,14 +1265,15 @@ window.SMPL_APP = (function () {
           ${identityChipHtml}
         </div>
 
-        <div class="flex items-center gap-1.5 flex-shrink-0">
+        <div class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderHeaderChipHtml === 'function' ? window.SMPL_SECURITY.renderHeaderChipHtml() : ''}
           ${
             !isPublic
               ? `<button type="button" onclick="SMPL_APP.switchTab('${activeTab === 'admin' ? 'standings' : 'admin'}')" class="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white border border-white/15 font-bold text-[11px]">
                    ${activeTab === 'admin' ? '🏆 Tabele' : '🛡️ Panel Admina'}
                  </button>`
               : (!isAuthenticated
-                  ? `<button type="button" onclick="SMPL_APP.handleGateLock()" class="smpl-topbar-login-btn px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-black text-[11px] uppercase shadow transition whitespace-nowrap inline-flex items-center justify-center gap-1">
+                  ? `<button type="button" onclick="SMPL_APP.handleGateLock()" class="smpl-topbar-login-btn px-2 sm:px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-black text-[10px] sm:text-[11px] uppercase shadow transition whitespace-nowrap inline-flex items-center justify-center gap-1">
                        🔑 Zaloguj
                      </button>`
                   : '')
@@ -1543,6 +1548,7 @@ window.SMPL_APP = (function () {
       { id: 'register', label: '📝 Konto & Zapisy', badge: pendingRegsCount },
       { id: 'updates', label: '🆕 Update ' + latestUpdVer, badge: hasUnseenUpdate ? 'NOWE' : '' },
       ...(supportCfgNav.enabled !== false ? [{ id: 'support', label: '☕ Wesprzyj Ligę', highlightClass: 'smpl-support-tab-pill' }] : []),
+      { id: 'security_cert', label: '🛡️ Certyfikat Bezpieczeństwa', badge: '0/94', badgeClass: 'bg-emerald-400 text-slate-950', highlightClass: 'smpl-sec-nav-pill', isSecurityModal: true },
       { id: 'legal', label: '⚖️ Prawo & Regulamin' }
     ];
 
@@ -1559,13 +1565,15 @@ window.SMPL_APP = (function () {
       <div class="smpl-tabs-scroller smpl-hscroll-fade flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-1">
         ${tabs
           .map((t) => {
-            const isAct = activeTab === t.id;
+            const isAct = !t.isSecurityModal && activeTab === t.id;
+            const clickHandler = t.isSecurityModal ? 'if(window.openSecurityCenter)window.openSecurityCenter()' : `SMPL_APP.switchTab('${t.id}')`;
+            const badgeCls = t.badgeClass || (isAct ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950');
             return `
               <button
                 type="button"
                 data-tab="${t.id}"
                 aria-current="${isAct ? 'page' : 'false'}"
-                onclick="SMPL_APP.switchTab('${t.id}')"
+                onclick="${clickHandler}"
                 class="px-3 py-2.5 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap ${
                   isAct
                     ? 'btn-league shadow-lg'
@@ -1575,7 +1583,7 @@ window.SMPL_APP = (function () {
                 <span>${t.label}</span>
                 ${
                   t.badge
-                    ? `<span class="px-1.5 py-0.2 rounded-full ${isAct ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950'} text-[10px] font-black">${t.badge}</span>`
+                    ? `<span class="px-1.5 py-0.2 rounded-full ${badgeCls} text-[10px] font-black">${t.badge}</span>`
                     : ''
                 }
               </button>

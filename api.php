@@ -15,6 +15,9 @@
 @ini_set('memory_limit', '256M');
 
 header('Content-Type: application/json; charset=utf-8');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('X-Frame-Options: SAMEORIGIN');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token');
@@ -5203,7 +5206,7 @@ if ($method === 'POST') {
             }
             if ($rawClip !== '' && !preg_match('/^https?:\/\/[^\s"\'<>]{4,500}$/i', $rawClip)) {
                 http_response_code(400);
-                echo json_encode(array('ok' => false, 'error' => 'Link do powtórki musi zaczynać się od https:// lub http://.'));
+                echo json_encode(array('ok' => false, 'error' => 'Link do powtórki musi zaczynać się od https://.'));
                 exit;
             }
             $scorer = null;

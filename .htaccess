@@ -19,7 +19,7 @@ ErrorDocument 404 /index.html
   </IfModule>
 </FilesMatch>
 
-<FilesMatch "^(package\.json|server\.js|server\.ps1|netlify\.toml|vercel\.json|\.ftp-deploy-sync-state\.json|\.user\.ini|\.env.*|\.git.*|\.editorconfig)$">
+<FilesMatch "^(package\.json|server\.js|server\.ps1|netlify\.toml|vercel\.json)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
@@ -30,6 +30,9 @@ ErrorDocument 404 /index.html
 </FilesMatch>
 
 <IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set X-Frame-Options "SAMEORIGIN"
   Header set Access-Control-Allow-Origin "*"
   Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
   Header set Access-Control-Allow-Headers "Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token"

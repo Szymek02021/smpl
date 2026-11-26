@@ -1871,6 +1871,9 @@ window.SMPL_VIEWS = (function () {
             }
             <button onclick="SMPL_APP.switchTab('archive')" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/15 font-display font-bold text-xs uppercase">🏛️ Archiwum S1–S55</button>
           </div>
+          <div class="max-w-xl mx-auto text-left">
+            ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderProfileTrustCardHtml === 'function' ? window.SMPL_SECURITY.renderProfileTrustCardHtml() : ''}
+          </div>
         </div>
       `;
     }
@@ -2235,6 +2238,8 @@ window.SMPL_VIEWS = (function () {
               </div>
             </div>
           </div>
+
+          ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderProfileTrustCardHtml === 'function' ? window.SMPL_SECURITY.renderProfileTrustCardHtml() : ''}
 
           <!-- Raport Mentalny, Ulubiony Rywal i Nemezis (Dokładne odwzorowanie z Excela!) -->
           <div class="glass-panel rounded-2xl p-5 mt-5 border border-white/10 space-y-3 text-xs">
@@ -3617,6 +3622,7 @@ window.SMPL_VIEWS = (function () {
       : '<strong>L1 (Ekstraklasa):</strong> 1 Mistrz Polski, 1–3 Podium, 2 nad spadkiem Baraże, 2 ostatnie Spadek do L2. <strong>L2 (2. Liga):</strong> 1–2 Bezpośredni Awans do L1, 3–5 Baraże o L1, 2 ostatnie Weryfikacja składu L2.';
     return `
       <!-- Część 1: Regulamin Rozgrywek dla Graczy (Uczciwy, Przejrzysty i Zautomatyzowany) -->
+      ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderProfileTrustCardHtml === 'function' ? `<div class="mb-4">${window.SMPL_SECURITY.renderProfileTrustCardHtml()}</div>` : ''}
       <div class="glass-panel-league rounded-3xl p-6 sm:p-8 border border-white/15">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-display font-bold uppercase tracking-widest">

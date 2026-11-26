@@ -42,6 +42,12 @@ const MIME_TYPES = {
   '.md': 'text/markdown; charset=utf-8'
 };
 
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'SAMEORIGIN'
+};
+
 function sendJson(res, statusCode, payload, extraHeaders) {
   const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const headers = Object.assign({
@@ -50,7 +56,7 @@ function sendJson(res, statusCode, payload, extraHeaders) {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token',
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
-  }, extraHeaders || {});
+  }, SECURITY_HEADERS, extraHeaders || {});
   const reqRef = res && res._smplReq;
   const acceptEnc = reqRef && reqRef.headers ? String(reqRef.headers['accept-encoding'] || '') : '';
   if (body.length > 1024 && acceptEnc.indexOf('gzip') !== -1) {
@@ -1211,7 +1217,7 @@ const server = http.createServer((req, res) => {
     return sendJson(res, 200, { ok: true });
   }
 
-  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const parsedUrl = new URL(req.url, 'http://localhost');
   const pathname = decodeURIComponent(parsedUrl.pathname);
   const action = parsedUrl.searchParams.get('action') || '';
 
@@ -3201,7 +3207,7 @@ const server = http.createServer((req, res) => {
               return sendJson(res, 400, { ok: false, error: 'Wybierz strzelca bramki oraz wpisz tytuł gola (min. 4 znaki).' });
             }
             if (clipUrl && !/^https?:\/\/[^\s"'<>]{4,500}$/i.test(clipUrl)) {
-              return sendJson(res, 400, { ok: false, error: 'Link do powtórki musi zaczynać się od https:// lub http://.' });
+              return sendJson(res, 400, { ok: false, error: 'Link do powtórki musi zaczynać się od https://.' });
             }
             const scorer = db.players.find((p) => p && String(p.id) === nomPlrId);
             if (!scorer) return sendJson(res, 404, { ok: false, error: 'Nie znaleziono wskazanego zawodnika.' });
@@ -4228,24 +4234,24 @@ const server = http.createServer((req, res) => {
         res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` });
         return res.end();
       }
-      res.writeHead(206, {
+      res.writeHead(206, Object.assign({
         'Content-Type': mime,
         'Content-Range': `bytes ${start}-${end}/${stat.size}`,
         'Accept-Ranges': 'bytes',
         'Content-Length': (end - start) + 1
-      });
+      }, SECURITY_HEADERS));
       return fs.createReadStream(safePath, { start, end }).pipe(res);
     }
-    res.writeHead(200, {
+    res.writeHead(200, Object.assign({
       'Content-Type': mime,
       'Accept-Ranges': 'bytes',
       'Content-Length': stat.size
-    });
+    }, SECURITY_HEADERS));
     fs.createReadStream(safePath).pipe(res);
   } else {
     // Fallback do index.html
     const indexPath = path.join(ROOT_DIR, 'index.html');
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.writeHead(200, Object.assign({ 'Content-Type': 'text/html; charset=utf-8' }, SECURITY_HEADERS));
     fs.createReadStream(indexPath).pipe(res);
   }
 });

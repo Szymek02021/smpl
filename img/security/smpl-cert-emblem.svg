@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" fill="none">
+  <defs>
+    <linearGradient id="holoRing" x1="18" y1="18" x2="182" y2="182" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6EE7B7"/>
+      <stop offset="32%" stop-color="#22D3EE"/>
+      <stop offset="66%" stop-color="#FDE047"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+    <radialGradient id="sealCore" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#0F293A"/>
+      <stop offset="65%" stop-color="#071120"/>
+      <stop offset="100%" stop-color="#030712"/>
+    </radialGradient>
+    <path id="certTextArc" d="M 100, 100 m -72, 0 a 72,72 0 1,1 144,0 a 72,72 0 1,1 -144,0"/>
+  </defs>
+
+  <!-- Outer Holographic Seal Disc -->
+  <circle cx="100" cy="100" r="95" fill="url(#sealCore)" stroke="url(#holoRing)" stroke-width="3"/>
+  <circle cx="100" cy="100" r="88" stroke="#34D399" stroke-opacity="0.4" stroke-width="1" stroke-dasharray="3 3"/>
+  <circle cx="100" cy="100" r="57" fill="#041E24" fill-opacity="0.72" stroke="url(#holoRing)" stroke-width="2"/>
+  <circle cx="100" cy="100" r="51" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="1"/>
+
+  <!-- Circular Legend -->
+  <text fill="#E2E8F0" font-family="'Exo 2', 'Segoe UI', system-ui, sans-serif" font-size="9.4" font-weight="800" letter-spacing="2.05">
+    <textPath href="#certTextArc" startOffset="2%">OFICJALNY CERTYFIKAT SMPL • 0/94 ZAGROŻEŃ • VERIFIED •</textPath>
+  </text>
+
+  <!-- Center Shield & Score -->
+  <path d="M100 62L126 72V97C126 115 114 128 100 135C86 128 74 115 74 97V72L100 62Z" fill="#064E3B" fill-opacity="0.65" stroke="#34D399" stroke-width="2"/>
+  <path d="M90 95L97 102L112 86" stroke="#A7F3D0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="100" y="118" text-anchor="middle" fill="#FDE047" font-family="'Exo 2', 'Segoe UI', sans-serif" font-size="11" font-weight="900" letter-spacing="0.8">0/94</text>
+</svg>

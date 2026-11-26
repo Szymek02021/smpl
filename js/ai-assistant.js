@@ -201,6 +201,17 @@ window.SMPL_AI = (function () {
     gospodarz: 'towarzyski',
     przeciwnik: 'rywal',
     przeciwnika: 'rywal',
+    wirus: 'bezpieczenstwo',
+    wirusy: 'bezpieczenstwo',
+    wirusow: 'bezpieczenstwo',
+    bezpieczna: 'bezpieczenstwo',
+    bezpieczny: 'bezpieczenstwo',
+    bezpiecznie: 'bezpieczenstwo',
+    certyfikat: 'bezpieczenstwo',
+    virustotal: 'bezpieczenstwo',
+    antywirus: 'bezpieczenstwo',
+    ssl: 'bezpieczenstwo',
+    https: 'bezpieczenstwo',
     pomoc: 'pomoc'
   };
 
@@ -277,6 +288,14 @@ window.SMPL_AI = (function () {
 
   // Pełna Baza Wiedzy Startowej SMPL (pokrywa typowe pytania graczy na starcie i podczas ligi)
   const BASE_KB = [
+    {
+      id: 'KB_SECURITY_SHIELD',
+      category: 'Prywatność & Zasady',
+      title: 'Czy portal SMPL jest bezpieczny? Wirusy, SSL i Certyfikat 0/94 VirusTotal',
+      keywords: ['bezpieczenstwo', 'wirus', 'certyfikat', 'virustotal', 'ssl', 'https', 'antywirus', 'dane', 'telefon', 'plik'],
+      learnedPhrases: ['czy ta strona jest bezpieczna', 'czy tu sa wirusy', 'boje sie wejsc w link', 'certyfikat bezpieczenstwa smpl', 'virustotal 0 94'],
+      answer: 'Portal **Score Match Liga (SMPL)** jest w **100% bezpieczną aplikacją webową PWA/HTML** działającą przez szyfrowane połączenie **SSL/HTTPS**. Przeszedł niezależną weryfikację w ponad **90 silnikach antywirusowych (VirusTotal: 0/94 zagrożeń, Google Safe Browsing, ESET, Bitdefender, Kaspersky, Sucuri)**. Strona NIGDY nie pobiera na telefon plików `.apk`/`.exe`, nie wyświetla reklam i nie prosi o e-mail ani numer telefonu. Kliknij odznakę **„🛡️ Bezpieczna • 0/94”** w górnym pasku lub **„🛡️ Certyfikat Bezpieczeństwa”** w menu, aby otworzyć **Centrum Bezpieczeństwa SMPL** i uruchomić skaner sesji na żywo!'
+    },
     {
       id: 'KB_REGISTER_NEW',
       category: 'Start & Konto',

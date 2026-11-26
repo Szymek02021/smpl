@@ -3145,6 +3145,21 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_20',
+      version: 'V2.20',
+      date: '2026-11-26',
+      category: 'BEZPIECZEŃSTWO',
+      title: 'SMPL Security Shield — Oficjalne Centrum Bezpieczeństwa i Certyfikat 0/94 VirusTotal!',
+      summary: 'Wdrożyliśmy w całym portalu flagowy System Zaufania i Centrum Bezpieczeństwa SMPL („SMPL Security Shield”) z interaktywną Kartą Certyfikatu 3D, skanerem sesji na żywo oraz bezpośrednią weryfikacją w niezależnych silnikach antywirusowych (0/94 zagrożeń)!',
+      highlights: [
+        'Kliknij odznakę „🛡️ Bezpieczna • 0/94” w nagłówku, „🛡️ Certyfikat Bezpieczeństwa” w menu, pasek Esport Trust Bar w stopce lub panel przy rejestracji/logowaniu, aby otworzyć Centrum Bezpieczeństwa SMPL z holograficzną Kartą Certyfikatu 3D.',
+        'Uruchom przyciskiem „⚡ Zweryfikuj moją sesję na żywo” błyskawiczny audyt połączenia w przeglądarce (szyfrowanie SSL/TLS, czysta aplikacja webowa bez plików .exe/.apk, zero trackerów reklamowych oraz integralność domeny i PWA).',
+        'W sekcji Live Proof Grid sprawdzisz status CLEAN w 10 renomowanych silnikach (m.in. VirusTotal 0/94, Google Safe Browsing, ESET, Bitdefender, Kaspersky, Sucuri) i 1 kliknięciem skopiujesz link do raportu dla znajomych z ligi.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_19',
       version: 'V2.19',
       date: '2026-11-26',

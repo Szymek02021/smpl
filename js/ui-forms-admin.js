@@ -6,6 +6,15 @@
 window.SMPL_FORMS_ADMIN = (function () {
   const escapeHtml = (s) => window.SMPL_VIEWS.escapeHtml(s);
 
+  function safeExternalHref(rawUrl) {
+    const u = String(rawUrl || '').trim();
+    if (!u) return '#';
+    if (/^https:\/\//i.test(u)) return escapeHtml(u);
+    if (/^http:\/\//i.test(u)) return escapeHtml(u.replace(/^http:\/\//i, 'https://'));
+    if (/^(m\.me\/|www\.|facebook\.com\/|fb\.com\/)/i.test(u)) return escapeHtml('https://' + u);
+    return '#';
+  }
+
   function getLeaguesSafe(state, includeDisabled) {
     if (window.SMPL_DB && typeof window.SMPL_DB.getLeaguesList === 'function') {
       return window.SMPL_DB.getLeaguesList(state, Boolean(includeDisabled));
@@ -795,6 +804,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                 🔓 Zaloguj się jako Gracz
               </button>
             </form>
+            ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderLoginTrustCapsuleHtml === 'function' ? window.SMPL_SECURITY.renderLoginTrustCapsuleHtml() : ''}
 
             <div class="mt-3 flex flex-wrap items-center gap-3">
               <button
@@ -959,6 +969,8 @@ window.SMPL_FORMS_ADMIN = (function () {
             </div>
           </div>
 
+          ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderRegistrationTrustPanelHtml === 'function' ? window.SMPL_SECURITY.renderRegistrationTrustPanelHtml() : ''}
+
           <form onsubmit="SMPL_APP.handleRegistrationSubmit(event)" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -1048,6 +1060,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                   oninput="SMPL_APP.updateRegField('password', this.value)"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-blue-400"
                 />
+                ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderPasswordSslHintHtml === 'function' ? window.SMPL_SECURITY.renderPasswordSslHintHtml() : ''}
               </div>
               <div>
                 <label class="block text-xs font-display uppercase text-slate-300 mb-1.5 font-bold">Uwagi / dyspozycyjność (opcjonalne)</label>
@@ -1291,6 +1304,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                 🔓 Zaloguj się do Panelu Administracji
               </button>
             </form>
+            ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderLoginTrustCapsuleHtml === 'function' ? window.SMPL_SECURITY.renderLoginTrustCapsuleHtml() : ''}
 
             <div class="mt-4 p-3 rounded-xl bg-slate-950/80 border border-white/10 text-[11px] text-slate-400 leading-relaxed">
               🛡️ Po zalogowaniu do Panelu możesz w zakładce <strong class="text-white">Ustawienia &amp; Linki</strong> w każdej chwili zmienić swój login oraz ustawić nowe, własne hasło administratora.
@@ -1752,7 +1766,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                                      Login: <code class="text-amber-300">${escapeHtml(req.username)}</code> • Dywizja: ${escapeHtml(req.division)}
                                    </div>
                                    <div class="text-xs text-slate-300 mt-1">
-                                     Kontakt FB/Messenger: <a href="${escapeHtml(req.fbLink)}" target="_blank" class="text-blue-400 underline">${escapeHtml(req.fbLink)}</a>
+                                     Kontakt FB/Messenger: <a href="${safeExternalHref(req.fbLink)}" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline">${escapeHtml(req.fbLink)}</a>
                                    </div>
                                    <div class="mt-3 p-3 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-200 italic">
                                      „${escapeHtml(req.reason || 'Prośba o nadanie uprawnień współadministratora Score Match Liga.')}”
@@ -2591,6 +2605,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                 >
                   <span>🚀 Zaloguj się i Przejdź do Portalu</span>
                 </button>
+                ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderLoginTrustCapsuleHtml === 'function' ? window.SMPL_SECURITY.renderLoginTrustCapsuleHtml() : ''}
 
                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs pt-3 mt-3.5 border-t border-white/10">
                   <button type="button" onclick="SMPL_APP.setGateMode('register')" class="smpl-inline-touch-link text-emerald-400 hover:text-white font-bold">
@@ -2621,6 +2636,8 @@ window.SMPL_FORMS_ADMIN = (function () {
                     </div>
                   </div>
                 </div>
+
+                ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderRegistrationTrustPanelHtml === 'function' ? window.SMPL_SECURITY.renderRegistrationTrustPanelHtml() : ''}
 
                 <div class="space-y-4 mb-6">
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2677,6 +2694,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                         placeholder="Minimum 4 znaki (Twoje prywatne hasło)"
                         class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-sm text-white font-semibold"
                       />
+                      ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderPasswordSslHintHtml === 'function' ? window.SMPL_SECURITY.renderPasswordSslHintHtml() : ''}
                     </div>
                   </div>
 
@@ -2814,6 +2832,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                 >
                   <span>👁️ Wejdź do Portalu jako Gość</span>
                 </button>
+                ${window.SMPL_SECURITY && typeof window.SMPL_SECURITY.renderLoginTrustCapsuleHtml === 'function' ? window.SMPL_SECURITY.renderLoginTrustCapsuleHtml() : ''}
 
                 <button onclick="SMPL_APP.setGateMode('login')" class="text-xs text-slate-400 hover:text-white underline mt-4 block mx-auto">
                   ← Wróć do ekranu logowania gracza
@@ -2962,7 +2981,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                              <div class="mt-2 p-2.5 rounded-lg bg-black/60 border border-rose-500/30 text-xs text-rose-200 italic">
                                „${escapeHtml(b.reason || 'Brak opisu.')}”
                              </div>
-                             ${b.fbProfile ? `<div class="mt-1 text-[11px] text-blue-400"><a href="${escapeHtml(b.fbProfile)}" target="_blank" class="underline">Profil FB/Messenger</a></div>` : ''}
+                             ${b.fbProfile ? `<div class="mt-1 text-[11px] text-blue-400"><a href="${safeExternalHref(b.fbProfile)}" target="_blank" rel="noopener noreferrer" class="underline">Profil FB/Messenger</a></div>` : ''}
                            </div>
                          </div>
 
@@ -4563,7 +4582,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                                  ${renderClanBadgeSafe(r, state, false)}
                                </div>
                                <div class="text-xs text-blue-300 font-bold">Nick: @${escapeHtml(r.nick)} • Login: <code class="text-amber-300">${escapeHtml(r.username || '')}</code></div>
-                               <div class="text-xs text-slate-300 mt-1">Kontakt FB: <a href="${escapeHtml(r.fbLink)}" target="_blank" class="text-blue-400 underline">${escapeHtml(r.fbLink)}</a></div>
+                               <div class="text-xs text-slate-300 mt-1">Kontakt FB: <a href="${safeExternalHref(r.fbLink)}" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline">${escapeHtml(r.fbLink)}</a></div>
                                <div class="text-xs text-slate-400 mt-1">${escapeHtml(r.notes || '')}</div>
                                ${
                                  declaredName
@@ -4634,7 +4653,7 @@ window.SMPL_FORMS_ADMIN = (function () {
                              <span>${escapeHtml(pr.requestedAt)}</span>
                            </div>
                            <div class="font-display font-black text-base text-white">${escapeHtml(pr.playerName)} (@${escapeHtml(pr.nick)})</div>
-                           <div class="text-xs text-slate-300 mt-0.5">Login: <code class="text-amber-300">${escapeHtml(pr.username)}</code> • FB: <a href="${escapeHtml(pr.fbLink)}" target="_blank" class="text-blue-400 underline">${escapeHtml(pr.fbLink)}</a></div>
+                           <div class="text-xs text-slate-300 mt-0.5">Login: <code class="text-amber-300">${escapeHtml(pr.username)}</code> • FB: <a href="${safeExternalHref(pr.fbLink)}" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline">${escapeHtml(pr.fbLink)}</a></div>
                            <div class="text-xs text-slate-400 italic mt-1">„${escapeHtml(pr.note || '')}”</div>
                          </div>
                          <div class="flex flex-wrap gap-2">
