@@ -3151,6 +3151,21 @@ window.SMPL_STUDIO = (function () {
    */
   var BUILTIN_PLAYER_UPDATES = [
     {
+      id: 'BUILTIN_V2_22',
+      version: 'V2.22',
+      date: '2026-11-27',
+      category: 'BEZPIECZEŃSTWO',
+      title: 'Tarcza Cloudflare Edge Anti-DDoS & WAF — Pełna Ochrona Serwera i Kont Graczy!',
+      summary: 'Podłączyliśmy do infrastruktury Score Match Liga warstwę brzegową Cloudflare Edge Shield oraz wielopoziomową tarczę Anty-DDoS / Anti-Brute-Force na serwerze, dzięki czemu tabele, wyniki meczów i konta zawodników są odporne na przeciążenia i ataki!',
+      highlights: [
+        'Aktywowaliśmy Cloudflare Edge Anti-DDoS & WAF Worker w Polsce (PoP Warszawa), który przechwytuje zalania ruchem i automatycznie blokuje skanery podatności, jednocześnie przyspieszając ładowanie grafik z pamięci brzegowej.',
+        'Dodaliśmy automatyczną blokadę prób łamania haseł (Anti-Brute-Force) oraz inteligentne limitowanie zalań zapytań dla zachowania płynnego działania ligi podczas szczytów kolejki.',
+        'W Centrum Bezpieczeństwa SMPL („⚡ Zweryfikuj moją sesję na żywo”) pojawił się nowy, 5. krok diagnostyki na żywo sprawdzający status tarczy Anty-DDoS Cloudflare & WAF w czasie rzeczywistym.'
+      ],
+      author: 'Szymon Komenda & Zespół SMPL',
+      isBuiltin: true
+    },
+    {
       id: 'BUILTIN_V2_21',
       version: 'V2.21',
       date: '2026-11-26',

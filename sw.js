@@ -3,7 +3,7 @@
  * Obsługuje: Instalację na telefonie (PWA), tryb offline oraz powiadomienia Push
  */
 
-const CACHE_NAME = 'smpl-pwa-v78';
+const CACHE_NAME = 'smpl-pwa-v79';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,13 +11,13 @@ const ASSETS_TO_CACHE = [
   './PANEL-ADMINA.html',
   './REJESTRACJA.html',
   './manifest.json',
-  './manifest.json?v=78',
+  './manifest.json?v=79',
   './favicon.ico',
   './css/styles.css',
-  './css/styles.css?v=78',
-  './css/smpl-wow-overhaul.css?v=78',
+  './css/styles.css?v=79',
+  './css/smpl-wow-overhaul.css?v=79',
   './css/security-center.css',
-  './css/security-center.css?v=78',
+  './css/security-center.css?v=79',
   './css/favicon-16x16.png',
   './css/favicon-32x32.png',
   './css/apple-touch-icon.png',
@@ -28,6 +28,7 @@ const ASSETS_TO_CACHE = [
   './img/security/smpl-cert-emblem.svg',
   './img/security/shield-mini.svg',
   './img/security/lock-ssl.svg',
+  './img/security/vendor-cloudflare.svg',
   './img/security/vendor-virustotal.svg',
   './img/security/vendor-google-sb.svg',
   './img/security/vendor-eset.svg',
@@ -68,23 +69,23 @@ const ASSETS_TO_CACHE = [
   './img/vip-preview-cert.jpg',
   './img/vip-preview-crest.jpg',
   './img/og-preview-smpl.jpg',
-  './js/seed-data.js?v=78',
-  './js/archive-data.js?v=78',
-  './js/crests-and-media.js?v=78',
+  './js/seed-data.js?v=79',
+  './js/archive-data.js?v=79',
+  './js/crests-and-media.js?v=79',
   './js/security-center.js',
-  './js/security-center.js?v=78',
-  './js/engine.js?v=78',
-  './js/expansion-studio.js?v=78',
+  './js/security-center.js?v=79',
+  './js/engine.js?v=79',
+  './js/expansion-studio.js?v=79',
   './js/ranks.js',
-  './js/ranks.js?v=78',
-  './js/api-client.js?v=78',
-  './js/ui-views.js?v=78',
-  './js/ui-forms-admin.js?v=78',
+  './js/ranks.js?v=79',
+  './js/api-client.js?v=79',
+  './js/ui-views.js?v=79',
+  './js/ui-forms-admin.js?v=79',
   './js/notifications.js',
-  './js/notifications.js?v=78',
-  './js/ai-assistant.js?v=78',
-  './js/wow-overhaul.js?v=78',
-  './js/app.js?v=78'
+  './js/notifications.js?v=79',
+  './js/ai-assistant.js?v=79',
+  './js/wow-overhaul.js?v=79',
+  './js/app.js?v=79'
 ];
 
 self.addEventListener('install', (event) => {

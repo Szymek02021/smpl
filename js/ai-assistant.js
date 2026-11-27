@@ -299,10 +299,10 @@ window.SMPL_AI = (function () {
     {
       id: 'KB_SECURITY_SHIELD',
       category: 'Prywatność & Zasady',
-      title: 'Czy portal SMPL jest bezpieczny? Wirusy, SSL i Certyfikat 0/94 VirusTotal',
-      keywords: ['bezpieczenstwo', 'wirus', 'certyfikat', 'virustotal', 'ssl', 'https', 'antywirus', 'dane', 'telefon', 'plik'],
-      learnedPhrases: ['czy ta strona jest bezpieczna', 'czy tu sa wirusy', 'boje sie wejsc w link', 'certyfikat bezpieczenstwa smpl', 'virustotal 0 94'],
-      answer: 'Portal **Score Match Liga (SMPL)** jest w **100% bezpieczną aplikacją webową PWA/HTML** działającą przez szyfrowane połączenie **SSL/HTTPS**. Przeszedł niezależną weryfikację w ponad **90 silnikach antywirusowych (VirusTotal: 0/94 zagrożeń, Google Safe Browsing, ESET, Bitdefender, Kaspersky, Sucuri)**. Strona NIGDY nie pobiera na telefon plików `.apk`/`.exe`, nie wyświetla reklam i nie prosi o e-mail ani numer telefonu. Kliknij odznakę **„🛡️ Bezpieczna • 0/94”** w górnym pasku lub **„🛡️ Certyfikat Bezpieczeństwa”** w menu, aby otworzyć **Centrum Bezpieczeństwa SMPL** i uruchomić skaner sesji na żywo!'
+      title: 'Czy portal SMPL jest bezpieczny? Wirusy, Anty-DDoS Cloudflare, SSL i 0/94 VirusTotal',
+      keywords: ['bezpieczenstwo', 'wirus', 'certyfikat', 'virustotal', 'ssl', 'https', 'antywirus', 'dane', 'telefon', 'plik', 'cloudflare', 'ddos', 'atak'],
+      learnedPhrases: ['czy ta strona jest bezpieczna', 'czy tu sa wirusy', 'boje sie wejsc w link', 'certyfikat bezpieczenstwa smpl', 'virustotal 0 94', 'czy serwer ma ochrone anty ddos cloudflare'],
+      answer: 'Portal **Score Match Liga (SMPL)** jest w **100% bezpieczną aplikacją webową PWA/HTML** działającą przez szyfrowane połączenie **SSL/HTTPS** oraz **wielowarstwową tarczę Anty-DDoS Cloudflare & Origin WAF** (blokującą ataki flood/brute-force i skanery podatności). Przeszedł niezależną weryfikację w ponad **90 silnikach antywirusowych (VirusTotal: 0/94 zagrożeń, Google Safe Browsing, ESET, Bitdefender, Kaspersky, Sucuri)**. Strona NIGDY nie pobiera na telefon plików `.apk`/`.exe`, nie wyświetla reklam i nie prosi o e-mail ani numer telefonu. Kliknij odznakę **„🛡️ Bezpieczna • 0/94”** w górnym pasku lub **„🛡️ Certyfikat Bezpieczeństwa”** w menu!'
     },
     {
       id: 'KB_REGISTER_NEW',

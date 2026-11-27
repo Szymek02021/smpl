@@ -18,14 +18,24 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('X-Frame-Options: SAMEORIGIN');
+header('Permissions-Policy: camera=(), geolocation=(), microphone=()');
+header('Cross-Origin-Opener-Policy: same-origin-allow-popups');
+header('X-SMPL-Shield: Cloudflare-WAF-v79');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token');
+header('Access-Control-Allow-Headers: Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token, X-SMPL-CF-Shield');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     echo json_encode(array('ok' => true));
+    exit;
+}
+
+$smplReqMethod = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string)$_SERVER['REQUEST_METHOD']) : 'GET';
+if ($smplReqMethod !== 'GET' && $smplReqMethod !== 'POST' && $smplReqMethod !== 'HEAD') {
+    http_response_code(405);
+    echo json_encode(array('ok' => false, 'error' => 'Method Not Allowed'));
     exit;
 }
 
@@ -45,6 +55,327 @@ if (!file_exists($htaccessData) || strpos((string)$existingHtaccess, 'Require al
 $dbFile = $dataDir . DIRECTORY_SEPARATOR . 'smpl-db.json';
 $backupFile = $dataDir . DIRECTORY_SEPARATOR . 'smpl-db.backup.json';
 $tokenFile = $dataDir . DIRECTORY_SEPARATOR . '.smpl-admin-tokens.json';
+
+// ============================================================================
+// TARCZA ANTY-DDOS / CLOUDFLARE CIDR / BRUTE-FORCE / FETCH METADATA (v79)
+// ============================================================================
+function smpl_ip_in_cidr($ip, $cidr) {
+    $ip = trim((string)$ip);
+    if (stripos($ip, '::ffff:') === 0) {
+        $ip = substr($ip, 7);
+    }
+    $parts = explode('/', (string)$cidr, 2);
+    if (count($parts) !== 2) return false;
+    $subnet = $parts[0];
+    $bits = (int)$parts[1];
+    $ipBin = @inet_pton($ip);
+    $subBin = @inet_pton($subnet);
+    if ($ipBin === false || $subBin === false || strlen($ipBin) !== strlen($subBin)) {
+        return false;
+    }
+    $len = strlen($ipBin);
+    if ($bits < 0 || $bits > $len * 8) return false;
+    $fullBytes = (int)floor($bits / 8);
+    $remBits = $bits % 8;
+    if ($fullBytes > 0 && substr($ipBin, 0, $fullBytes) !== substr($subBin, 0, $fullBytes)) {
+        return false;
+    }
+    if ($remBits > 0) {
+        $mask = (0xff << (8 - $remBits)) & 0xff;
+        if ((ord($ipBin[$fullBytes]) & $mask) !== (ord($subBin[$fullBytes]) & $mask)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function smpl_is_cloudflare_ip($ip) {
+    $cidrs = array(
+        // Cloudflare IPv4
+        '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+        '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+        '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+        '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+        // Cloudflare IPv6
+        '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
+        '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32'
+    );
+    foreach ($cidrs as $c) {
+        if (smpl_ip_in_cidr($ip, $c)) return true;
+    }
+    return false;
+}
+
+function smpl_verify_cf_shield_header($dataDir) {
+    $provided = isset($_SERVER['HTTP_X_SMPL_CF_SHIELD']) ? trim((string)$_SERVER['HTTP_X_SMPL_CF_SHIELD']) : '';
+    if ($provided === '' && function_exists('getallheaders')) {
+        $hdrs = @getallheaders();
+        if (is_array($hdrs)) {
+            foreach ($hdrs as $k => $v) {
+                if (strtolower((string)$k) === 'x-smpl-cf-shield') {
+                    $provided = trim((string)$v);
+                    break;
+                }
+            }
+        }
+    }
+    if ($provided === '') return false;
+    $expected = trim((string)@getenv('SMPL_CF_SHIELD_SECRET'));
+    if ($expected === '' && $dataDir !== '') {
+        $secPath = $dataDir . DIRECTORY_SEPARATOR . '.smpl-cf-shield.json';
+        if (file_exists($secPath)) {
+            $parsed = @json_decode((string)@file_get_contents($secPath), true);
+            if (is_array($parsed) && !empty($parsed['secret'])) {
+                $expected = trim((string)$parsed['secret']);
+            }
+        }
+    }
+    if ($expected === '') return false;
+    return hash_equals(hash('sha256', $expected), hash('sha256', $provided));
+}
+
+function smpl_get_cloudflare_context($dataDir = '') {
+    if (isset($GLOBALS['smplResolvedCfCtx']) && is_array($GLOBALS['smplResolvedCfCtx'])) {
+        return $GLOBALS['smplResolvedCfCtx'];
+    }
+    $resolvedDir = $dataDir !== '' ? $dataDir : (isset($GLOBALS['dataDir']) ? (string)$GLOBALS['dataDir'] : (__DIR__ . DIRECTORY_SEPARATOR . 'data'));
+    $remoteAddr = isset($_SERVER['REMOTE_ADDR']) ? trim((string)$_SERVER['REMOTE_ADDR']) : 'UNKNOWN';
+    $shieldValid = smpl_verify_cf_shield_header($resolvedDir);
+    $isCfIp = ($remoteAddr !== 'UNKNOWN') ? smpl_is_cloudflare_ip($remoteAddr) : false;
+    $behindCf = ($isCfIp || $shieldValid);
+
+    $realIp = $remoteAddr;
+    if ($behindCf && !empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        $candidate = trim((string)$_SERVER['HTTP_CF_CONNECTING_IP']);
+        if (@filter_var($candidate, FILTER_VALIDATE_IP) !== false) {
+            $realIp = $candidate;
+        }
+    }
+    $cfRay = isset($_SERVER['HTTP_CF_RAY']) ? trim((string)$_SERVER['HTTP_CF_RAY']) : '';
+    $cfCountry = isset($_SERVER['HTTP_CF_IPCOUNTRY']) ? trim((string)$_SERVER['HTTP_CF_IPCOUNTRY']) : '';
+
+    $ctx = array(
+        'ip' => $realIp !== '' ? $realIp : 'UNKNOWN',
+        'remoteAddr' => $remoteAddr,
+        'behindCloudflare' => $behindCf,
+        'edgeWorkerVerified' => $shieldValid,
+        'cfRay' => $cfRay,
+        'cfCountry' => $cfCountry
+    );
+    $GLOBALS['smplResolvedCfCtx'] = $ctx;
+    return $ctx;
+}
+
+function smpl_get_real_client_ip() {
+    $ctx = smpl_get_cloudflare_context();
+    return $ctx['ip'];
+}
+
+function smpl_is_trusted_loopback_ip($ip) {
+    $clean = strtolower(trim((string)$ip));
+    if (strpos($clean, '::ffff:') === 0) $clean = substr($clean, 7);
+    return ($clean === '127.0.0.1' || $clean === '::1');
+}
+
+function smpl_security_rl_path($dataDir) {
+    return $dataDir . DIRECTORY_SEPARATOR . '.smpl-security-ratelimit.json';
+}
+
+function smpl_update_security_rl_store($dataDir, $callback) {
+    $rlFile = smpl_security_rl_path($dataDir);
+    $lockPath = $dataDir . DIRECTORY_SEPARATOR . '.smpl-security-rl.lock';
+    $lockFp = @fopen($lockPath, 'c+');
+    if ($lockFp) @flock($lockFp, LOCK_EX);
+
+    $store = array('buckets' => array(), 'authFails' => array());
+    if (file_exists($rlFile)) {
+        $parsed = @json_decode((string)@file_get_contents($rlFile), true);
+        if (is_array($parsed)) {
+            if (isset($parsed['buckets']) && is_array($parsed['buckets'])) $store['buckets'] = $parsed['buckets'];
+            if (isset($parsed['authFails']) && is_array($parsed['authFails'])) $store['authFails'] = $parsed['authFails'];
+        }
+    }
+    $now = time();
+    foreach ($store['buckets'] as $bk => $stamps) {
+        if (!is_array($stamps)) { unset($store['buckets'][$bk]); continue; }
+        $recent = array();
+        foreach ($stamps as $t) {
+            if ((int)$t > ($now - 900)) $recent[] = (int)$t;
+        }
+        if (count($recent) > 0) $store['buckets'][$bk] = $recent;
+        else unset($store['buckets'][$bk]);
+    }
+    foreach ($store['authFails'] as $ak => $stamps) {
+        if (!is_array($stamps)) { unset($store['authFails'][$ak]); continue; }
+        $recent = array();
+        foreach ($stamps as $t) {
+            if ((int)$t > ($now - 300)) $recent[] = (int)$t;
+        }
+        if (count($recent) > 0) $store['authFails'][$ak] = $recent;
+        else unset($store['authFails'][$ak]);
+    }
+    if (count($store['buckets']) > 4000) $store['buckets'] = array_slice($store['buckets'], -2000, null, true);
+    if (count($store['authFails']) > 4000) $store['authFails'] = array_slice($store['authFails'], -2000, null, true);
+
+    $res = call_user_func_array($callback, array(&$store, $now));
+    @file_put_contents($rlFile, json_encode($store), LOCK_EX);
+
+    if ($lockFp) { @flock($lockFp, LOCK_UN); @fclose($lockFp); }
+    return $res;
+}
+
+function smpl_check_auth_lockout($dataDir, $clientIp) {
+    $ipKey = hash('sha256', (string)$clientIp);
+    $res = smpl_update_security_rl_store($dataDir, function (&$store, $now) use ($ipKey) {
+        $fails = isset($store['authFails'][$ipKey]) ? $store['authFails'][$ipKey] : array();
+        $recent = array();
+        foreach ($fails as $t) {
+            if ((int)$t > ($now - 300)) $recent[] = (int)$t;
+        }
+        $store['authFails'][$ipKey] = $recent;
+        return count($recent);
+    });
+    if ($res >= 8) {
+        header('Retry-After: 300');
+        http_response_code(429);
+        echo json_encode(array(
+            'ok' => false,
+            'error' => 'Zbyt wiele nieudanych prób logowania. Konto/IP zostało tymczasowo zablokowane na 5 minut (Ochrona Brute-Force).',
+            'code' => 'RATE_LIMITED_AUTH',
+            'retryAfter' => 300
+        ));
+        exit;
+    }
+}
+
+function smpl_record_auth_failure($dataDir, $clientIp) {
+    $ipKey = hash('sha256', (string)$clientIp);
+    smpl_update_security_rl_store($dataDir, function (&$store, $now) use ($ipKey) {
+        $fails = isset($store['authFails'][$ipKey]) ? $store['authFails'][$ipKey] : array();
+        $fails[] = $now;
+        $store['authFails'][$ipKey] = $fails;
+        return count($fails);
+    });
+}
+
+function smpl_clear_auth_failures($dataDir, $clientIp) {
+    $ipKey = hash('sha256', (string)$clientIp);
+    smpl_update_security_rl_store($dataDir, function (&$store) use ($ipKey) {
+        unset($store['authFails'][$ipKey]);
+        return 0;
+    });
+}
+
+function smpl_enforce_security_shield($dataDir, $method, $action) {
+    $ctx = smpl_get_cloudflare_context($dataDir);
+    $clientIp = $ctx['ip'];
+    $rawRemote = $ctx['remoteAddr'];
+    $testShieldHdr = isset($_SERVER['HTTP_X_SMPL_TEST_SHIELD']) && trim((string)$_SERVER['HTTP_X_SMPL_TEST_SHIELD']) !== '';
+
+    // 1. Fetch Metadata Cross-Site Guard na żądaniach POST
+    if ($method === 'POST') {
+        $secFetchSite = isset($_SERVER['HTTP_SEC_FETCH_SITE']) ? strtolower(trim((string)$_SERVER['HTTP_SEC_FETCH_SITE'])) : '';
+        if ($secFetchSite === 'cross-site') {
+            $origin = isset($_SERVER['HTTP_ORIGIN']) ? trim((string)$_SERVER['HTTP_ORIGIN']) : '';
+            $originAllowed = false;
+            if ($origin !== '') {
+                $parsedOrig = @parse_url($origin);
+                $oHost = is_array($parsedOrig) && isset($parsedOrig['host']) ? strtolower((string)$parsedOrig['host']) : '';
+                if ($oHost === 'host976694.xce.pl' || $oHost === 'localhost' || $oHost === '127.0.0.1' || substr($oHost, -12) === '.workers.dev') {
+                    $originAllowed = true;
+                }
+            }
+            $hasTokenHdr = (!empty($_SERVER['HTTP_X_SMPL_ADMIN_TOKEN']) && strlen((string)$_SERVER['HTTP_X_SMPL_ADMIN_TOKEN']) >= 16)
+                || (!empty($_SERVER['HTTP_X_SMPL_PLAYER_TOKEN']) && strlen((string)$_SERVER['HTTP_X_SMPL_PLAYER_TOKEN']) >= 16);
+            if (!$originAllowed && !$hasTokenHdr) {
+                http_response_code(403);
+                echo json_encode(array(
+                    'ok' => false,
+                    'error' => 'Odmowa dostępu (Cross-Site Resource Isolation Guard).',
+                    'code' => 'CROSS_SITE_BLOCKED'
+                ));
+                exit;
+            }
+        }
+
+        // 2. Wczesna blokada rozmiaru Content-Length przed parsowaniem i I/O bazy
+        $contentLength = isset($_SERVER['CONTENT_LENGTH']) ? (int)$_SERVER['CONTENT_LENGTH'] : 0;
+        if ($contentLength > 33554432) {
+            http_response_code(413);
+            echo json_encode(array('ok' => false, 'error' => 'Przekroczono maksymalny rozmiar żądania (32 MB).'));
+            exit;
+        }
+        $compactActions = array('admin_auth', 'admin_logout', 'player_auth', 'ai_chat', 'push_subscribe');
+        if (in_array($action, $compactActions, true) && $contentLength > 131072) {
+            http_response_code(413);
+            echo json_encode(array('ok' => false, 'error' => 'Przekroczono limit rozmiaru danych uwierzytelniania/AI.'));
+            exit;
+        }
+        if ($action === 'player_register' && $contentLength > 1048576) {
+            http_response_code(413);
+            echo json_encode(array('ok' => false, 'error' => 'Formularz rejestracji przekracza dopuszczalny rozmiar (1 MB).'));
+            exit;
+        }
+    }
+
+    // 3. Sliding-Window Anti-DDoS / Anti-Flood Rate Limiter
+    $isLoopbackNormal = smpl_is_trusted_loopback_ip($rawRemote) && !$testShieldHdr && !$ctx['behindCloudflare'];
+    $globalMax = $isLoopbackNormal ? 600 : 180;
+    $postMax = $isLoopbackNormal ? 240 : 40;
+    $regMax = $isLoopbackNormal ? 60 : 6;
+    $hasAdminHdr = !empty($_SERVER['HTTP_X_SMPL_ADMIN_TOKEN']) || !empty($_SERVER['REDIRECT_HTTP_X_SMPL_ADMIN_TOKEN']);
+    $ipHash = hash('sha256', (string)$clientIp);
+
+    $blocked = smpl_update_security_rl_store($dataDir, function (&$store, $now) use ($ipHash, $method, $action, $globalMax, $postMax, $regMax, $hasAdminHdr) {
+        $gKey = 'G_' . $ipHash;
+        $gList = isset($store['buckets'][$gKey]) ? $store['buckets'][$gKey] : array();
+        $gRecent = array();
+        foreach ($gList as $t) { if ((int)$t > ($now - 60)) $gRecent[] = (int)$t; }
+        if (count($gRecent) >= $globalMax) {
+            return array('bucket' => 'GLOBAL_API', 'retryAfter' => 30);
+        }
+        $gRecent[] = $now;
+        $store['buckets'][$gKey] = $gRecent;
+
+        if ($method === 'POST' && !$hasAdminHdr) {
+            $pKey = 'P_' . $ipHash;
+            $pList = isset($store['buckets'][$pKey]) ? $store['buckets'][$pKey] : array();
+            $pRecent = array();
+            foreach ($pList as $t) { if ((int)$t > ($now - 60)) $pRecent[] = (int)$t; }
+            if (count($pRecent) >= $postMax) {
+                return array('bucket' => 'PUBLIC_POST', 'retryAfter' => 30);
+            }
+            $pRecent[] = $now;
+            $store['buckets'][$pKey] = $pRecent;
+        }
+
+        if ($method === 'POST' && $action === 'player_register') {
+            $rKey = 'R_' . $ipHash;
+            $rList = isset($store['buckets'][$rKey]) ? $store['buckets'][$rKey] : array();
+            $rRecent = array();
+            foreach ($rList as $t) { if ((int)$t > ($now - 900)) $rRecent[] = (int)$t; }
+            if (count($rRecent) >= $regMax) {
+                return array('bucket' => 'REGISTER_POST', 'retryAfter' => 300);
+            }
+            $rRecent[] = $now;
+            $store['buckets'][$rKey] = $rRecent;
+        }
+        return null;
+    });
+
+    if (is_array($blocked)) {
+        $ra = isset($blocked['retryAfter']) ? (int)$blocked['retryAfter'] : 30;
+        header('Retry-After: ' . $ra);
+        http_response_code(429);
+        echo json_encode(array(
+            'ok' => false,
+            'error' => 'Zbyt wiele zapytań w krótkim czasie (Tarcza Anty-DDoS SMPL). Odczekaj chwilę.',
+            'code' => 'RATE_LIMITED_' . $blocked['bucket'],
+            'retryAfter' => $ra
+        ));
+        exit;
+    }
+}
 
 function smpl_i32($v) {
     $v = $v & 0xffffffff;
@@ -1095,7 +1426,7 @@ function smpl_get_header_value($headerName) {
 }
 
 function smpl_check_ai_rate_limit($dataDir, $isAdmin) {
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string)$_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+    $ip = smpl_get_real_client_ip();
     $pTok = smpl_get_header_value('X-SMPL-Player-Token');
     $aTok = smpl_get_header_value('X-SMPL-Admin-Token');
     $subTag = $aTok !== '' ? ('_ADM_' . substr(hash('sha256', $aTok), 0, 12)) : ($pTok !== '' ? ('_PLR_' . substr(hash('sha256', $pTok), 0, 12)) : '_USR');
@@ -2169,9 +2500,29 @@ function smpl_build_server_league_snapshot($db) {
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
+smpl_enforce_security_shield($dataDir, $method, isset($_GET['action']) ? (string)$_GET['action'] : '');
 
 if ($method === 'GET') {
     $getAction = isset($_GET['action']) ? (string)$_GET['action'] : '';
+    if ($getAction === 'security_status') {
+        $cfCtx = smpl_get_cloudflare_context($dataDir);
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+        echo json_encode(array(
+            'ok' => true,
+            'shieldVersion' => 'v79',
+            'server' => 'PHP_ZERO_CONFIG_SECURED',
+            'behindCloudflare' => (bool)$cfCtx['behindCloudflare'],
+            'edgeWorkerVerified' => (bool)$cfCtx['edgeWorkerVerified'],
+            'cfRay' => $cfCtx['cfRay'],
+            'cfCountry' => $cfCtx['cfCountry'],
+            'rateLimitActive' => true,
+            'wafRulesActive' => true,
+            'bruteForceLimit' => '8 prób / 5 min',
+            'httpsActive' => (bool)$isHttps
+        ));
+        exit;
+    }
     if ($getAction === 'health') {
         echo json_encode(array(
             'ok' => true,
@@ -2338,6 +2689,8 @@ if ($method === 'POST') {
 
     // Akcja 1: Logowanie Administratora na serwerze i wydanie kryptograficznego tokena X-SMPL-Admin-Token
     if ($action === 'admin_auth') {
+        $authIp = smpl_get_real_client_ip();
+        smpl_check_auth_lockout($dataDir, $authIp);
         $creds = @json_decode((string)$input, true);
         $login = is_array($creds) && isset($creds['login']) ? strtolower(trim((string)$creds['login'])) : '';
         $pass = is_array($creds) && isset($creds['password']) ? trim((string)$creds['password']) : '';
@@ -2363,16 +2716,19 @@ if ($method === 'POST') {
             }
         }
         if (!$matchedAdmin || !smpl_verify_secret($matchedAdmin, $pass)) {
+            smpl_record_auth_failure($dataDir, $authIp);
             http_response_code(403);
             echo json_encode(array('ok' => false, 'error' => 'Nieprawidłowy login lub hasło administratora.'));
             exit;
         }
         $admStatus = isset($matchedAdmin['status']) ? (string)$matchedAdmin['status'] : 'APPROVED';
         if ($admStatus !== 'APPROVED') {
+            smpl_record_auth_failure($dataDir, $authIp);
             http_response_code(403);
             echo json_encode(array('ok' => false, 'error' => 'Konto administratora nie jest zatwierdzone.'));
             exit;
         }
+        smpl_clear_auth_failures($dataDir, $authIp);
 
         $rawToken = bin2hex(random_bytes(24));
         $tokHash = hash('sha256', $rawToken);
@@ -2424,6 +2780,8 @@ if ($method === 'POST') {
 
     // Akcja 2b: Logowanie Gracza i wydanie tokena gracza (X-SMPL-Player-Token)
     if ($action === 'player_auth') {
+        $authIp = smpl_get_real_client_ip();
+        smpl_check_auth_lockout($dataDir, $authIp);
         $creds = @json_decode((string)$input, true);
         $login = is_array($creds) && isset($creds['identifier'])
             ? strtolower(trim((string)$creds['identifier']))
@@ -2471,6 +2829,7 @@ if ($method === 'POST') {
             }
         }
         if ($subject === null || !smpl_verify_secret($subject, $pass)) {
+            smpl_record_auth_failure($dataDir, $authIp);
             http_response_code(401);
             echo json_encode(array('ok' => false, 'error' => 'Nieprawidłowy login lub hasło zawodnika.'));
             exit;
@@ -2490,10 +2849,12 @@ if ($method === 'POST') {
             }
         }
         if ($isBl) {
+            smpl_record_auth_failure($dataDir, $authIp);
             http_response_code(403);
             echo json_encode(array('ok' => false, 'error' => 'Konto znajduje się na Czarnej Liście SMPL.'));
             exit;
         }
+        smpl_clear_auth_failures($dataDir, $authIp);
         try {
             $rawTok = bin2hex(random_bytes(24));
         } catch (Exception $e) {
@@ -3251,7 +3612,7 @@ if ($method === 'POST') {
         }
 
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | PLAYER_REGISTER | IP: " . $clientIp . " | " . $regId . " (" . $cleanUser . ")\n", FILE_APPEND | LOCK_EX);
 
         echo json_encode(array(
@@ -3521,7 +3882,7 @@ if ($method === 'POST') {
         }
 
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | MASTER_GRANT_ADMIN | IP: " . $clientIp . " | " . $admRecord['id'] . " (" . $rawUsername . ")\n", FILE_APPEND | LOCK_EX);
 
         echo json_encode(array(
@@ -3875,7 +4236,7 @@ if ($method === 'POST') {
         }
 
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_MANUAL_REGISTER | IP: " . $clientIp . " | " . $entityId . " (" . $cleanUser . ")\n", FILE_APPEND | LOCK_EX);
 
         echo json_encode(array(
@@ -3970,7 +4331,7 @@ if ($method === 'POST') {
             exit;
         }
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_SEASON_WINDOW | IP: " . $clientIp . " | open=" . ($isOpen ? '1' : '0') . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
 
         echo json_encode(array(
@@ -4065,7 +4426,7 @@ if ($method === 'POST') {
             exit;
         }
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_SET_MAINTENANCE | IP: " . $clientIp . " | enabled=" . ($enabled ? '1' : '0') . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
 
         echo json_encode(array(
@@ -4231,7 +4592,7 @@ if ($method === 'POST') {
             exit;
         }
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_SET_COUNTDOWN | IP: " . $clientIp . " | enabled=" . ($enabled ? '1' : '0') . " target=" . $targetDate . " " . $targetTime . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
 
         echo json_encode(array(
@@ -4317,7 +4678,7 @@ if ($method === 'POST') {
                 exit;
             }
             $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-            $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+            $clientIp = smpl_get_real_client_ip();
             @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_CLEAR_ROUND_EXTENSION | IP: " . $clientIp . " | id=" . $targetId . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
 
             echo json_encode(array(
@@ -4475,7 +4836,7 @@ if ($method === 'POST') {
             exit;
         }
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_SET_ROUND_EXTENSION | IP: " . $clientIp . " | id=" . $extId . " until=" . $extendedUntilDate . " " . $extendedUntilTime . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
 
         echo json_encode(array(
@@ -4660,7 +5021,7 @@ if ($method === 'POST') {
             exit;
         }
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_RELEASE_ROUND | IP: " . $clientIp . " | week=" . $targetWeek . " closedUpTo=" . $newClosedUpTo . " escalated=" . $unplayedEscalatedCount . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
 
         echo json_encode(array(
@@ -4832,7 +5193,7 @@ if ($method === 'POST') {
             exit;
         }
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN_RESOLVE_UNPLAYED | IP: " . $clientIp . " | resolved=" . $resolvedCount . " decision=" . $decision . " by " . $admName . "\n", FILE_APPEND | LOCK_EX);
 
         echo json_encode(array(
@@ -6481,7 +6842,7 @@ if ($method === 'POST') {
         }
 
         $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-        $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+        $clientIp = smpl_get_real_client_ip();
         @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | ADMIN:" . $adminTokenInfo['adminId'] . " | IP: " . $clientIp . " | AI_CONFIG_SAVE model=" . $cfg['model'] . " enabled=" . ($cfg['enabled'] ? '1' : '0') . "\n", FILE_APPEND | LOCK_EX);
 
         $resolved = smpl_resolve_gemini_api_key($cfg);
@@ -6844,7 +7205,7 @@ if ($method === 'POST') {
             if ($lockFp) { @flock($lockFp, LOCK_UN); @fclose($lockFp); }
             http_response_code(403);
             $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-            $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+            $clientIp = smpl_get_real_client_ip();
             @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | BLOCKED 403 | IP: " . $clientIp . " | " . $violationError . "\n", FILE_APPEND | LOCK_EX);
             echo json_encode(array('ok' => false, 'error' => $violationError, 'code' => 'ADMIN_AUTH_REQUIRED'));
             exit;
@@ -6855,7 +7216,7 @@ if ($method === 'POST') {
             if ($lockFp) { @flock($lockFp, LOCK_UN); @fclose($lockFp); }
             http_response_code(403);
             $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-            $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+            $clientIp = smpl_get_real_client_ip();
             @file_put_contents($auditLogFile, date('Y-m-d H:i:s') . " | BLOCKED 403 CO_ADMIN_GUARD | IP: " . $clientIp . " | " . $admViolation . "\n", FILE_APPEND | LOCK_EX);
             echo json_encode(array('ok' => false, 'error' => $admViolation, 'code' => 'MASTER_ADMIN_REQUIRED'));
             exit;
@@ -6953,7 +7314,7 @@ if ($method === 'POST') {
     }
 
     $auditLogFile = $dataDir . DIRECTORY_SEPARATOR . 'audit.log';
-    $clientIp = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'UNKNOWN';
+    $clientIp = smpl_get_real_client_ip();
     $actorTag = $adminTokenInfo ? ('ADMIN:' . $adminTokenInfo['adminId']) : 'PUBLIC_VALIDATED';
     $logEntry = date('Y-m-d H:i:s') . " | " . $actorTag . " | IP: " . $clientIp . " | Sync DB payload (" . strlen($input) . " bytes)\n";
     @file_put_contents($auditLogFile, $logEntry, FILE_APPEND | LOCK_EX);

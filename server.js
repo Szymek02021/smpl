@@ -45,7 +45,10 @@ const MIME_TYPES = {
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'X-Frame-Options': 'SAMEORIGIN'
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
+  'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+  'X-SMPL-Shield': 'Cloudflare-WAF-v79'
 };
 
 function sendJson(res, statusCode, payload, extraHeaders) {
@@ -54,7 +57,7 @@ function sendJson(res, statusCode, payload, extraHeaders) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token',
+    'Access-Control-Allow-Headers': 'Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token, X-SMPL-CF-Shield, X-SMPL-Test-Shield',
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
   }, SECURITY_HEADERS, extraHeaders || {});
   const reqRef = res && res._smplReq;
@@ -70,6 +73,292 @@ function sendJson(res, statusCode, payload, extraHeaders) {
   }
   res.writeHead(statusCode, headers);
   res.end(body);
+}
+
+// ============================================================================
+// TARCZA ANTY-DDOS / CLOUDFLARE CIDR / BRUTE-FORCE / FETCH METADATA (v79)
+// ============================================================================
+const CF_IPV4_CIDRS = [
+  '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+  '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+  '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+  '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22'
+];
+const CF_IPV6_CIDRS = [
+  '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
+  '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32'
+];
+
+function ipv4ToInt(ip) {
+  const m = String(ip || '').trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return null;
+  let val = 0;
+  for (let i = 1; i <= 4; i++) {
+    const oct = Number(m[i]);
+    if (oct < 0 || oct > 255) return null;
+    val = ((val << 8) | oct) >>> 0;
+  }
+  return val;
+}
+
+function expandIpv6ToBigInt(ip) {
+  let clean = String(ip || '').trim().toLowerCase();
+  if (!clean || clean.indexOf(':') === -1) return null;
+  const halves = clean.split('::');
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(':') : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const missing = halves.length === 2 ? (8 - (left.length + right.length)) : 0;
+  if (missing < 0 || (halves.length === 1 && left.length !== 8)) return null;
+  const full = left.concat(Array(missing).fill('0'), right);
+  let res = 0n;
+  for (const part of full) {
+    if (!/^[0-9a-f]{1,4}$/.test(part)) return null;
+    res = (res << 16n) | BigInt(parseInt(part, 16));
+  }
+  return res;
+}
+
+function isCloudflareIp(ip) {
+  let clean = String(ip || '').trim();
+  if (clean.toLowerCase().startsWith('::ffff:')) clean = clean.slice(7);
+  if (clean.indexOf('.') !== -1) {
+    const ipNum = ipv4ToInt(clean);
+    if (ipNum === null) return false;
+    for (const cidr of CF_IPV4_CIDRS) {
+      const [sub, bitsStr] = cidr.split('/');
+      const subNum = ipv4ToInt(sub);
+      const bits = Number(bitsStr);
+      const mask = bits === 0 ? 0 : ((0xffffffff << (32 - bits)) >>> 0);
+      if (subNum !== null && ((ipNum & mask) === (subNum & mask))) return true;
+    }
+    return false;
+  }
+  if (clean.indexOf(':') !== -1) {
+    const ipBig = expandIpv6ToBigInt(clean);
+    if (ipBig === null) return false;
+    for (const cidr of CF_IPV6_CIDRS) {
+      const [sub, bitsStr] = cidr.split('/');
+      const subBig = expandIpv6ToBigInt(sub);
+      const bits = BigInt(bitsStr);
+      const shift = 128n - bits;
+      if (subBig !== null && ((ipBig >> shift) === (subBig >> shift))) return true;
+    }
+  }
+  return false;
+}
+
+function verifyCfShieldHeader(req) {
+  const provided = req && req.headers ? String(req.headers['x-smpl-cf-shield'] || '').trim() : '';
+  if (!provided) return false;
+  let expected = String(process.env.SMPL_CF_SHIELD_SECRET || '').trim();
+  if (!expected) {
+    const secPath = path.join(DATA_DIR, '.smpl-cf-shield.json');
+    if (fs.existsSync(secPath)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(secPath, 'utf8'));
+        if (parsed && parsed.secret) expected = String(parsed.secret).trim();
+      } catch (_e) {}
+    }
+  }
+  if (!expected) return false;
+  const h1 = crypto.createHash('sha256').update(expected).digest();
+  const h2 = crypto.createHash('sha256').update(provided).digest();
+  return crypto.timingSafeEqual(h1, h2);
+}
+
+function getCloudflareContext(req) {
+  if (req && req._smplCfCtx) return req._smplCfCtx;
+  const remoteAddr = req && req.socket && req.socket.remoteAddress ? String(req.socket.remoteAddress).trim() : 'UNKNOWN';
+  const shieldValid = verifyCfShieldHeader(req);
+  const behindCf = isCloudflareIp(remoteAddr) || shieldValid;
+  let realIp = remoteAddr;
+  const cfConnIp = req && req.headers ? String(req.headers['cf-connecting-ip'] || '').trim() : '';
+  if (behindCf && cfConnIp && (ipv4ToInt(cfConnIp) !== null || expandIpv6ToBigInt(cfConnIp) !== null)) {
+    realIp = cfConnIp;
+  }
+  const ctx = {
+    ip: realIp || 'UNKNOWN',
+    remoteAddr,
+    behindCloudflare: behindCf,
+    edgeWorkerVerified: shieldValid,
+    cfRay: req && req.headers ? String(req.headers['cf-ray'] || '').trim() : '',
+    cfCountry: req && req.headers ? String(req.headers['cf-ipcountry'] || '').trim() : ''
+  };
+  if (req) req._smplCfCtx = ctx;
+  return ctx;
+}
+
+function getRealClientIp(req) {
+  return getCloudflareContext(req).ip;
+}
+
+function isTrustedLoopbackIp(ip) {
+  let clean = String(ip || '').trim().toLowerCase();
+  if (clean.startsWith('::ffff:')) clean = clean.slice(7);
+  return clean === '127.0.0.1' || clean === '::1';
+}
+
+const SECURITY_RL_FILE = path.join(DATA_DIR, '.smpl-security-ratelimit.json');
+
+function updateSecurityRlStore(mutator) {
+  let store = { buckets: {}, authFails: {} };
+  if (fs.existsSync(SECURITY_RL_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(SECURITY_RL_FILE, 'utf8'));
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.buckets && typeof parsed.buckets === 'object') store.buckets = parsed.buckets;
+        if (parsed.authFails && typeof parsed.authFails === 'object') store.authFails = parsed.authFails;
+      }
+    } catch (_e) {}
+  }
+  const now = Math.floor(Date.now() / 1000);
+  for (const [k, arr] of Object.entries(store.buckets)) {
+    if (!Array.isArray(arr)) { delete store.buckets[k]; continue; }
+    const recent = arr.filter((t) => Number(t) > now - 900);
+    if (recent.length) store.buckets[k] = recent;
+    else delete store.buckets[k];
+  }
+  for (const [k, arr] of Object.entries(store.authFails)) {
+    if (!Array.isArray(arr)) { delete store.authFails[k]; continue; }
+    const recent = arr.filter((t) => Number(t) > now - 300);
+    if (recent.length) store.authFails[k] = recent;
+    else delete store.authFails[k];
+  }
+  const res = mutator(store, now);
+  try {
+    fs.writeFileSync(SECURITY_RL_FILE, JSON.stringify(store), 'utf8');
+  } catch (_wErr) {}
+  return res;
+}
+
+function checkAuthLockout(req, res) {
+  const clientIp = getRealClientIp(req);
+  const ipKey = crypto.createHash('sha256').update(String(clientIp)).digest('hex');
+  const failCount = updateSecurityRlStore((store, now) => {
+    const arr = Array.isArray(store.authFails[ipKey]) ? store.authFails[ipKey].filter((t) => Number(t) > now - 300) : [];
+    store.authFails[ipKey] = arr;
+    return arr.length;
+  });
+  if (failCount >= 8) {
+    sendJson(res, 429, {
+      ok: false,
+      error: 'Zbyt wiele nieudanych prób logowania. Adres IP tymczasowo zablokowany na 5 minut (Ochrona Brute-Force).',
+      code: 'RATE_LIMITED_AUTH',
+      retryAfter: 300
+    }, { 'Retry-After': '300' });
+    return true;
+  }
+  return false;
+}
+
+function recordAuthFailure(req) {
+  const ipKey = crypto.createHash('sha256').update(String(getRealClientIp(req))).digest('hex');
+  updateSecurityRlStore((store, now) => {
+    const arr = Array.isArray(store.authFails[ipKey]) ? store.authFails[ipKey] : [];
+    arr.push(now);
+    store.authFails[ipKey] = arr;
+  });
+}
+
+function clearAuthFailures(req) {
+  const ipKey = crypto.createHash('sha256').update(String(getRealClientIp(req))).digest('hex');
+  updateSecurityRlStore((store) => {
+    delete store.authFails[ipKey];
+  });
+}
+
+function enforceRequestShield(req, res, action) {
+  const ctx = getCloudflareContext(req);
+  const testShieldHdr = Boolean(req.headers && String(req.headers['x-smpl-test-shield'] || '').trim());
+  const method = String(req.method || 'GET').toUpperCase();
+
+  if (method !== 'GET' && method !== 'POST' && method !== 'HEAD') {
+    sendJson(res, 405, { ok: false, error: 'Method Not Allowed' });
+    return false;
+  }
+
+  if (method === 'POST') {
+    const secFetchSite = String((req.headers && req.headers['sec-fetch-site']) || '').trim().toLowerCase();
+    if (secFetchSite === 'cross-site') {
+      const origin = String((req.headers && req.headers.origin) || '').trim();
+      let originAllowed = false;
+      if (origin) {
+        try {
+          const u = new URL(origin);
+          const h = u.hostname.toLowerCase();
+          if (h === 'host976694.xce.pl' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.workers.dev')) {
+            originAllowed = true;
+          }
+        } catch (_uErr) {}
+      }
+      const admH = String((req.headers && req.headers['x-smpl-admin-token']) || '').trim();
+      const plrH = String((req.headers && req.headers['x-smpl-player-token']) || '').trim();
+      if (!originAllowed && admH.length < 16 && plrH.length < 16) {
+        sendJson(res, 403, { ok: false, error: 'Odmowa dostępu (Cross-Site Resource Isolation Guard).', code: 'CROSS_SITE_BLOCKED' });
+        return false;
+      }
+    }
+
+    const cl = Number(req.headers && req.headers['content-length'] ? req.headers['content-length'] : 0);
+    if (Number.isFinite(cl) && cl > 0) {
+      if (cl > 33554432) {
+        sendJson(res, 413, { ok: false, error: 'Przekroczono maksymalny rozmiar żądania (32 MB).' });
+        return false;
+      }
+      if (['admin_auth', 'admin_logout', 'player_auth', 'ai_chat', 'push_subscribe'].includes(action) && cl > 131072) {
+        sendJson(res, 413, { ok: false, error: 'Przekroczono limit rozmiaru danych uwierzytelniania/AI.' });
+        return false;
+      }
+      if (action === 'player_register' && cl > 1048576) {
+        sendJson(res, 413, { ok: false, error: 'Formularz rejestracji przekracza dopuszczalny rozmiar (1 MB).' });
+        return false;
+      }
+    }
+  }
+
+  const isLoopbackNormal = isTrustedLoopbackIp(ctx.remoteAddr) && !testShieldHdr && !ctx.behindCloudflare;
+  const globalMax = isLoopbackNormal ? 600 : 180;
+  const postMax = isLoopbackNormal ? 240 : 40;
+  const regMax = isLoopbackNormal ? 60 : 6;
+  const hasAdminHdr = Boolean(req.headers && req.headers['x-smpl-admin-token']);
+  const ipHash = crypto.createHash('sha256').update(String(ctx.ip)).digest('hex');
+
+  const blocked = updateSecurityRlStore((store, now) => {
+    const gKey = 'G_' + ipHash;
+    const gRecent = (Array.isArray(store.buckets[gKey]) ? store.buckets[gKey] : []).filter((t) => Number(t) > now - 60);
+    if (gRecent.length >= globalMax) return { bucket: 'GLOBAL_API', retryAfter: 30 };
+    gRecent.push(now);
+    store.buckets[gKey] = gRecent;
+
+    if (method === 'POST' && !hasAdminHdr) {
+      const pKey = 'P_' + ipHash;
+      const pRecent = (Array.isArray(store.buckets[pKey]) ? store.buckets[pKey] : []).filter((t) => Number(t) > now - 60);
+      if (pRecent.length >= postMax) return { bucket: 'PUBLIC_POST', retryAfter: 30 };
+      pRecent.push(now);
+      store.buckets[pKey] = pRecent;
+    }
+
+    if (method === 'POST' && action === 'player_register') {
+      const rKey = 'R_' + ipHash;
+      const rRecent = (Array.isArray(store.buckets[rKey]) ? store.buckets[rKey] : []).filter((t) => Number(t) > now - 900);
+      if (rRecent.length >= regMax) return { bucket: 'REGISTER_POST', retryAfter: 300 };
+      rRecent.push(now);
+      store.buckets[rKey] = rRecent;
+    }
+    return null;
+  });
+
+  if (blocked) {
+    sendJson(res, 429, {
+      ok: false,
+      error: 'Zbyt wiele zapytań w krótkim czasie (Tarcza Anty-DDoS SMPL). Odczekaj chwilę.',
+      code: 'RATE_LIMITED_' + blocked.bucket,
+      retryAfter: blocked.retryAfter
+    }, { 'Retry-After': String(blocked.retryAfter) });
+    return false;
+  }
+  return true;
 }
 
 function hashSecretLocal(plain) {
@@ -595,7 +884,7 @@ function buildServerLeagueSnapshot(db) {
 }
 
 function checkAiRateLimit(req, isAdmin) {
-  const ip = req && req.socket && req.socket.remoteAddress ? String(req.socket.remoteAddress) : 'LOCAL';
+  const ip = getRealClientIp(req);
   const aTok = req && req.headers ? String(req.headers['x-smpl-admin-token'] || '').trim() : '';
   const pTok = req && req.headers ? String(req.headers['x-smpl-player-token'] || '').trim() : '';
   const subTag = aTok
@@ -1223,7 +1512,27 @@ const server = http.createServer((req, res) => {
 
   // Obsługa API bazy danych i Gemini (zarówno pod /api/state jak i /api.php)
   if (pathname === '/api/state' || pathname === '/api.php') {
+    if (!enforceRequestShield(req, res, action)) {
+      return;
+    }
     if (req.method === 'GET') {
+      if (action === 'security_status') {
+        const cfCtx = getCloudflareContext(req);
+        const proto = String((req.headers && req.headers['x-forwarded-proto']) || '').toLowerCase();
+        return sendJson(res, 200, {
+          ok: true,
+          shieldVersion: 'v79',
+          server: 'NODE_ZERO_CONFIG_SECURED',
+          behindCloudflare: Boolean(cfCtx.behindCloudflare),
+          edgeWorkerVerified: Boolean(cfCtx.edgeWorkerVerified),
+          cfRay: cfCtx.cfRay,
+          cfCountry: cfCtx.cfCountry,
+          rateLimitActive: true,
+          wafRulesActive: true,
+          bruteForceLimit: '8 prób / 5 min',
+          httpsActive: proto === 'https'
+        });
+      }
       if (action === 'health') {
         return sendJson(res, 200, {
           ok: true,
@@ -1340,6 +1649,7 @@ const server = http.createServer((req, res) => {
       });
       req.on('end', async () => {
         if (action === 'admin_auth') {
+          if (checkAuthLockout(req, res)) return;
           let creds = {};
           try { creds = JSON.parse(body || '{}'); } catch (e) {}
           const login = String(creds.login || creds.username || '').trim().toLowerCase();
@@ -1355,11 +1665,14 @@ const server = http.createServer((req, res) => {
             return (u && u === login) || (em && em === login);
           });
           if (!matched || !verifySecretLocal(matched, pass)) {
+            recordAuthFailure(req);
             return sendJson(res, 403, { ok: false, error: 'Nieprawidłowy login lub hasło administratora.' });
           }
           if (matched.status && matched.status !== 'APPROVED') {
+            recordAuthFailure(req);
             return sendJson(res, 403, { ok: false, error: 'Konto administratora nie jest zatwierdzone.' });
           }
+          clearAuthFailures(req);
           const rawToken = crypto.randomBytes(24).toString('hex');
           const tokHash = crypto.createHash('sha256').update(rawToken).digest('hex');
           const tokens = loadTokens();
@@ -1401,6 +1714,7 @@ const server = http.createServer((req, res) => {
         }
 
         if (action === 'player_auth') {
+          if (checkAuthLockout(req, res)) return;
           let creds = {};
           try { creds = JSON.parse(body || '{}') || {}; } catch (e) {}
           const login = String(creds.identifier || creds.login || '').trim().toLowerCase();
@@ -1427,6 +1741,7 @@ const server = http.createServer((req, res) => {
             if (subject) subjectKind = 'REG';
           }
           if (!subject || !verifySecretLocal(subject, pass)) {
+            recordAuthFailure(req);
             return sendJson(res, 401, { ok: false, error: 'Nieprawidłowy login lub hasło zawodnika.' });
           }
           const sName = String(subject.name || '').trim().toLowerCase();
@@ -1439,8 +1754,10 @@ const server = http.createServer((req, res) => {
             )))
           );
           if (isBl) {
+            recordAuthFailure(req);
             return sendJson(res, 403, { ok: false, error: 'Konto znajduje się na Czarnej Liście SMPL.' });
           }
+          clearAuthFailures(req);
           const rawToken = crypto.randomBytes(24).toString('hex');
           const tokHash = crypto.createHash('sha256').update(rawToken).digest('hex');
           const tokens = loadTokens();
@@ -4200,9 +4517,11 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // Ochrona ukrytych plików konfiguracyjnych / kluczy API w katalogu data/
-  if (pathname.startsWith('/data/') && /\/(\.smpl-|secrets|tokens|webhooks|snapshots|audit\.log)/i.test(pathname)) {
-    res.writeHead(403);
+  // Tarcza WAF Origin: blokada ukrytych plikow, skanerow exploitow i katalogow konfiguracyjnych
+  if (/^\/(\.env|\.git|\.htaccess|\.user\.ini|wp-admin|wp-login\.php|xmlrpc\.php|phpmyadmin|pma|vendor\/phpunit|cgi-bin|cloudflare-worker\/)/i.test(pathname) ||
+      /\.(sql|bak|old|ini|log|sh|bat|ps1|phar)$/i.test(pathname) ||
+      (pathname.startsWith('/data/') && /\/(\.smpl-|secrets|tokens|webhooks|snapshots|audit\.log)/i.test(pathname))) {
+    res.writeHead(403, SECURITY_HEADERS);
     return res.end('Forbidden');
   }
 

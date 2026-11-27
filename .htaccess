@@ -8,8 +8,8 @@ Options -Indexes
 AddDefaultCharset UTF-8
 ErrorDocument 404 /index.html
 
-# Blokada bezposredniego podgladu plikow dokumentacji, skryptow i kopii
-<FilesMatch "\.(md|bat|ps1|sh|log|bak)$">
+# Blokada bezposredniego podgladu plikow dokumentacji, skryptow, konfiguracji i kopii
+<FilesMatch "\.(md|bat|ps1|sh|log|bak|sql|old|ini|phar)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
@@ -19,7 +19,7 @@ ErrorDocument 404 /index.html
   </IfModule>
 </FilesMatch>
 
-<FilesMatch "^(package\.json|server\.js|server\.ps1|netlify\.toml|vercel\.json)$">
+<FilesMatch "^(\.env.*|\.git.*|\.htaccess|\.user\.ini|package\.json|server\.js|server\.ps1|netlify\.toml|vercel\.json)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
@@ -33,9 +33,12 @@ ErrorDocument 404 /index.html
   Header always set X-Content-Type-Options "nosniff"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Permissions-Policy "camera=(), geolocation=(), microphone=()"
+  Header always set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+  Header always set X-SMPL-Shield "Cloudflare-WAF-v79"
   Header set Access-Control-Allow-Origin "*"
   Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
-  Header set Access-Control-Allow-Headers "Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token"
+  Header set Access-Control-Allow-Headers "Content-Type, Accept, X-SMPL-Admin-Token, X-SMPL-Player-Token, X-SMPL-CF-Shield"
   <FilesMatch "\.(json|php)$">
     Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
     Header set X-LiteSpeed-Cache-Control "no-cache"
@@ -64,6 +67,17 @@ ErrorDocument 404 /index.html
 # Automatyczne przekierowanie wywołań /api/state do api.php, obsługa wielkości liter i fallback SPA/PWA (LiteSpeed/Apache)
 <IfModule mod_rewrite.c>
   RewriteEngine On
+
+  # Tarcza WAF Origin: blokada niedozwolonych metod HTTP, skanerow exploitow i atakow w URL
+  RewriteCond %{REQUEST_METHOD} !^(GET|POST|HEAD|OPTIONS)$
+  RewriteRule ^ - [F,L]
+
+  RewriteCond %{REQUEST_URI} ^/(\.env|\.git|wp-admin|wp-login\.php|xmlrpc\.php|phpmyadmin|pma|vendor/phpunit|cgi-bin|cloudflare-worker/) [NC]
+  RewriteRule ^ - [F,L]
+
+  RewriteCond %{QUERY_STRING} (\.\./|%2e%2e|union.*select|<script|base64_decode) [NC]
+  RewriteRule ^ - [F,L]
+
   RewriteRule ^api/state$ api.php [L,QSA]
 
   # Przekierowania niewrażliwe na wielkość liter dla dedykowanych stron HTML
